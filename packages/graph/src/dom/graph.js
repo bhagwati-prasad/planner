@@ -408,6 +408,43 @@ export class Graph {
     return this
   }
 
+  /**
+   * Moves a request dot along an edge, from its source to its target or back with `reverse`
+   * (ds §6 "Followed request"). The dot follows the edge's drawn path and is removed when it
+   * arrives.
+   * @param {string} edgeId
+   * @param {{ durationMs?: number, reverse?: boolean }} [options]
+   * @returns {Promise<void>} resolves when the dot arrives
+   */
+  animateToken(edgeId, { durationMs = 600, reverse = false } = {}) {
+    const path = /** @type {SVGPathElement|null} */ (
+      this.#layers.edges
+        ?.node()
+        .querySelector(`g.sg-edge[data-id="${cssEscape(edgeId)}"] path.sg-edge-path`)
+    )
+    if (!path) return Promise.reject(new Error(`Edge '${edgeId}' is not drawn`))
+    const length = path.getTotalLength()
+    const dot = this.#layers.tokens.append('circle').attr('class', 'sg-token').attr('r', 4)
+    const place = (/** @type {number} */ t) => {
+      const point = path.getPointAtLength(length * (reverse ? 1 - t : t))
+      dot.attr('cx', point.x).attr('cy', point.y)
+    }
+    place(0)
+    return new Promise(resolve => {
+      const start = performance.now()
+      const step = (/** @type {number} */ now) => {
+        const t = Math.min(1, Math.max(0, (now - start) / durationMs))
+        place(t)
+        if (t < 1) requestAnimationFrame(step)
+        else {
+          dot.remove()
+          resolve()
+        }
+      }
+      requestAnimationFrame(step)
+    })
+  }
+
   /** @param {Partial<typeof DEFAULTS>} options */
   setOptions(options) {
     const { theme, ...rest } = options
@@ -675,6 +712,7 @@ export class Graph {
       annotations: root.append('g').attr('class', 'sg-layer-annotations'),
       handles: root.append('g').attr('class', 'sg-layer-handles'),
       guides: root.append('g').attr('class', 'sg-layer-guides'),
+      tokens: root.append('g').attr('class', 'sg-layer-tokens'),
     }
   }
 

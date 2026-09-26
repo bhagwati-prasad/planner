@@ -4,12 +4,6 @@
 
 /** Namespaces that arrive in later milestones, with where they land. */
 export const PLANNED = Object.freeze({
-  sim: {
-    release: 'R1',
-    what: 'discrete-event and functional simulation in a Web Worker',
-    example:
-      "const run = await strata.sim.run({ scenario: 'checkout', rate: 200, duration: '30s', seed: 42 })",
-  },
   test: {
     release: 'R1',
     what: 'functional, SLO, resilience and architecture-rule tests',
@@ -39,6 +33,21 @@ export const PLANNED = Object.freeze({
 
 /** @type {Record<string, { summary: string, entries: [string, string, string?][] }>} */
 const TOPICS = {
+  sim: {
+    summary:
+      'Simulation (spec §11). So far one request over one edge, as in the walking skeleton; run controls follow (spec §12).',
+    entries: [
+      [
+        'await strata.sim.start({ system, edge, seed })',
+        'Run one request over an edge and wait for the response',
+        'const run = await strata.sim.start({ seed: 42 })',
+      ],
+      [
+        'run.response.atUs / run.trace / run.hash',
+        'When the response arrived, every hop, and the run hash',
+      ],
+    ],
+  },
   projects: {
     summary: 'Create, open, save and switch projects. One project = one .strata file.',
     entries: [

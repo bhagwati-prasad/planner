@@ -116,6 +116,7 @@ const html = scripts => `<!doctype html>
   noscript { display: block; padding: 2rem; font: 15px system-ui, sans-serif; }
 </style>
 <script src="vendor/d3.min.js"></script>
+<script src="sim-worker.js"></script>
 <script src="strata.js"></script>
 </head>
 <body data-strata-app>

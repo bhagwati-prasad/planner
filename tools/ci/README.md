@@ -29,7 +29,7 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 | Budget | Recorded | Removed by |
 | --- | --- | --- |
-| strata-graph | 98.5 KB of 60 KB | 0207 (level of detail and performance) |
+| strata-graph | 99.5 KB of 60 KB | 0207 (level of detail and performance). 0010 raised it from 98.5 KB for the request dot the walking skeleton needs (`animateToken`) |
 | Simulation worker bundle | 150.3 KB of 120 KB | 0402 (worker host) |
 
 The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` (about 138 KB) comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR.

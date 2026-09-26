@@ -20,6 +20,7 @@ import { formatTarget } from './format.js'
 import { helpText, PLANNED } from './help.js'
 import { copyNodes } from './clipboard.js'
 import { ComponentsApi } from './components.js'
+import { SimApi, inProcessSimHost } from './sim.js'
 
 /**
  * @typedef {object} Identity  local identity that signs operations (becomes an account in R4)
@@ -34,6 +35,7 @@ import { ComponentsApi } from './components.js'
  * @property {() => number} [clock]
  * @property {(n: number) => Uint8Array} [random]
  * @property {(text: string) => void} [output]  where print() and help() write (default console.log)
+ * @property {import('./sim.js').SimHost} [simHost]  runs simulations (default: in the calling thread)
  */
 
 export class Strata {
@@ -60,6 +62,7 @@ export class Strata {
     clock = Date.now,
     random,
     output,
+    simHost = inProcessSimHost,
   } = {}) {
     this.#registry = registry
     this.#clock = clock
@@ -95,6 +98,9 @@ export class Strata {
 
     /** Component types (built-in types, manifests and packed plugins share one registry). */
     this.components = new ComponentsApi(this.#registry, emit)
+
+    /** Simulation (spec §11): one request over one edge so far. */
+    this.sim = new SimApi(this, simHost)
 
     for (const [name, info] of Object.entries(PLANNED))
       this[name] = planned(name, info.release, info.what)
