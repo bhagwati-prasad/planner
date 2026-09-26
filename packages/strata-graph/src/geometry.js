@@ -8,6 +8,7 @@
  * @typedef {Point & { side: Side|null }} Anchor
  */
 
+/** @type {readonly Side[]} */
 export const SIDES = Object.freeze(['left', 'right', 'top', 'bottom'])
 
 /** Unit vector pointing out of a side. @param {Side|null|undefined} side */
@@ -94,7 +95,11 @@ export function portAnchors (node, ports) {
   return out
 }
 
-/** Inputs sit on the left and outputs on the right unless told otherwise. @param {PortSpec} port */
+/**
+ * Inputs sit on the left and outputs on the right unless told otherwise.
+ * @param {PortSpec} port
+ * @returns {Side}
+ */
 function defaultSide (port) {
   return port.direction === 'out' ? 'right' : port.direction === 'both' ? 'bottom' : 'left'
 }

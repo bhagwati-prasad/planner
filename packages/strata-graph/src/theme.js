@@ -103,9 +103,9 @@ export function themeStyle (theme) {
   return Object.entries(TOKENS).map(([key, cssVar]) => `${cssVar}: ${tokens[key]};`).join(' ')
 }
 
-/** Resolved token values, for export where CSS variables are unavailable. @param {string} theme */
+/** Resolved token values, for export where CSS variables are unavailable. @param {'light'|'dark'|Record<string, string>} theme */
 export function themeTokens (theme) {
-  return theme === 'dark' ? DARK : typeof theme === 'object' && theme ? { ...LIGHT, ...theme } : LIGHT
+  return theme === 'dark' ? DARK : typeof theme === 'object' && theme ? { ...LIGHT, .../** @type {object} */ (theme) } : LIGHT
 }
 
 /** @param {keyof typeof TOKENS} token */
@@ -138,11 +138,11 @@ export const STYLESHEET = `
 .sg-edge-label-bg { fill: ${v('edgeLabelBackground')}; }
 .sg-edge-label { fill: ${v('edgeLabel')}; font-size: 0.9em; text-anchor: middle; dominant-baseline: central; }
 .sg-arrow { fill: ${v('edge')}; }
-.sg-frame-rect { fill: ${v('frameFill')}; stroke: ${v('frameStroke')}; stroke-width: 1.25; stroke-dasharray: 6 4; }
+.sg-frame-rect { fill: ${v('frameFill')}; stroke: ${v('frameStroke')}; stroke-width: 1.25; stroke-dasharray: 6 4; pointer-events: visibleStroke; }
 .sg-frame.sg-kind-trust-boundary .sg-frame-rect { stroke: ${v('trustBoundary')}; stroke-dasharray: 10 4 2 4; }
 .sg-frame.sg-kind-system .sg-frame-rect { stroke-dasharray: none; stroke-width: 2; }
 .sg-frame-label { fill: ${v('frameText')}; font-weight: 600; font-size: 0.95em; dominant-baseline: hanging; }
-.sg-frame-title { cursor: move; fill: transparent; }
+.sg-frame-title { cursor: move; fill: transparent; pointer-events: all; }
 .sg-note { fill: ${v('sticky')}; stroke: rgba(0,0,0,0.08); }
 .sg-annotation-text { fill: ${v('stickyText')}; dominant-baseline: hanging; }
 .sg-kind-text .sg-note { fill: transparent; stroke: none; }
@@ -165,5 +165,10 @@ export const STYLESHEET = `
 .sg-waypoint { fill: ${v('accent')}; stroke: ${v('nodeFill')}; stroke-width: 1.5; cursor: move; }
 .sg-waypoint-new { fill: ${v('nodeFill')}; stroke: ${v('accent')}; opacity: 0.8; }
 .sg-locked { cursor: not-allowed; }
+.sg-edge.sg-ghost { opacity: 0.35; pointer-events: none; }
+.sg-dimmed { opacity: 0.2; }
+.sg-readonly .sg-port { cursor: default; }
+.sg-node, .sg-annotation, .sg-frame-title { cursor: move; }
+.sg-readonly .sg-node, .sg-readonly .sg-annotation, .sg-readonly .sg-frame-title, .sg-node.sg-locked { cursor: default; }
 .sg-panning, .sg-panning * { cursor: grabbing !important; }
 `

@@ -12,3 +12,6 @@ export { fitTransform, zoomAt, screenToWorld, worldToScreen, visibleRect, IDENTI
 export { wrapText, estimateMeasure } from './text.js'
 export { GraphModel, DEFAULT_NODE_SIZE, FRAME_KINDS, ANNOTATION_KINDS } from './data.js'
 export { TOKENS, LIGHT, DARK, themeStyle, themeTokens } from './theme.js'
+export { create, Graph } from './dom/graph.js'
+export { BUILTIN_SHAPES } from './dom/shapes.js'
+export { sanitizeSvg } from './dom/svg.js'

@@ -141,7 +141,7 @@ export class GraphModel {
     for (const n of data.nodes ?? []) {
       if (!unique('node', n) || !finite('node', n, ['x', 'y', 'w', 'h'])) continue
       const size = sizeOf(n)
-      const node = { shape: 'box', label: '', ...n, w: n.w ?? size.w, h: n.h ?? size.h, x: n.x ?? 0, y: n.y ?? 0 }
+      const node = /** @type {any} */ ({ shape: 'box', label: '', ...n, w: n.w ?? size.w, h: n.h ?? size.h, x: n.x ?? 0, y: n.y ?? 0 })
       node.ports = n.ports ?? portsOf(node) ?? []
       if (node.parent && !this.frames.has(node.parent)) { problem('node', n.id, `Node '${n.id}' has a missing parent frame '${n.parent}'`); node.parent = undefined }
       this.nodes.set(n.id, node)
@@ -168,7 +168,7 @@ export class GraphModel {
           end.port = null
         }
       }
-      this.edges.set(e.id, { routing, label: '', arrow: true, ...e, source: s, target: t, waypoints: e.waypoints ?? [] })
+      this.edges.set(e.id, /** @type {any} */ ({ routing, label: '', arrow: true, ...e, source: s, target: t, waypoints: e.waypoints ?? [] }))
     }
   }
 

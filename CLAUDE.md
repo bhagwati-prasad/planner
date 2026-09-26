@@ -7,8 +7,10 @@ The specification is a Claude Docs document, not a file in this repo: "Strata â€
 ## Commands
 
 - `npm test`: every `packages/*/test/**/*.test.js`, via `node:test`. Pass a substring to filter (`npm test -- recursion`).
-- `npm run check`: architecture boundary check (dependency direction, no DOM or Node built-ins in headless packages).
-- `npm run verify`: both. Run it before every commit.
+- `npm run test:browser`: `packages/*/test/browser/*.browser.js` in real Chromium through Playwright (a dev tool found locally, via `PLAYWRIGHT_MODULE`, or in the global npm root; skipped with a note when absent).
+- `npm run check`: architecture boundary check (dependency direction, no DOM or Node built-ins in headless code).
+- `npm run verify`: all three. Run it before every commit.
+- `npm run serve`: zero-dependency static server for the repo (ES modules do not load from `file://`); it sends the strict CSP the spec requires, so keep scripts in files, never inline.
 - `npm run demo`: the spec's console session, headless.
 - `npm run typecheck`: JSDoc type check with `tsc --checkJs` (fetches TypeScript through npx; it is a dev tool, not a dependency).
 
@@ -17,6 +19,7 @@ The specification is a Claude Docs document, not a file in this repo: "Strata â€
 - JavaScript ES modules with JSDoc types. No TypeScript, no framework, no npm runtime dependencies. Node 20+.
 - Packages import each other by relative path (`../../strata-core/src/index.js`) so the same files load in Node, in a browser over http and in the future bundler without import maps. Add every new package to `ALLOWED` in `scripts/check-boundaries.js`; dependencies point downward only.
 - `strata-core` and `strata` never touch the DOM or browser storage; environment differences go behind adapters.
+- `strata-graph` knows nothing about Strata: it renders data and emits intents, never owns state. Only `src/dom/` may touch the DOM; D3 comes from the vendored global (`vendor/d3`) or `options.d3`, never an import.
 - Every model change is a command on the bus. Handlers must be deterministic so the op log replays exactly: allocate ids only with `ctx.newId()`, write only through `ctx.tx`, iterate in id order (store lookups already return sorted results), and never read the clock or randomness directly. A handler may normalise its payload in place (e.g. pin the resolved type version) so replay needs no registry.
 - Entities are frozen plain objects; commands and snapshots must survive `JSON.stringify`.
 - Errors are `StrataError` with a `code`; messages should say what to do next.
