@@ -1,8 +1,8 @@
 // Starts the Strata app (spec §9) in a page: creates the facade, installs components (packed
 // bundles registered by script tags, then anything the local server offers), opens a
 // project and mounts the workspace. Shared by the development page and the offline build.
-import { createStrata } from '../packages/strata/src/index.js'
-import { mountStrata } from '../packages/strata-ui/src/elements/index.js'
+import { createStrata } from '../packages/facade/src/index.js'
+import { mountStrata } from '../packages/ui/src/elements/index.js'
 import { buildSampleProject } from './sample.js'
 import { installServedComponents, watchServedComponents } from './components.js'
 

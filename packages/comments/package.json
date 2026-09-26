@@ -1,0 +1,14 @@
+{
+  "name": "strata-comments",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Comment threads, anchors, outdated and orphan detection, and roll-up counts.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

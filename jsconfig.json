@@ -11,7 +11,7 @@
     "packages/*/src/**/*.js"
   ],
   "exclude": [
-    "packages/strata-cli/**",
-    "packages/strata-server/**"
+    "packages/cli/**",
+    "packages/server/**"
   ]
 }

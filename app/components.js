@@ -5,7 +5,7 @@
 /**
  * Installs the components the local server offers. Resolves to the number installed, or null
  * when the page is not served by strata serve.
- * @param {import('../packages/strata/src/index.js').Strata} strata
+ * @param {import('../packages/facade/src/index.js').Strata} strata
  * @param {{ replace?: boolean }} [options]
  */
 export async function installServedComponents (strata, { replace = false } = {}) {
@@ -36,7 +36,7 @@ export async function installServedComponents (strata, { replace = false } = {})
 
 /**
  * Reinstalls components whenever the server repacks a folder.
- * @param {import('../packages/strata/src/index.js').Strata} strata
+ * @param {import('../packages/facade/src/index.js').Strata} strata
  * @param {(message: string) => void} notify
  */
 export function watchServedComponents (strata, notify) {

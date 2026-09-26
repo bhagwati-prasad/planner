@@ -7,8 +7,8 @@
 //
 // A page whose <body> has the data-strata-app attribute (dist/strata.html) starts the app when
 // the document has loaded, after every component script tag has run.
-import { createStrata } from '../packages/strata/src/index.js'
-import { mountStrata } from '../packages/strata-ui/src/elements/index.js'
+import { createStrata } from '../packages/facade/src/index.js'
+import { mountStrata } from '../packages/ui/src/elements/index.js'
 import { boot } from './boot.js'
 
 export { createStrata, mountStrata }
