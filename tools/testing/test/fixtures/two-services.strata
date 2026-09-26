@@ -1,0 +1,5 @@
+{
+  "format": "strata",
+  "schemaVersion": 1,
+  "project": { "name": "Two services" }
+}
