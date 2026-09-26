@@ -1,10 +1,10 @@
 {
   "strata-graph (minified)": {
-    "bytes": 99451,
+    "bytes": 88513,
     "owner": "0207"
   },
   "Simulation worker bundle (minified)": {
-    "bytes": 157525,
+    "bytes": 143018,
     "owner": "0402"
   }
 }

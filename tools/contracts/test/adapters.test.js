@@ -53,7 +53,7 @@ function recordingStream() {
 
 const realScheduler = (/** @type {any} */ scheduler) => ({
   scheduler,
-  settle: () => new Promise(resolve => scheduler.setTimeout(resolve, 20)),
+  settle: () => new Promise(resolve => scheduler.setTimeout(resolve, 60)),
 })
 
 // Real implementations.
