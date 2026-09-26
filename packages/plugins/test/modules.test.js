@@ -247,7 +247,7 @@ test('the tokenizer reads every JavaScript file in this repository', () => {
     assert.doesNotThrow(() => tokenize(readFileSync(file, 'utf8')), relative(repo, file))
 })
 
-test('minify keeps every token and every line break of every file in this repository', () => {
+test('minify keeps every token of every file in this repository, and the line breaks that could matter', () => {
   const walk = (dir, out = []) => {
     for (const name of readdirSync(dir)) {
       if (name === 'node_modules' || name.startsWith('.') || name === 'vendor' || name === 'dist')
@@ -258,6 +258,20 @@ test('minify keeps every token and every line break of every file in this reposi
     }
     return out
   }
+  // Stated independently of the minifier's own tables: a line break can be a semicolon only
+  // between a token that can end a statement and one that can start one, or after a
+  // restricted production.
+  const RESTRICTED = new Set(['return', 'throw', 'break', 'continue', 'yield', 'async'])
+  const WORD_OPERATORS = new Set(['in', 'instanceof'])
+  const canEnd = t =>
+    ['name', 'number', 'string', 'template', 'regex', 'private'].includes(t.type) ||
+    [')', ']', '}', '++', '--'].includes(t.value)
+  const canStart = (t, prev) =>
+    (t.type === 'name' &&
+      !WORD_OPERATORS.has(t.value) &&
+      !(['else', 'catch', 'finally'].includes(t.value) && /^[};]$/.test(prev.value))) ||
+    ['number', 'string', 'template', 'regex', 'private'].includes(t.type) ||
+    ['(', '[', '{', '++', '--', '+', '-', '!', '~'].includes(t.value)
   let before = 0
   let after = 0
   for (const file of walk(repo)) {
@@ -265,11 +279,22 @@ test('minify keeps every token and every line break of every file in this reposi
     const out = minify(src)
     before += src.length
     after += out.length
-    // A line break before the first token (after a leading comment) carries no meaning.
-    const shape = code => tokenize(code).map((t, i) => `${i && t.nl ? '\n' : ''}${t.value}`)
-    assert.deepEqual(shape(out), shape(src), relative(repo, file))
+    const original = tokenize(src)
+    const minified = tokenize(out)
+    const name = relative(repo, file)
+    assert.deepEqual(
+      minified.map(t => t.value),
+      original.map(t => t.value),
+      `${name}: the same tokens in the same order`
+    )
+    for (let i = 1; i < original.length; i++) {
+      const [prev, t] = [original[i - 1], original[i]]
+      const matters = RESTRICTED.has(prev.value) || (canEnd(prev) && canStart(t, prev))
+      if (t.nl && matters)
+        assert.ok(minified[i].nl, `${name}:${t.line}: the line break before '${t.value}' stays`)
+    }
   }
-  assert.ok(after < before * 0.8, `minified to ${Math.round((after / before) * 100)}%`)
+  assert.ok(after < before * 0.7, `minified to ${Math.round((after / before) * 100)}%`)
 })
 
 test('the facade bundles into one CommonJS script that works', async () => {
