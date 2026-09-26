@@ -28,7 +28,7 @@ test('normalises defaults and resolves ports from the shape', () => {
   assert.deepEqual([a.w, a.h, a.shape], [DEFAULT_NODE_SIZE.w, DEFAULT_NODE_SIZE.h, 'box'])
   assert.deepEqual(m.nodes.get('b').ports, [{ id: 'in', side: 'left' }])
   assert.deepEqual(m.edges.get('ab').target, { node: 'b', port: null }, 'a string end means the node itself')
-  assert.equal(m.edges.get('ab').routing, 'orthogonal')
+  assert.equal(m.edges.get('ab').routing, undefined, 'follows the graph default unless set')
   assert.equal(m.annotations.get('note').kind, 'sticky')
   assert.equal(m.annotations.get('note').w, 160)
 })

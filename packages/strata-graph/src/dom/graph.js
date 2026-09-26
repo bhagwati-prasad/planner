@@ -176,6 +176,24 @@ export class Graph {
   /** Problems found in the last `setData`. */
   get problems () { return [...this.#model.problems] }
   get options () { return { ...this.#opts } }
+  /** Size of the view in pixels. */
+  get size () { return { ...this.#size } }
+
+  /**
+   * Rectangles of the visible nodes, frames and annotations (for overviews such as the minimap).
+   * @returns {{ id: string, kind: string, x: number, y: number, w: number, h: number, ghost: boolean }[]}
+   */
+  rects () {
+    const m = this.#model
+    const out = []
+    for (const [kind, map] of /** @type {[string, Map<string, any>][]} */ ([['frame', m.frames], ['node', m.nodes], ['annotation', m.annotations]])) {
+      for (const item of map.values()) {
+        if (m.isHidden(item)) continue
+        out.push({ id: item.id, kind, ...this.#itemRect(item.id), ghost: !!item.ghost })
+      }
+    }
+    return out
+  }
 
   /**
    * Adds or replaces a shape.
@@ -201,8 +219,7 @@ export class Graph {
   setData (data) {
     this.#model = new GraphModel(data ?? {}, {
       portsOf: n => this.#shapeOf(n).ports?.(n) ?? [],
-      sizeOf: n => this.#shapeOf(n).size ?? DEFAULT_NODE_SIZE,
-      routing: this.#opts.routing
+      sizeOf: n => this.#shapeOf(n).size ?? DEFAULT_NODE_SIZE
     })
     for (const id of this.#selection) if (!this.#model.kindOf(id)) this.#selection.delete(id)
     for (const id of this.#routes.keys()) if (!this.#model.edges.has(id)) this.#routes.delete(id)
@@ -278,6 +295,16 @@ export class Graph {
     if (animate && typeof this.#svg.transition === 'function') this.#svg.transition().duration(350).call(this.#zoom.transform, z)
     else this.#svg.call(this.#zoom.transform, z)
     return this
+  }
+
+  /**
+   * Pans so a world point is in the middle of the view, keeping the zoom.
+   * @param {{ x: number, y: number }} point
+   * @param {{ animate?: boolean }} [options]
+   */
+  centerOn (point, { animate = false } = {}) {
+    const { k } = this.#transform
+    return this.setTransform({ x: this.#size.width / 2 - point.x * k, y: this.#size.height / 2 - point.y * k, k }, { animate })
   }
 
   /**

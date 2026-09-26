@@ -6,18 +6,18 @@ The product and technical specification lives in the Claude Docs document **"Str
 
 ## Status
 
-R0 (offline foundations) is built in six milestones. This repository currently holds **M1: Core**.
+R0 (offline foundations) is built in six milestones. M1 and M2 are done.
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | M1 Core | Model store, command bus, undo/redo, events, recursion resolver, console facade, Node test harness | Done |
-| M2 strata-graph | D3 diagram library: shapes, ports, edges, zoom, selection, frames, export | Next |
-| M3 Shell | Web Components UI, library panel, inspector, breadcrumb, drill-down transitions | |
+| M2 strata-graph | D3 diagram library: shapes, ports, edges, zoom, selection, frames, export | Done |
+| M3 Shell | Web Components UI, library panel, inspector, breadcrumb, drill-down transitions | Next |
 | M4 Plugins | Manifest schema, in-house bundler, `strata pack`, `strata serve`, starter library | |
 | M5 Persistence | IndexedDB, sessionStorage, `.strata` import/export, File System Access save | |
 | M6 Comments | Annotations, threaded comments, anchors, roll-up badges | |
 
-See [docs/implementation-notes.md](docs/implementation-notes.md) for what M1 covers in detail and the decisions taken where the spec left room.
+See [docs/implementation-notes.md](docs/implementation-notes.md) for what each milestone covers and the decisions taken where the spec left room.
 
 ## Layout
 
@@ -26,22 +26,26 @@ packages/
   strata-core/   headless core: entity store, command bus, op log, undo/redo, events,
                  queries, validation, recursion resolver, roll-up engine
   strata/        the facade: the one public API (browser console, Node, and the UI to come)
-examples/        runnable scripts
-scripts/         test runner and architecture boundary check
+  strata-graph/  D3 diagramming library: renders graph data, emits intents, knows nothing about Strata
+vendor/          third-party code shipped for offline use (D3 7.9.0, ISC)
+examples/        runnable scripts and the diagram demo
+scripts/         test runners, dev server and architecture boundary check
 docs/            implementation notes
 ```
 
-Dependencies point downward only: `strata` → `strata-core`. `npm run check` enforces this and keeps both packages free of DOM, Node built-ins and npm dependencies, so they run unchanged in a browser tab, a Web Worker and Node.
+Dependencies point downward only: `strata` → `strata-core`, and `strata-graph` depends on nothing of Strata's. `npm run check` enforces this and keeps headless code free of DOM, Node built-ins and npm dependencies, so it runs unchanged in a browser tab, a Web Worker and Node.
 
 ## Try it
 
 Node 20 or newer; there is nothing to install.
 
 ```sh
-npm test          # all tests (node:test)
-npm run check     # architecture boundary check
-npm run verify    # both
-npm run demo      # the console session from the spec, headless
+npm test              # headless tests (node:test)
+npm run test:browser  # browser tests in Chromium via Playwright (skipped if Playwright is absent)
+npm run check         # architecture boundary check
+npm run verify        # all of the above
+npm run demo          # the console session from the spec, headless
+npm run serve         # static server; then open http://127.0.0.1:4321/examples/graph-demo.html
 ```
 
 ```js

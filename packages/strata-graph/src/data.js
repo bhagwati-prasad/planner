@@ -109,9 +109,9 @@ export class GraphModel {
 
   /**
    * @param {GraphData} data
-   * @param {{ portsOf?: (node: NodeData) => PortSpec[], sizeOf?: (node: NodeData) => {w: number, h: number}, routing?: string }} [options]
+   * @param {{ portsOf?: (node: NodeData) => PortSpec[], sizeOf?: (node: NodeData) => {w: number, h: number}} } [options]
    */
-  constructor (data = {}, { portsOf = () => [], sizeOf = () => DEFAULT_NODE_SIZE, routing = 'orthogonal' } = {}) {
+  constructor (data = {}, { portsOf = () => [], sizeOf = () => DEFAULT_NODE_SIZE } = {}) {
     const seen = new Set()
     const problem = (kind, id, message) => this.problems.push({ kind, id, message })
     const unique = (kind, item) => {
@@ -168,7 +168,8 @@ export class GraphModel {
           end.port = null
         }
       }
-      this.edges.set(e.id, /** @type {any} */ ({ routing, label: '', arrow: true, ...e, source: s, target: t, waypoints: e.waypoints ?? [] }))
+      // An edge without its own routing follows the graph's current default.
+      this.edges.set(e.id, /** @type {any} */ ({ label: '', arrow: true, ...e, source: s, target: t, waypoints: e.waypoints ?? [] }))
     }
   }
 

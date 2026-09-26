@@ -56,6 +56,40 @@ What is built so far, and the decisions taken where the specification left room.
 - `map` and `filter` on a Collection return plain arrays; methods that return collections return Collections.
 - History is session state: it is not saved with the project (M5 decides whether to persist the op log).
 
-## Next: M2 strata-graph
+## M2 strata-graph: what exists
 
-The D3 diagram library (§9): shapes, ports, edges, zoom, selection, frames and export, with no knowledge of Strata. It renders and captures gestures, emits intents, and never owns state; a view adapter in `strata-ui` (M3) maps the model to graph data and intents back to commands. D3 modules are vendored locally for the offline build.
+The diagram library from §9. It knows nothing about Strata: hosts hand it plain graph data (`nodes`, `edges`, `frames`, `annotations`, `layers`) and receive intents (`select`, `move`, `resize`, `connect`, `connect-to-point`, `reconnect`, `waypoints`, `delete`, `open`, `context`, `drop`). It never changes the data itself; in Strata, the view adapter (M3) turns intents into commands and calls `setData` with the result, so undo and history stay in one place.
+
+| Area | Module | Notes |
+| --- | --- | --- |
+| Geometry, ports | `geometry.js` | Rectangles, port anchors spread along sides, boundary anchors for port-less edges. |
+| Routing | `routing.js` | Straight, curved (Bézier, Catmull-Rom through waypoints) and orthogonal. The orthogonal router runs A* over a sparse grid of obstacle edges with a bend penalty, leaves and enters along port sides, and only considers nearby obstacles (capped) so it stays fast. |
+| Spatial index | `spatial.js` | Uniform grid for marquee selection, port hit-testing, smart-guide candidates and culling. |
+| Snapping, arrange | `snap.js`, `arrange.js` | Grid snap, smart guides (edges and centres), align and distribute. |
+| Viewport, text | `viewport.js`, `text.js` | d3-zoom-compatible transforms, fit and zoom-at; word wrapping with an injected measurer. |
+| Data | `data.js` | Normalisation with defaults, problem reporting, frame nesting, layers (hidden, locked). |
+| Theme | `theme.js` | Every colour, font and radius is a CSS custom property; light and dark sets. |
+| Renderer | `dom/graph.js` | D3 joins into SVG layers; d3-zoom, d3-drag; gestures and keyboard; overlays; culling; SVG/PNG export. |
+| Shapes | `dom/shapes.js` | box, rect, ellipse, diamond, hexagon, cylinder, queue, document, note, cloud, person, component, placeholder, boundary-port; hosts register more. |
+| Minimap | `dom/minimap.js` | Overview with the visible area; click or drag to move. |
+
+Tests: headless modules in Node; the renderer in real Chromium through Playwright (`npm run test:browser`), driving mouse and keyboard gestures, plus a smoke test of `examples/graph-demo.html` under the dev server's strict CSP.
+
+## Decisions in M2
+
+- **Selection is requested, not taken.** Clicks, marquees and keyboard emit a `select` intent; the host calls `graph.select(ids)`. The graph only keeps transient gesture state (a drag in progress).
+- **Pointer model:** background drag draws a selection rectangle (Shift adds), Space+drag or the middle button pans, the wheel scrolls, Ctrl/⌘+wheel or a pinch zooms (Excalidraw-style rather than d3-zoom's default wheel-zoom). Marquees pick nodes and annotations they touch, frames they enclose, and edges whose ends are both picked.
+- **Frames** are hit only on their border and title bar, so selection rectangles can start inside them. Dragging a frame moves everything nested in it; a `move` intent reports each moved item's innermost containing frame as `parent`.
+- **Connections** can be drawn from either end: dragging from an input produces the same `connect` intent as dragging from the output. Dropping on a node picks its nearest suitable port. Validity is the host's call via `canConnect(source, target)`; by default outputs connect to inputs on other nodes.
+- **Edges without their own routing follow the graph's current routing option.**
+- **Ids are unique across all kinds**, since a selection mixes nodes, edges, frames and annotations.
+- **Icons from plugins are sanitised** by an allowlist (drawing elements and presentation attributes only; no scripts, handlers, links, styles or external URLs; ids prefixed).
+- **Culling** replaces the spec's Canvas 2D switch for now: above 600 items only what is near the view is in the DOM (2,000 nodes: first render under 1.5 s, drag frames under 60 ms in tests). A Canvas 2D node layer can follow if profiling on real diagrams asks for it.
+- **D3 is vendored** as the unmodified 7.9.0 UMD bundle (`vendor/d3`), loaded as a classic script so it works from `file://`, and reached through `globalThis.d3` or the `d3` option, never imported.
+- **Dev server:** browsers refuse ES modules from `file://`, so until the M4 bundler produces the offline build, development and browser tests use `scripts/dev-server.js`. It serves with a strict CSP (no inline scripts), matching the spec's served mode.
+
+Known gaps, kept for later: parallel edge segments in the same channel overlap (no nudging yet); ports sit on the bounding box, so on curved shapes such as the cloud they float slightly off the outline; auto-layout (layered, force, tree) is R1.
+
+## Next: M3 Shell
+
+Web Components UI (§9 workspace layout): library panel, canvas with breadcrumb and mode tabs, inspector (properties, metrics, comments, links), bottom dock (console, problems), command palette, and the view adapter that maps the model to graph data and intents back to commands, including drill-down transitions and context ghosts.
