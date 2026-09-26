@@ -22,6 +22,9 @@ const DESCRIPTIONS = {
   E_ERROR_CODE_UNREGISTERED: 'An error was raised with a code missing from this registry',
   E_ADAPTER_MISSING: 'A required adapter (clock, random source) was not passed in at startup',
 
+  E_COMMAND_PAYLOAD:
+    'A command payload holds a value JSON cannot carry: undefined, a Date, a Map, a class instance, a function or a non-finite number',
+
   E_BUNDLE_BARE_SPECIFIER:
     'A bundle imports an npm package; only relative imports, d3 and three are allowed',
   E_BUNDLE_CYCLE:

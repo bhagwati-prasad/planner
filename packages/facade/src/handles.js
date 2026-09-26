@@ -7,7 +7,7 @@
  */
 import { fail } from '../../core/src/index.js'
 import { Collection } from './collection.js'
-import { CORE, INSPECT } from './internal.js'
+import { CORE, INSPECT, defined } from './internal.js'
 import { pasteClip } from './clipboard.js'
 
 /** @typedef {import('./projects.js').ProjectHandle} ProjectHandle */
@@ -139,7 +139,7 @@ export class SystemHandle extends Handle {
     const id = this.project.transaction(() => {
       const nodeId = this.project.dispatch({
         type: 'component.add',
-        payload: { systemId: this.id, typeRef: type, ...fields },
+        payload: defined({ systemId: this.id, typeRef: type, ...fields }),
       })
       if (at) this.#place(nodeId, at)
       return nodeId
@@ -158,7 +158,7 @@ export class SystemHandle extends Handle {
     const id = this.project.transaction(() => {
       const nodeId = this.project.dispatch({
         type: 'node.place',
-        payload: { systemId: this.id, systemRef, placement, name },
+        payload: defined({ systemId: this.id, systemRef, placement, name }),
       })
       if (at) this.#place(nodeId, at)
       return nodeId
@@ -186,7 +186,7 @@ export class SystemHandle extends Handle {
     const [fromPort, toPort] = pickPorts(this, from, to, type)
     const edgeId = this.project.dispatch({
       type: 'edge.add',
-      payload: { fromPort, toPort, connectionType: type, props, label, id },
+      payload: defined({ fromPort, toPort, connectionType: type, props, label, id }),
     })
     return new EdgeHandle(this.project, edgeId, { readOnly: this.#readOnly })
   }
@@ -202,7 +202,7 @@ export class SystemHandle extends Handle {
     const nodeIds = [...nodes].map(n => resolveNodeId(this, n))
     const { systemId, nodeId } = this.project.dispatch({
       type: 'system.extract',
-      payload: { systemId: this.id, nodeIds, name },
+      payload: defined({ systemId: this.id, nodeIds, name }),
     })
     return new SystemHandle(this.project, systemId, { via: nodeId })
   }
@@ -556,7 +556,7 @@ export class NodeHandle extends Handle {
     this.#writable()
     const id = this.project.dispatch({
       type: 'port.add',
-      payload: { nodeId: this.id, name, direction, accepts },
+      payload: defined({ nodeId: this.id, name, direction, accepts }),
     })
     return new PortHandle(this.project, id, { readOnly: this.#readOnly })
   }
@@ -810,7 +810,7 @@ export class EdgeHandle extends Handle {
     this.#writable()
     this.project.dispatch({
       type: 'edge.update',
-      payload: { id: this.id, changes: { label, connectionType: type } },
+      payload: { id: this.id, changes: defined({ label, connectionType: type }) },
     })
     return this
   }
@@ -821,11 +821,11 @@ export class EdgeHandle extends Handle {
     const system = new SystemHandle(this.project, this.entity.systemId)
     this.project.dispatch({
       type: 'edge.rewire',
-      payload: {
+      payload: defined({
         id: this.id,
         fromPort: from && resolvePortId(system, from),
         toPort: to && resolvePortId(system, to),
-      },
+      }),
     })
     return this
   }

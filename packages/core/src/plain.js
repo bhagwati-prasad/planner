@@ -6,53 +6,62 @@ import { fail } from './errors.js'
 
 /**
  * Deep-clones a value, rejecting anything JSON cannot carry. Object properties that are
- * `undefined` are dropped; `undefined` anywhere else is an error.
+ * `undefined` are dropped; `undefined` anywhere else is an error. With `strict` (command
+ * payloads, eng §7), an `undefined` property is an error too, and every refusal carries
+ * E_COMMAND_PAYLOAD and the offending `path` in its details.
  * @template T
  * @param {T} value
  * @param {string} [path]
+ * @param {{ strict?: boolean }} [options]
  * @returns {T}
  */
-export function toPlain(value, path = 'value') {
-  return /** @type {T} */ (clone(value, path, new Set()))
+export function toPlain(value, path = 'value', { strict = false } = {}) {
+  return /** @type {T} */ (clone(value, path, new Set(), strict))
 }
 
-function clone(value, path, seen) {
+/** @param {boolean} strict @param {string} path @param {string} message @returns {never} */
+const refuse = (strict, path, message) =>
+  fail(strict ? 'E_COMMAND_PAYLOAD' : 'INVALID', message, { path })
+
+function clone(value, path, seen, strict) {
   if (value === null) return null
   switch (typeof value) {
     case 'string':
     case 'boolean':
       return value
     case 'number':
-      if (!Number.isFinite(value)) fail('INVALID', `${path} must be a finite number, got ${value}`)
+      if (!Number.isFinite(value))
+        refuse(strict, path, `${path} must be a finite number, got ${value}`)
       return value
     case 'undefined':
-      fail('INVALID', `${path} is undefined`)
+      refuse(strict, path, `${path} is undefined`)
       break
     case 'object': {
-      if (seen.has(value)) fail('INVALID', `${path} contains a circular reference`)
+      if (seen.has(value)) refuse(strict, path, `${path} contains a circular reference`)
       seen.add(value)
       let out
       if (Array.isArray(value)) {
-        out = value.map((item, i) => clone(item, `${path}[${i}]`, seen))
+        out = value.map((item, i) => clone(item, `${path}[${i}]`, seen, strict))
       } else {
         const proto = Object.getPrototypeOf(value)
         if (proto !== Object.prototype && proto !== null) {
-          fail(
-            'INVALID',
+          refuse(
+            strict,
+            path,
             `${path} is a ${value?.constructor?.name ?? 'non-plain object'}; only plain objects, arrays, strings, finite numbers, booleans and null are allowed`
           )
         }
         out = {}
         for (const key of Object.keys(value)) {
-          if (value[key] === undefined) continue
-          out[key] = clone(value[key], `${path}.${key}`, seen)
+          if (value[key] === undefined && !strict) continue
+          out[key] = clone(value[key], `${path}.${key}`, seen, strict)
         }
       }
       seen.delete(value)
       return out
     }
     default:
-      fail('INVALID', `${path} is a ${typeof value}, which is not serialisable`)
+      refuse(strict, path, `${path} is a ${typeof value}, which is not serialisable`)
   }
 }
 

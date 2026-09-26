@@ -110,8 +110,13 @@ export function setup(options) {
   return { core, root: rootSystemId }
 }
 
+/** Adds a component; without a name the command picks the default one. */
 export function add(core, systemId, typeRef, name, extra = {}) {
-  return core.dispatch({ type: 'component.add', payload: { systemId, typeRef, name, ...extra } })
+  const named = name === undefined ? {} : { name }
+  return core.dispatch({
+    type: 'component.add',
+    payload: { systemId, typeRef, ...named, ...extra },
+  })
 }
 
 export function port(core, nodeId, name) {

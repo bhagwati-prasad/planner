@@ -8,7 +8,7 @@
  * must still exist when pasting).
  */
 import { fail } from '../../core/src/index.js'
-import { CORE } from './internal.js'
+import { CORE, defined } from './internal.js'
 
 export const CLIP_FORMAT = 'strata/clip@1'
 
@@ -160,7 +160,7 @@ export function pasteClip(system, clip, { at } = {}) {
           } else {
             id = project.dispatch({
               type: 'component.add',
-              payload: {
+              payload: defined({
                 systemId: system.id,
                 typeRef: n.typeRef,
                 name: nameFor(n.name),
@@ -169,10 +169,10 @@ export function pasteClip(system, clip, { at } = {}) {
                 owner: n.owner,
                 status: n.status,
                 description: n.description,
-              },
+              }),
             })
             for (const port of n.extraPorts ?? [])
-              project.dispatch({ type: 'port.add', payload: { nodeId: id, ...port } })
+              project.dispatch({ type: 'port.add', payload: defined({ nodeId: id, ...port }) })
           }
           created.set(n.key, id)
           const rel = n.at ?? { x: 0, y: 0 }
@@ -197,13 +197,13 @@ export function pasteClip(system, clip, { at } = {}) {
           edgeIds.push(
             project.dispatch({
               type: 'edge.add',
-              payload: {
+              payload: defined({
                 fromPort: fromPort.id,
                 toPort: toPort.id,
                 connectionType: e.connectionType,
                 props: e.props,
                 label: e.label,
-              },
+              }),
             })
           )
         } catch (err) {

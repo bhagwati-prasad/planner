@@ -56,6 +56,16 @@ export class Emitter {
     }
   }
 
+  /**
+   * Hands an error to the error handler, as a throwing listener's is. The command bus reports
+   * here when a command a listener queued fails after that listener has returned.
+   * @param {unknown} err
+   * @param {string} event
+   */
+  report(err, event) {
+    this.#onError(err, event)
+  }
+
   /** @param {string} [event] */
   listenerCount(event) {
     if (event) return this.#handlers.get(event)?.size ?? 0
