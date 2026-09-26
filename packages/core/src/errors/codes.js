@@ -38,6 +38,17 @@ const DESCRIPTIONS = {
 
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',
 
+  E_SCHEMA_TYPE: 'A value has the wrong type for its property or state schema',
+  E_SCHEMA_RANGE: "A value is below its schema's min or above its max",
+  E_SCHEMA_ENUM: "A value is not one of its enum's options",
+  E_SCHEMA_UNIT: 'A duration, size or rate is neither a number nor a string with a known unit',
+  E_SCHEMA_DISTRIBUTION:
+    'A distribution has an unknown kind, or a parameter that is missing or invalid',
+  E_SCHEMA_FIELD: 'A table row lacks a column the table declares, or has one it does not',
+  E_SCHEMA_KEY: "A table row repeats another row's key",
+  E_SCHEMA_UNKNOWN_TYPE:
+    'A schema names a type that is neither a property or state type nor a known record type',
+
   E_SIM_NO_EDGE: 'The system has no edge for a request to travel over',
   E_SIM_EDGE_NOT_FOUND: 'The edge a run names is not in the model',
   E_SIM_COMPONENT_NOT_FOUND: 'An edge in a run names a component that is not in the model',

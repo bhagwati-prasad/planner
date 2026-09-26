@@ -7,24 +7,20 @@
  * them to canonical numbers (ms, bytes, per second) for consumers such as roll-ups and the
  * simulation.
  */
-import { fail, StrataError } from './errors.js'
+import { fail } from './errors.js'
 import { isPlainObject } from './plain.js'
+import {
+  DISTRIBUTION_KINDS,
+  PROPERTY_TYPES,
+  checkDistribution,
+  checkValue,
+  durationMs,
+  perSecond,
+  sizeBytes,
+  unitProblem,
+} from './schema.js'
 
-export const PROPERTY_TYPES = Object.freeze([
-  'number',
-  'integer',
-  'boolean',
-  'string',
-  'enum',
-  'duration',
-  'bytes',
-  'rate',
-  'percent',
-  'distribution',
-  'list',
-  'map',
-  'ref',
-])
+export { DISTRIBUTION_KINDS, PROPERTY_TYPES }
 
 /** Aggregation rules from spec §6 "Data roll-up", plus plain min and max (§7). */
 export const ROLLUP_RULES = Object.freeze([
@@ -39,51 +35,15 @@ export const ROLLUP_RULES = Object.freeze([
   'count',
 ])
 
-export const DISTRIBUTION_KINDS = Object.freeze([
-  'constant',
-  'uniform',
-  'normal',
-  'exponential',
-  'lognormal',
-  'empirical',
-])
-
-const DURATION_UNITS = {
-  ms: 1,
-  s: 1000,
-  sec: 1000,
-  m: 60_000,
-  min: 60_000,
-  h: 3_600_000,
-  hr: 3_600_000,
-  d: 86_400_000,
-  w: 604_800_000,
-}
-const BYTE_UNITS = {
-  b: 1,
-  kb: 1e3,
-  mb: 1e6,
-  gb: 1e9,
-  tb: 1e12,
-  pb: 1e15,
-  kib: 1024,
-  mib: 1024 ** 2,
-  gib: 1024 ** 3,
-  tib: 1024 ** 4,
-  pib: 1024 ** 5,
-}
-const RATE_UNITS = {
-  s: 1,
-  sec: 1,
-  second: 1,
-  m: 1 / 60,
-  min: 1 / 60,
-  minute: 1 / 60,
-  h: 1 / 3600,
-  hr: 1 / 3600,
-  hour: 1 / 3600,
-  d: 1 / 86400,
-  day: 1 / 86400,
+/**
+ * The value of a check, or its failure thrown as a StrataError with the check's code, message
+ * and details.
+ * @param {import('./result.js').Ok<any> | import('./result.js').Err} result
+ */
+function orThrow(result) {
+  if (result.ok === false)
+    fail(result.code, /** @type {string} */ (result.details.message), result.details)
+  return result.value
 }
 
 /**
@@ -93,22 +53,8 @@ const RATE_UNITS = {
  * @returns {number}
  */
 export function parseDuration(value) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'string') fail('INVALID', `Invalid duration ${JSON.stringify(value)}`)
-  const src = value.trim()
-  const re = /(\d+(?:\.\d+)?)\s*(ms|sec|min|hr|s|m|h|d|w)/gy
-  let total = 0
-  let consumed = 0
-  let match
-  while ((match = re.exec(src))) {
-    total += Number(match[1]) * DURATION_UNITS[match[2]]
-    consumed = re.lastIndex
-    while (src[consumed] === ' ') consumed++
-    re.lastIndex = consumed
-  }
-  if (consumed === 0 || consumed !== src.length)
-    fail('INVALID', `Invalid duration '${value}' (use e.g. 250ms, 30s, 5m, 4d, 1h30m)`)
-  return total
+  const ms = durationMs(value)
+  return ms ?? fail('E_SCHEMA_UNIT', unitProblem('duration', value), { value })
 }
 
 /**
@@ -116,10 +62,8 @@ export function parseDuration(value) {
  * @param {number|string} value
  */
 export function parseBytes(value) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  const m = typeof value === 'string' && /^\s*(\d+(?:\.\d+)?)\s*([kmgtp]i?b|b)\s*$/i.exec(value)
-  if (!m) fail('INVALID', `Invalid size ${JSON.stringify(value)} (use e.g. 512B, 10MB, 1.5GiB)`)
-  return Number(m[1]) * BYTE_UNITS[m[2].toLowerCase()]
+  const bytes = sizeBytes(value)
+  return bytes ?? fail('E_SCHEMA_UNIT', unitProblem('bytes', value), { value })
 }
 
 /**
@@ -127,14 +71,8 @@ export function parseBytes(value) {
  * @param {number|string} value
  */
 export function parseRate(value) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  const m =
-    typeof value === 'string' &&
-    /^\s*(\d+(?:\.\d+)?)\s*(?:[a-z]+\s*)?\/\s*(second|minute|hour|day|sec|min|hr|s|m|h|d)\s*$/i.exec(
-      value
-    )
-  if (!m) fail('INVALID', `Invalid rate ${JSON.stringify(value)} (use e.g. 500/s, 30 req/min)`)
-  return Number(m[1]) * RATE_UNITS[m[2].toLowerCase()]
+  const rate = perSecond(value)
+  return rate ?? fail('E_SCHEMA_UNIT', unitProblem('rate', value), { value })
 }
 
 /**
@@ -143,74 +81,7 @@ export function parseRate(value) {
  * @param {string} [label]
  */
 export function normalizeDistribution(value, label = 'distribution') {
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) fail('INVALID', `${label} must be finite`)
-    return { kind: 'constant', value }
-  }
-  if (!isPlainObject(value)) fail('INVALID', `${label} must be a number or a distribution object`)
-  const d = /** @type {Record<string, any>} */ (value)
-  const num = (key, { min = -Infinity, positive = false } = {}) => {
-    const v = d[key]
-    if (typeof v !== 'number' || !Number.isFinite(v))
-      fail('INVALID', `${label}.${key} must be a finite number`)
-    if (v < min || (positive && v <= 0))
-      fail('INVALID', `${label}.${key} must be ${positive ? '> 0' : `>= ${min}`}`)
-    return v
-  }
-  switch (d.kind) {
-    case 'constant':
-      return { kind: 'constant', value: num('value') }
-    case 'uniform': {
-      const min = num('min')
-      const max = num('max')
-      if (min > max) fail('INVALID', `${label}: min must not exceed max`)
-      return { kind: 'uniform', min, max }
-    }
-    case 'normal':
-      return { kind: 'normal', mean: num('mean'), sd: num('sd', { min: 0 }) }
-    case 'exponential':
-      if (d.rate !== undefined && d.mean === undefined)
-        return { kind: 'exponential', mean: 1 / num('rate', { positive: true }) }
-      return { kind: 'exponential', mean: num('mean', { positive: true }) }
-    case 'lognormal': {
-      const median = num('median', { positive: true })
-      const p99 = num('p99', { positive: true })
-      if (p99 < median) fail('INVALID', `${label}: p99 must be >= median`)
-      return { kind: 'lognormal', median, p99 }
-    }
-    case 'empirical': {
-      if (Array.isArray(d.values)) {
-        if (!d.values.length || d.values.some(v => typeof v !== 'number' || !Number.isFinite(v)))
-          fail('INVALID', `${label}.values must be a non-empty list of numbers`)
-        return { kind: 'empirical', values: [...d.values] }
-      }
-      if (Array.isArray(d.buckets)) {
-        let prev = -Infinity
-        let total = 0
-        for (const [i, b] of d.buckets.entries()) {
-          if (
-            !isPlainObject(b) ||
-            typeof b.le !== 'number' ||
-            typeof b.count !== 'number' ||
-            b.count < 0 ||
-            !(b.le > prev)
-          ) {
-            fail(
-              'INVALID',
-              `${label}.buckets[${i}] must be { le, count } with increasing le and count >= 0`
-            )
-          }
-          prev = b.le
-          total += b.count
-        }
-        if (total <= 0) fail('INVALID', `${label}.buckets must contain at least one observation`)
-        return { kind: 'empirical', buckets: d.buckets.map(b => ({ le: b.le, count: b.count })) }
-      }
-      return fail('INVALID', `${label}: an empirical distribution needs 'values' or 'buckets'`)
-    }
-    default:
-      return fail('INVALID', `${label}.kind must be one of ${DISTRIBUTION_KINDS.join(', ')}`)
-  }
+  return orThrow(checkDistribution(value, label))
 }
 
 /**
@@ -356,13 +227,6 @@ export function statistic(dist, name) {
   return quantile(dist, q)
 }
 
-/** Numeric bound in the schema's own notation (e.g. min: "1s" for a duration). */
-function bound(schema, key) {
-  const raw = schema[key]
-  if (raw === undefined) return undefined
-  return normalizeScalar(schema.type, raw)
-}
-
 function normalizeScalar(type, value) {
   switch (type) {
     case 'duration':
@@ -377,81 +241,14 @@ function normalizeScalar(type, value) {
 }
 
 /**
- * Validates one value against a property schema. Throws a StrataError(INVALID).
+ * Validates one value against a property schema and returns it in canonical units; throws a
+ * StrataError with the E_SCHEMA_ code and path `checkValue` reports.
  * @param {PropertySchema} schema
  * @param {unknown} value
  * @param {string} [label]
  */
 export function validateValue(schema, value, label = 'value') {
-  const type = schema.type
-  const checkRange = n => {
-    const min = bound(schema, 'min')
-    const max = bound(schema, 'max')
-    if (min !== undefined && n < min)
-      fail('INVALID', `${label} must be >= ${schema.min}, got ${JSON.stringify(value)}`)
-    if (max !== undefined && n > max)
-      fail('INVALID', `${label} must be <= ${schema.max}, got ${JSON.stringify(value)}`)
-  }
-  switch (type) {
-    case 'number':
-      if (typeof value !== 'number' || !Number.isFinite(value))
-        fail('INVALID', `${label} must be a number`)
-      checkRange(value)
-      return
-    case 'integer':
-      if (!Number.isInteger(value)) fail('INVALID', `${label} must be an integer`)
-      checkRange(value)
-      return
-    case 'boolean':
-      if (typeof value !== 'boolean') fail('INVALID', `${label} must be true or false`)
-      return
-    case 'string':
-      if (typeof value !== 'string') fail('INVALID', `${label} must be a string`)
-      return
-    case 'enum':
-      if (!schema.values?.includes(value))
-        fail(
-          'INVALID',
-          `${label} must be one of ${schema.values?.map(v => JSON.stringify(v)).join(', ')}`
-        )
-      return
-    case 'duration':
-    case 'bytes':
-    case 'rate':
-      try {
-        checkRange(normalizeScalar(type, value))
-      } catch (err) {
-        if (err instanceof StrataError) fail('INVALID', `${label}: ${err.message}`)
-        throw err
-      }
-      return
-    case 'percent':
-      if (typeof value !== 'number' || !Number.isFinite(value))
-        fail('INVALID', `${label} must be a percentage number`)
-      if (value < Number(schema.min ?? 0) || value > Number(schema.max ?? 100))
-        fail('INVALID', `${label} must be between ${schema.min ?? 0} and ${schema.max ?? 100}`)
-      return
-    case 'distribution':
-      normalizeDistribution(value, label)
-      return
-    case 'list':
-      if (!Array.isArray(value)) fail('INVALID', `${label} must be a list`)
-      if (schema.items)
-        value.forEach((item, i) => validateValue(schema.items, item, `${label}[${i}]`))
-      return
-    case 'map':
-      if (!isPlainObject(value)) fail('INVALID', `${label} must be an object`)
-      if (schema.values && typeof schema.values === 'object' && !Array.isArray(schema.values)) {
-        for (const [k, v] of Object.entries(/** @type {object} */ (value)))
-          validateValue(schema.values, v, `${label}.${k}`)
-      }
-      return
-    case 'ref':
-      if (typeof value !== 'string' || !value) fail('INVALID', `${label} must be a node id`)
-      return
-    default:
-      fail('INVALID', `${label} has unknown property type '${type}'`)
-  }
+  return orThrow(checkValue(schema, value, label))
 }
 
 /**
