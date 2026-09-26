@@ -91,6 +91,57 @@ describe('npm run check', () => {
   })
 })
 
+describe('browser tests', () => {
+  it('run every spec in Chromium, Firefox and WebKit, served and from file://', async () => {
+    const {
+      default: config,
+      browserProjects,
+      selectBrowsers,
+    } = await import('../../playwright.config.js')
+    const all = browserProjects(selectBrowsers(undefined))
+    const projects = all.map(p => ({
+      name: p.name,
+      browser: p.use?.browserName,
+      mode: p.use?.mode,
+    }))
+    assert.deepEqual(projects, [
+      { name: 'chromium-served', browser: 'chromium', mode: 'served' },
+      { name: 'chromium-file', browser: 'chromium', mode: 'file' },
+      { name: 'firefox-served', browser: 'firefox', mode: 'served' },
+      { name: 'firefox-file', browser: 'firefox', mode: 'file' },
+      { name: 'webkit-served', browser: 'webkit', mode: 'served' },
+      { name: 'webkit-file', browser: 'webkit', mode: 'file' },
+    ])
+    const fileMode = all.find(p => p.name === 'chromium-file')
+    assert.deepEqual(fileMode?.testMatch, ['tests/e2e/**/*.spec.js'], 'the harness needs a server')
+    assert.equal(config.forbidOnly, true)
+    assert.deepEqual(selectBrowsers('chromium'), ['chromium'], 'a local run may narrow them')
+    assert.throws(() => selectBrowsers('chrome'), /unknown browser 'chrome'/)
+  })
+
+  it('run Playwright first in the browser gate', () => {
+    const script = readFileSync(join(ROOT, 'scripts/run-browser-tests.js'), 'utf8')
+    assert.match(script, /resolve\('@playwright\/test\/cli'\)/)
+    const playwright = script.indexOf("[playwright, 'test'")
+    const nodeTest = script.indexOf("['--test'")
+    assert.ok(
+      playwright > 0 && playwright < nodeTest,
+      'Playwright specs run before node:test files'
+    )
+  })
+
+  it('run in CI through the same npm run check, with all three browsers installed', () => {
+    const workflow = readFileSync(join(ROOT, '.github/workflows/ci.yml'), 'utf8')
+    const runs = [...workflow.matchAll(/^\s*(?:- )?run: (.+)$/gm)].map(m => m[1].trim())
+    assert.deepEqual(runs, [
+      'npm ci --ignore-scripts',
+      'npx playwright install --with-deps chromium firefox webkit',
+      'npm run check',
+    ])
+    assert.doesNotMatch(workflow, /STRATA_BROWSERS/, 'CI runs every browser')
+  })
+})
+
 describe('size check', () => {
   it('reads every size budget from eng §15', () => {
     assert.deepEqual(budgets(), [

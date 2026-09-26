@@ -27,6 +27,7 @@
     "strata": "packages/cli/bin/strata.js"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "eslint": "10.11.0",
     "prettier": "3.9.9",
     "typescript": "7.0.2"

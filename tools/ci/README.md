@@ -1,6 +1,6 @@
 # CI gates
 
-`npm run check` runs `check.js`: every gate eng §19 lists that exists so far, in order, stopping at the first failure. The CI workflow runs the same script, so a green local check means a green pipeline.
+`npm run check` runs `check.js`: every gate eng §19 lists that exists so far, in order, stopping at the first failure. The CI workflow (`.github/workflows/ci.yml`) installs the three browsers and runs the same script, so a green local check means a green pipeline.
 
 | Gate        | Runs                                                  | Notes                                                                          |
 | ----------- | ----------------------------------------------------- | ------------------------------------------------------------------------------ |

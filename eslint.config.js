@@ -45,9 +45,16 @@ export default [
     },
   },
   {
-    // Component behaviour entries (the plugin API requires a default export), tool configs, and
-    // test fixtures that stand in for any code a user might bundle.
-    files: ['components/*/index.js', 'eslint.config.js', '**/test/fixtures/**/*.js'],
+    // Component behaviour entries (the plugin API requires a default export), tool configs and
+    // Playwright's global setup (both read a default export), and test fixtures that stand in
+    // for any code a user might bundle.
+    files: [
+      'components/*/index.js',
+      'eslint.config.js',
+      'playwright.config.js',
+      'tests/e2e/global-setup.js',
+      '**/test/fixtures/**/*.js',
+    ],
     rules: { 'no-restricted-syntax': 'off' },
   },
   {
