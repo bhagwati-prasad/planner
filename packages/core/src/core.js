@@ -12,6 +12,8 @@ import { createUlidFactory } from './ulid.js'
 import { registerCoreCommands } from './commands/index.js'
 import { rollup, checkContracts } from './rollup.js'
 import { findProblems } from './validate.js'
+import { canonicalJson } from './plain.js'
+import { sha256, toHex } from './sha256.js'
 import {
   acceptsOf,
   boundaryPortsOf,
@@ -381,6 +383,14 @@ export class Core {
   /** A JSON-ready copy of the model. */
   snapshot() {
     return this.#store.snapshot()
+  }
+
+  /**
+   * The state hash: the SHA-256, in hex, of the snapshot as sorted-key JSON. Equal models
+   * (entities, their audit fields and `rev`) hash the same however they were built.
+   */
+  stateHash() {
+    return toHex(sha256(canonicalJson(this.snapshot())))
   }
 }
 

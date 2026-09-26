@@ -117,6 +117,26 @@ export function isPlainObject(value) {
 }
 
 /**
+ * A deep copy of plain data with every object's keys in sorted order, so it serialises to the
+ * same JSON however it was built or wherever it came from.
+ * @template T
+ * @param {T} value
+ * @returns {T}
+ */
+export function sortKeys(value) {
+  if (Array.isArray(value)) return /** @type {T} */ (value.map(sortKeys))
+  if (value && typeof value === 'object')
+    return /** @type {T} */ (
+      Object.fromEntries(
+        Object.keys(value)
+          .sort()
+          .map(key => [key, sortKeys(/** @type {any} */ (value)[key])])
+      )
+    )
+  return value
+}
+
+/**
  * Sorted-key JSON, so a hash of plain data does not depend on property order (bundle integrity,
  * run hashes). Undefined properties are left out, as JSON.stringify does.
  * @param {unknown} value

@@ -11,8 +11,12 @@
  * redo, replay) are queued and run, first in, first out, once every listener has heard the
  * current events, never inside one.
  *
- * Each applied command becomes an Operation:
- *   { id, actorId, timestamp, command, payload, inverse, baseRev, modelRev, ids, meta? }
+ * Each applied command becomes an Operation, its keys in sorted order so that it serialises to
+ * the same JSON wherever it is stored or sent:
+ *   { actorId, baseRev, command, id, ids, inverse, meta?, modelRev, payload, timestamp, version }
+ * `version` is the command's payload version (eng §7): when a payload shape changes, the
+ * command registers the next version with an upgrader from the one before, and replay upgrades
+ * older operations (and the commands inside batches) before applying them.
  * `baseRev` is the model revision the command applied to and `modelRev` the one it made.
  * `ids` lists the entity ids the handler allocated, in order, so replaying the operation on
  * another machine produces exactly the same entities. `inverse` is a `model.restore` command
@@ -21,7 +25,7 @@
 import { Tx } from './store.js'
 import { StrataError, didYouMean, fail, suggest } from './errors.js'
 import { ERROR_CODES } from './errors/codes.js'
-import { deepFreeze, isPlainObject, toPlain } from './plain.js'
+import { deepFreeze, isPlainObject, sortKeys, toPlain } from './plain.js'
 import { err, ok } from './result.js'
 
 const TYPE_RE = /^[a-z][\w-]*(?:\.[a-zA-Z][\w-]*)+$|^batch$/
@@ -38,7 +42,7 @@ export class CommandBus {
   #undo = []
   /** @type {Operation[]} */
   #redo = []
-  /** @type {{ ctx: HandlerContext, commands: {type: string, payload: any}[], events: Event[] } | null} */
+  /** @type {{ ctx: HandlerContext, commands: {type: string, version: number, payload: any}[], events: Event[] } | null} */
   #group = null
   /** Changes started by listeners while events were being delivered, to run after them. @type {(() => unknown)[]} */
   #queue = []
@@ -69,9 +73,9 @@ export class CommandBus {
       description: 'Writes previously captured entity values back (used by undo and redo)',
       signature: '{ entities: [{ kind, id, value|null }] }',
     })
-    this.register('batch', batchHandler, {
+    this.register('batch', (payload, ctx) => this.#batch(payload, ctx), {
       description: 'Applies several commands atomically as one undoable operation',
-      signature: '{ commands: [{ type, payload }], label? }',
+      signature: '{ commands: [{ type, version?, payload }], label? }',
     })
   }
 
@@ -84,14 +88,38 @@ export class CommandBus {
   register(
     type,
     handler,
-    { validate, undoable = true, description = '', signature = '', replace = false } = {}
+    {
+      validate,
+      version = 1,
+      upgrades = {},
+      undoable = true,
+      description = '',
+      signature = '',
+      replace = false,
+    } = {}
   ) {
     if (!TYPE_RE.test(type))
       fail('INVALID', `Command type '${type}' must be namespaced, e.g. 'component.add'`)
     if (typeof handler !== 'function') fail('INVALID', `Handler for '${type}' must be a function`)
     if (this.#handlers.has(type) && !replace)
       fail('CONFLICT', `Command '${type}' is already registered`)
-    this.#handlers.set(type, { type, handler, validate, undoable, description, signature })
+    for (let v = 1; v < version; v++)
+      if (typeof upgrades[v] !== 'function')
+        fail(
+          'E_COMMAND_VERSION',
+          `Command '${type}' is at version ${version} but has no upgrader from version ${v}`,
+          { type, version: v }
+        )
+    this.#handlers.set(type, {
+      type,
+      handler,
+      validate,
+      version,
+      upgrades,
+      undoable,
+      description,
+      signature,
+    })
   }
 
   /** @param {string} type */
@@ -264,7 +292,7 @@ export class CommandBus {
       try {
         const result = this.#apply(entry, payload, ctx)
         ctx.tx.release(savepoint)
-        commands.push({ type: entry.type, payload })
+        commands.push({ type: entry.type, version: entry.version, payload })
         return result
       } catch (error) {
         ctx.tx.rollbackTo(savepoint)
@@ -350,6 +378,48 @@ export class CommandBus {
   }
 
   /**
+   * A payload written by `version` of a command, brought up to its current version.
+   * @param {HandlerEntry} entry
+   * @param {number} version
+   * @param {any} payload
+   */
+  #upgrade(entry, version, payload) {
+    if (version > entry.version)
+      fail(
+        'E_COMMAND_VERSION',
+        `'${entry.type}' version ${version} is newer than the version ${entry.version} this build registers`,
+        { type: entry.type, version }
+      )
+    let out = payload
+    for (let v = version; v < entry.version; v++)
+      out = toPlain(entry.upgrades[v](out), `${entry.type} payload`, { strict: true })
+    return out
+  }
+
+  /**
+   * Applies the commands of a batch in order, each brought up to its command's current version
+   * (a command without a version is taken to be current), and records that version.
+   * @param {{ commands: {type: string, version?: number, payload?: any}[] }} payload
+   * @param {HandlerContext} ctx
+   */
+  #batch(payload, ctx) {
+    if (!Array.isArray(payload.commands)) fail('INVALID', 'batch needs a commands list')
+    return payload.commands.map((command, i) => {
+      if (!isPlainObject(command) || typeof command.type !== 'string')
+        fail('INVALID', `batch.commands[${i}] must be { type, payload }`)
+      const entry = this.#require(command.type)
+      const sub = this.#upgrade(
+        entry,
+        command.version ?? entry.version,
+        toPlain(command.payload ?? {}, `batch.commands[${i}].payload`)
+      )
+      const result = this.#apply(entry, sub, ctx)
+      payload.commands[i] = { type: entry.type, version: entry.version, payload: sub }
+      return result
+    })
+  }
+
+  /**
    * Commits a transaction as one operation. Returns it (null when nothing changed) with the
    * events to publish: 'op', 'change', those the handlers emitted, then 'history'.
    * @param {HandlerContext} ctx
@@ -367,18 +437,21 @@ export class CommandBus {
     const baseRev = this.#store.rev
     this.#store.rev += 1
     const op = /** @type {Operation} */ (
-      deepFreeze({
-        id: options.opId ?? this.#newId(),
-        actorId: ctx.actorId,
-        timestamp: ctx.timestamp,
-        command: type,
-        payload,
-        inverse: { type: 'model.restore', payload: { entities: tx.inverse() } },
-        baseRev,
-        modelRev: this.#store.rev,
-        ids: generated,
-        ...(options.meta ? { meta: toPlain(options.meta, 'meta') } : {}),
-      })
+      deepFreeze(
+        sortKeys({
+          id: options.opId ?? this.#newId(),
+          actorId: ctx.actorId,
+          timestamp: ctx.timestamp,
+          command: type,
+          version: entry.version,
+          payload,
+          inverse: { type: 'model.restore', payload: { entities: tx.inverse() } },
+          baseRev,
+          modelRev: this.#store.rev,
+          ids: generated,
+          ...(options.meta ? { meta: toPlain(options.meta, 'meta') } : {}),
+        })
+      )
     )
     this.oplog.push(op)
     const history = options.history ?? (entry.undoable ? 'record' : 'none')
@@ -478,7 +551,12 @@ export class CommandBus {
     const applied = []
     for (const op of ops) {
       const entry = this.#require(op.command)
-      const payload = toPlain(op.payload, `${op.command} payload`)
+      // Operations from before command versions were recorded are version 1.
+      const payload = this.#upgrade(
+        entry,
+        op.version ?? 1,
+        toPlain(op.payload, `${op.command} payload`)
+      )
       const { ctx, generated, queue, events } = this.#context({
         ids: op.ids,
         timestamp: op.timestamp,
@@ -514,25 +592,13 @@ function restoreHandler(payload, ctx) {
   for (const { kind, id, value } of payload.entities) ctx.tx.restore(kind, id, value ?? null)
 }
 
-/** @param {{ commands: {type: string, payload: any}[] }} payload @param {HandlerContext} ctx */
-function batchHandler(payload, ctx) {
-  if (!Array.isArray(payload.commands)) fail('INVALID', 'batch needs a commands list')
-  return payload.commands.map((command, i) => {
-    if (!isPlainObject(command) || typeof command.type !== 'string')
-      fail('INVALID', `batch.commands[${i}] must be { type, payload }`)
-    const sub = toPlain(command.payload ?? {}, `batch.commands[${i}].payload`)
-    const result = ctx.exec(command.type, sub)
-    payload.commands[i] = { type: command.type, payload: sub }
-    return result
-  })
-}
-
 /**
  * @typedef {object} Operation
  * @property {string} id
  * @property {string} actorId
  * @property {string} timestamp ISO 8601
  * @property {string} command
+ * @property {number} version   the version of the command the payload was written for
  * @property {any} payload
  * @property {{ type: 'model.restore', payload: { entities: {kind: string, id: string, value: any}[] } }} inverse
  * @property {number} baseRev   the model revision the command applied to
@@ -553,6 +619,10 @@ function batchHandler(payload, ctx) {
  * @typedef {object} CommandMeta
  * @property {(payload: any, ctx: HandlerContext) => import('./result.js').Ok | import('./result.js').Err} [validate]
  *   checks the payload against the model before the handler runs; pure, and reads only
+ * @property {number} [version]        the payload version (default 1); bump it when the payload
+ *   shape changes
+ * @property {Record<number, (payload: any) => any>} [upgrades]  for every earlier version n, a
+ *   pure function turning a version-n payload into a version n+1 one
  * @property {boolean} [undoable]      recorded on the undo stack (default true)
  * @property {string} [description]
  * @property {string} [signature]
@@ -562,6 +632,8 @@ function batchHandler(payload, ctx) {
  * @property {string} type
  * @property {(payload: any, ctx: HandlerContext) => any} handler
  * @property {CommandMeta['validate']} validate
+ * @property {number} version
+ * @property {Record<number, (payload: any) => any>} upgrades
  * @property {boolean} undoable
  * @property {string} description
  * @property {string} signature

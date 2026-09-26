@@ -24,6 +24,8 @@ const DESCRIPTIONS = {
 
   E_COMMAND_PAYLOAD:
     'A command payload holds a value JSON cannot carry: undefined, a Date, a Map, a class instance, a function or a non-finite number',
+  E_COMMAND_VERSION:
+    'An operation was written by a newer version of its command, or a command version has no upgrader from the one before',
 
   E_BUNDLE_BARE_SPECIFIER:
     'A bundle imports an npm package; only relative imports, d3 and three are allowed',
