@@ -12,9 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "async-message"
-      ]
+      "accepts": ["async-message"]
     },
     {
       "name": "out",

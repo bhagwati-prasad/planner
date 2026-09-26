@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M00 Foundation and walking skeleton](../ROADMAP.md#m00-foundation-and-walking-skeleton) | R0 | todo | [0002](../M00-foundation-and-walking-skeleton/0002-dev-tooling.md) |
+| [M00 Foundation and walking skeleton](../ROADMAP.md#m00-foundation-and-walking-skeleton) | R0 | done | [0002](../M00-foundation-and-walking-skeleton/0002-dev-tooling.md) |
 
 ## Read first
 
@@ -21,11 +21,11 @@ In-house ESLint rules: import boundaries from the eng §6 table, banned globals 
 
 Write these tests first, in `tools/lint/test/*.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] Every rule has valid and invalid cases run through ESLint's RuleTester
-- [ ] Importing `packages/core/src/model/*` from `packages/ui` fails; importing `packages/core/src/index.js` from `packages/facade` passes
-- [ ] `Math.random` fails in `packages/sim` and passes in `packages/ui`
-- [ ] A hex colour in a component `.css` file fails
-- [ ] `it.only` fails lint
+- [x] Every rule has valid and invalid cases run through ESLint's RuleTester
+- [x] Importing `packages/core/src/model/*` from `packages/ui` fails; importing `packages/core/src/index.js` from `packages/facade` passes
+- [x] `Math.random` fails in `packages/sim` and passes in `packages/ui`
+- [x] A hex colour in a component `.css` file fails
+- [x] `it.only` fails lint
 
 ## Notes
 
@@ -33,8 +33,8 @@ Write these tests first, in `tools/lint/test/*.test.js`. Run them and confirm ea
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

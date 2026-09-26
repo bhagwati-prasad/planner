@@ -12,10 +12,11 @@ export const CORE_COMMANDS = Object.freeze({
   ...nodeCommands,
   ...edgeCommands,
   ...viewCommands,
-  ...recursionCommands
+  ...recursionCommands,
 })
 
 /** @param {import('../bus.js').CommandBus} bus */
-export function registerCoreCommands (bus) {
-  for (const [type, { handler, ...meta }] of Object.entries(CORE_COMMANDS)) bus.register(type, handler, meta)
+export function registerCoreCommands(bus) {
+  for (const [type, { handler, ...meta }] of Object.entries(CORE_COMMANDS))
+    bus.register(type, handler, meta)
 }

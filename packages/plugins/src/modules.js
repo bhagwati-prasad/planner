@@ -34,12 +34,13 @@ const RESERVED = new Set([...MODULE_PARAMS, '__default'])
  * @property {string} code        `function (__require, __export, __meta, __import) { ... }`
  * @property {ModuleImport[]} imports
  * @property {string[]} exports   names the module exports (not counting `export *`)
+ * @property {string[]} [functionExports]  exports that are hoisted function declarations
  * @property {{ specifier: string|null, line: number }[]} dynamic  dynamic import() calls
  */
 
 export class ModuleError extends Error {
   /** @param {string} message @param {number} [line] */
-  constructor (message, line) {
+  constructor(message, line) {
     super(message)
     this.name = 'ModuleError'
     this.line = line
@@ -51,7 +52,7 @@ export class ModuleError extends Error {
  * @param {string} text
  * @returns {TransformedModule}
  */
-export function transformJson (text) {
+export function transformJson(text) {
   try {
     JSON.parse(text)
   } catch (err) {
@@ -61,7 +62,7 @@ export function transformJson (text) {
     code: `function (${MODULE_PARAMS.join(', ')}) { "use strict"; __export({ "default": () => __default }); const __default = ${text.trim()}\n}`,
     imports: [],
     exports: ['default'],
-    dynamic: []
+    dynamic: [],
   }
 }
 
@@ -69,7 +70,7 @@ export function transformJson (text) {
  * @param {string} source an ES module
  * @returns {TransformedModule}
  */
-export function transformModule (source) {
+export function transformModule(source) {
   let tokens
   try {
     tokens = tokenize(source)
@@ -78,7 +79,8 @@ export function transformModule (source) {
     throw err
   }
   for (const t of tokens) {
-    if (t.type === 'name' && RESERVED.has(t.value)) throw new ModuleError(`'${t.value}' is reserved for the bundler; rename it`, t.line)
+    if (t.type === 'name' && RESERVED.has(t.value))
+      throw new ModuleError(`'${t.value}' is reserved for the bundler; rename it`, t.line)
   }
 
   /** @type {{ start: number, end: number, text: string }[]} */
@@ -92,10 +94,15 @@ export function transformModule (source) {
 
   const at = k => tokens[k]
   const value = k => tokens[k]?.value
-  const fail = (message, k) => { throw new ModuleError(message, tokens[Math.min(k, tokens.length - 1)]?.line) }
-  const expect = (k, v) => { if (value(k) !== v) fail(`Expected '${v}' but found '${value(k) ?? 'end of file'}'`, k) }
+  const fail = (message, k) => {
+    throw new ModuleError(message, tokens[Math.min(k, tokens.length - 1)]?.line)
+  }
+  const expect = (k, v) => {
+    if (value(k) !== v) fail(`Expected '${v}' but found '${value(k) ?? 'end of file'}'`, k)
+  }
   /** Removes source text but keeps its line breaks. */
-  const remove = (start, end) => edits.push({ start, end, text: source.slice(start, end).replace(/[^\n]/g, '') })
+  const remove = (start, end) =>
+    edits.push({ start, end, text: source.slice(start, end).replace(/[^\n]/g, '') })
   const addExport = (name, local, k) => {
     if (getters.has(name)) fail(`Duplicate export '${name}'`, k)
     getters.set(name, local)
@@ -103,7 +110,10 @@ export function transformModule (source) {
   const moduleName = k => {
     const t = at(k)
     if (t?.type === 'name') return t.value
-    if (t?.type === 'string') return JSON.parse(t.value.startsWith("'") ? `"${t.value.slice(1, -1).replace(/"/g, '\\"')}"` : t.value)
+    if (t?.type === 'string')
+      return JSON.parse(
+        t.value.startsWith("'") ? `"${t.value.slice(1, -1).replace(/"/g, '\\"')}"` : t.value
+      )
     return fail(`Expected a name but found '${t?.value ?? 'end of file'}'`, k)
   }
   const specifier = k => {
@@ -137,10 +147,14 @@ export function transformModule (source) {
       const first = moduleName(j)
       let second = first
       j++
-      if (value(j) === 'as') { second = moduleName(j + 1); j += 2 }
+      if (value(j) === 'as') {
+        second = moduleName(j + 1)
+        j += 2
+      }
       pairs.push([first, second])
       if (value(j) === ',') j++
-      else if (value(j) !== '}') fail(`Expected ',' or '}' but found '${value(j) ?? 'end of file'}'`, j)
+      else if (value(j) !== '}')
+        fail(`Expected ',' or '}' but found '${value(j) ?? 'end of file'}'`, j)
     }
     return [pairs, j + 1]
   }
@@ -154,7 +168,13 @@ export function transformModule (source) {
     if (t.value === 'import') {
       if (value(k + 1) === '(' && !isMethod(tokens, k + 1)) {
         edits.push({ start: t.start, end: t.end, text: '__import' })
-        dynamic.push({ specifier: at(k + 2)?.type === 'string' && [')', ','].includes(value(k + 3)) ? specifier(k + 2) : null, line: t.line })
+        dynamic.push({
+          specifier:
+            at(k + 2)?.type === 'string' && [')', ','].includes(value(k + 3))
+              ? specifier(k + 2)
+              : null,
+          line: t.line,
+        })
         continue
       }
       if (value(k + 1) === '.') {
@@ -166,14 +186,26 @@ export function transformModule (source) {
       // Elsewhere `import` is an object key or a method name.
       if (t.depth !== 0) continue
       /** @type {ModuleImport} */
-      const record = { specifier: '', line: t.line, bindings: [], reexports: [], star: false, attributes: null }
+      const record = {
+        specifier: '',
+        line: t.line,
+        bindings: [],
+        reexports: [],
+        star: false,
+        attributes: null,
+      }
       let j = k + 1
       if (at(j)?.type !== 'string') {
         if (at(j)?.type === 'name' && value(j) !== 'from') {
           record.bindings.push({ imported: 'default', local: value(j) })
           j++
           if (value(j) === ',') j++
-        } else if (at(j)?.type === 'name' && value(j) === 'from' && value(j + 1) !== '{' && at(j + 1)?.type === 'name') {
+        } else if (
+          at(j)?.type === 'name' &&
+          value(j) === 'from' &&
+          value(j + 1) !== '{' &&
+          at(j + 1)?.type === 'name'
+        ) {
           // `import from from '...'`: a default import named 'from'
           record.bindings.push({ imported: 'default', local: 'from' })
           j++
@@ -199,7 +231,8 @@ export function transformModule (source) {
       continue
     }
 
-    if (t.value === 'await' && t.depth === 0) fail('Top-level await is not supported in bundled modules; move it into a function', k)
+    if (t.value === 'await' && t.depth === 0)
+      fail('Top-level await is not supported in bundled modules; move it into a function', k)
 
     if (t.value !== 'export' || t.depth !== 0) continue
     const n = value(k + 1)
@@ -209,8 +242,16 @@ export function transformModule (source) {
       if (value(next) === 'from') {
         const spec = specifier(next + 1)
         const [attributes, end] = tail(next + 2)
-        imports.push({ specifier: spec, line: t.line, bindings: [], reexports: pairs.map(([imported, exported]) => ({ imported, exported })), star: false, attributes })
-        for (const [, exported] of pairs) if (getters.has(exported)) fail(`Duplicate export '${exported}'`, k)
+        imports.push({
+          specifier: spec,
+          line: t.line,
+          bindings: [],
+          reexports: pairs.map(([imported, exported]) => ({ imported, exported })),
+          star: false,
+          attributes,
+        })
+        for (const [, exported] of pairs)
+          if (getters.has(exported)) fail(`Duplicate export '${exported}'`, k)
         remove(t.start, at(end - 1).end)
         k = end - 1
       } else {
@@ -225,11 +266,21 @@ export function transformModule (source) {
     if (n === '*') {
       let j = k + 2
       let exported = null
-      if (value(j) === 'as') { exported = moduleName(j + 1); j += 2 }
+      if (value(j) === 'as') {
+        exported = moduleName(j + 1)
+        j += 2
+      }
       expect(j, 'from')
       const spec = specifier(j + 1)
       const [attributes, end] = tail(j + 2)
-      imports.push({ specifier: spec, line: t.line, bindings: [], reexports: exported ? [{ imported: '*', exported }] : [], star: !exported, attributes })
+      imports.push({
+        specifier: spec,
+        line: t.line,
+        bindings: [],
+        reexports: exported ? [{ imported: '*', exported }] : [],
+        star: !exported,
+        attributes,
+      })
       remove(t.start, at(end - 1).end)
       k = end - 1
       continue
@@ -284,9 +335,22 @@ export function transformModule (source) {
   if (exportedLets.size) {
     for (let k = 0; k < tokens.length; k++) {
       const t = tokens[k]
-      if (t.type === 'name' && exportedLets.has(t.value) && value(k - 1) !== '.' && /^(=|\+=|-=|\*=|\/=|%=|\*\*=|<<=|>>=|>>>=|&=|\|=|\^=|&&=|\|\|=|\?\?=|\+\+|--)$/.test(value(k + 1) ?? '')) {
-        const decl = tokens.slice(Math.max(0, k - 3), k).some(x => ['let', 'var', ','].includes(x.value))
-        if (!decl) fail(`The exported binding '${t.value}' is reassigned; importers would not see the change. Export a function or an object instead`, k)
+      if (
+        t.type === 'name' &&
+        exportedLets.has(t.value) &&
+        value(k - 1) !== '.' &&
+        /^(=|\+=|-=|\*=|\/=|%=|\*\*=|<<=|>>=|>>>=|&=|\|=|\^=|&&=|\|\|=|\?\?=|\+\+|--)$/.test(
+          value(k + 1) ?? ''
+        )
+      ) {
+        const decl = tokens
+          .slice(Math.max(0, k - 3), k)
+          .some(x => ['let', 'var', ','].includes(x.value))
+        if (!decl)
+          fail(
+            `The exported binding '${t.value}' is reassigned; importers would not see the change. Export a function or an object instead`,
+            k
+          )
       }
     }
   }
@@ -303,27 +367,73 @@ export function transformModule (source) {
   body += source.slice(pos)
   if (body.startsWith('#!')) body = body.replace(/^#![^\n]*/, '')
 
-  const header = []
+  // The module's own getters are registered before its imports run, so a module that imports
+  // it back through a cycle can already reach its (hoisted) functions, as with native modules.
+  const getterList = map =>
+    [...map].map(([name, local]) => `${JSON.stringify(name)}: () => ${local}`).join(', ')
+  const header = [`__export({ ${getterList(getters)} });`]
+  const hoisted = hoistedFunctions(tokens)
+  const functionExports = [...getters]
+    .filter(([, local]) => hoisted.has(local))
+    .map(([name]) => name)
+  /** @type {Map<string, string>} */
+  const reexported = new Map()
   const stars = []
   imports.forEach((imp, i) => {
     const m = `__m${i}`
     header.push(`const ${m} = __require(${JSON.stringify(imp.specifier)});`)
-    for (const b of imp.bindings) header.push(`const ${b.local} = ${b.imported === '*' ? m : `${m}${access(b.imported)}`};`)
+    for (const b of imp.bindings)
+      header.push(`const ${b.local} = ${b.imported === '*' ? m : `${m}${access(b.imported)}`};`)
     for (const r of imp.reexports) {
-      if (getters.has(r.exported)) throw new ModuleError(`Duplicate export '${r.exported}'`, imp.line)
-      getters.set(r.exported, r.imported === '*' ? m : `${m}${access(r.imported)}`)
+      if (getters.has(r.exported) || reexported.has(r.exported))
+        throw new ModuleError(`Duplicate export '${r.exported}'`, imp.line)
+      reexported.set(r.exported, r.imported === '*' ? m : `${m}${access(r.imported)}`)
     }
     if (imp.star) stars.push(m)
   })
-  const entries = [...getters].map(([name, local]) => `${JSON.stringify(name)}: () => ${local}`)
-  header.push(`__export({ ${entries.join(', ')} }${stars.length ? `, [${stars.join(', ')}]` : ''});`)
+  if (reexported.size || stars.length) {
+    header.push(
+      `__export({ ${getterList(reexported)} }${stars.length ? `, [${stars.join(', ')}]` : ''});`
+    )
+  }
 
   return {
     code: `function (${MODULE_PARAMS.join(', ')}) { "use strict"; ${header.join(' ')} ${body}\n}`,
     imports,
-    exports: [...getters.keys()],
-    dynamic
+    exports: [...getters.keys(), ...reexported.keys()],
+    functionExports,
+    dynamic,
   }
+}
+
+/** Tokens after which a `function` keyword starts an expression, not a declaration. */
+const EXPRESSION_BEFORE =
+  /^(=|\(|,|:|\?|\[|\+|-|\*|\/|%|&&|\|\||\?\?|!|~|=>|return|typeof|void|new|delete|await|yield|in|of|instanceof|&|\||\^|<|>|<=|>=|==|===|!=|!==)$/
+
+/**
+ * Names of the function declarations at the top level of a module: they are hoisted, so they
+ * exist before the module body runs.
+ * @param {import('./tokenize.js').Token[]} tokens
+ */
+function hoistedFunctions(tokens) {
+  const names = new Set()
+  for (let k = 0; k < tokens.length; k++) {
+    const t = tokens[k]
+    if (t.type !== 'name' || t.value !== 'function' || t.depth !== 0) continue
+    let before = k - 1
+    if (tokens[before]?.value === 'async' && !t.nl) before--
+    const prev = tokens[before]
+    const statement =
+      !prev ||
+      [';', '}', '{', 'export', 'default'].includes(prev.value) ||
+      (tokens[before + 1].nl && !EXPRESSION_BEFORE.test(prev.value))
+    if (!statement) continue
+    const name = tokens[k + 1]?.value === '*' ? tokens[k + 2] : tokens[k + 1]
+    if (name?.type === 'name') names.add(name.value)
+    // `export default function () {}` is declared as __default by the transform.
+    else if (prev?.value === 'default') names.add('__default')
+  }
+  return names
 }
 
 /**
@@ -332,7 +442,7 @@ export function transformModule (source) {
  * @param {import('./tokenize.js').Token[]} tokens
  * @param {number} k
  */
-function isMethod (tokens, k) {
+function isMethod(tokens, k) {
   const depth = tokens[k].depth
   let j = k + 1
   while (j < tokens.length && !(tokens[j].value === ')' && tokens[j].depth === depth)) j++
@@ -340,7 +450,7 @@ function isMethod (tokens, k) {
 }
 
 /** Property access for an export name: `.name` or `["odd-name"]`. @param {string} name */
-function access (name) {
+function access(name) {
   return /^[A-Za-z_$][\w$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`
 }
 
@@ -351,21 +461,28 @@ function access (name) {
  * @param {number} depth  depth of the declaration statement
  * @param {(message: string, k: number) => never} fail
  */
-function declaredNames (tokens, k, depth, fail) {
+function declaredNames(tokens, k, depth, fail) {
   const names = []
   const value = j => tokens[j]?.value
 
   /** Collects the names of a binding pattern at `j`; returns the index after it. */
   const pattern = j => {
     const t = tokens[j]
-    if (t?.type === 'name') { names.push(t.value); return j + 1 }
+    if (t?.type === 'name') {
+      names.push(t.value)
+      return j + 1
+    }
     if (value(j) === '{') {
       const inner = t.depth + 1
       j++
       while (value(j) !== '}') {
-        if (value(j) === '...') { j = pattern(j + 1) } else {
+        if (value(j) === '...') {
+          j = pattern(j + 1)
+        } else {
           const key = tokens[j]
-          if (value(j) === '[') { while (!(value(j) === ']' && tokens[j].depth === inner)) j++ }
+          if (value(j) === '[') {
+            while (!(value(j) === ']' && tokens[j].depth === inner)) j++
+          }
           j++
           if (value(j) === ':') j = pattern(j + 1)
           else if (key.type === 'name') names.push(key.value)
@@ -380,14 +497,20 @@ function declaredNames (tokens, k, depth, fail) {
       const inner = t.depth + 1
       j++
       while (value(j) !== ']') {
-        if (value(j) === ',') { j++; continue }
+        if (value(j) === ',') {
+          j++
+          continue
+        }
         j = pattern(value(j) === '...' ? j + 1 : j)
         if (value(j) === '=') j = skipUntil(j + 1, inner, [',', ']'])
         if (value(j) === ',') j++
       }
       return j + 1
     }
-    return fail(`Expected a name in the exported declaration but found '${t?.value ?? 'end of file'}'`, j)
+    return fail(
+      `Expected a name in the exported declaration but found '${t?.value ?? 'end of file'}'`,
+      j
+    )
   }
 
   /** Index of the first token at `d` whose value is in `stops`. */
@@ -400,7 +523,10 @@ function declaredNames (tokens, k, depth, fail) {
   for (;;) {
     j = pattern(j)
     if (value(j) === '=') j = skipInitializer(tokens, j + 1, depth)
-    if (value(j) === ',' && tokens[j].depth === depth) { j++; continue }
+    if (value(j) === ',' && tokens[j].depth === depth) {
+      j++
+      continue
+    }
     return names
   }
 }
@@ -415,7 +541,7 @@ const CONTINUES = new Set(['in', 'instanceof', 'of', 'as'])
  * @param {number} j
  * @param {number} depth
  */
-function skipInitializer (tokens, j, depth) {
+function skipInitializer(tokens, j, depth) {
   const start = j
   for (; j < tokens.length; j++) {
     const t = tokens[j]
@@ -427,14 +553,19 @@ function skipInitializer (tokens, j, depth) {
 }
 
 /** @param {import('./tokenize.js').Token} t */
-function endsExpression (t) {
+function endsExpression(t) {
   if (t.type === 'punct') return [')', ']', '}', '++', '--'].includes(t.value)
   if (t.type === 'template') return t.value.endsWith('`')
   return true
 }
 
 /** @param {import('./tokenize.js').Token} t */
-function startsStatement (t) {
+function startsStatement(t) {
   if (t.type === 'name') return !CONTINUES.has(t.value)
-  return t.type === 'string' || t.type === 'number' || t.type === 'private' || (t.type === 'template' && t.value.startsWith('`'))
+  return (
+    t.type === 'string' ||
+    t.type === 'number' ||
+    t.type === 'private' ||
+    (t.type === 'template' && t.value.startsWith('`'))
+  )
 }

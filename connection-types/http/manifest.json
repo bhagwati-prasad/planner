@@ -19,11 +19,7 @@
     },
     "httpVersion": {
       "type": "enum",
-      "values": [
-        "1.1",
-        "2",
-        "3"
-      ],
+      "values": ["1.1", "2", "3"],
       "default": "2",
       "group": "HTTP"
     },

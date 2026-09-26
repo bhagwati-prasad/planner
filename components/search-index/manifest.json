@@ -12,9 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http"
-      ]
+      "accepts": ["http"]
     }
   ],
   "properties": {

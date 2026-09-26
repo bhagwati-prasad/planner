@@ -64,11 +64,7 @@
     },
     "deliverySemantics": {
       "type": "enum",
-      "values": [
-        "at-most-once",
-        "at-least-once",
-        "exactly-once"
-      ],
+      "values": ["at-most-once", "at-least-once", "exactly-once"],
       "default": "at-least-once",
       "group": "Delivery"
     }

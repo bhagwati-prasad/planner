@@ -24,7 +24,7 @@ let running = null
  * they are installed straight away.
  * @param {object} bundle
  */
-export function registerComponent (bundle) {
+export function registerComponent(bundle) {
   if (running) return running.components.install(bundle, { replace: true })
   pending.push(bundle)
 }
@@ -33,12 +33,15 @@ if (typeof document !== 'undefined') {
   const start = () => {
     if (!document.body?.hasAttribute('data-strata-app')) return
     boot({ bundles: pending.splice(0) })
-      .then(({ strata }) => { running = strata })
+      .then(({ strata }) => {
+        running = strata
+      })
       .catch(err => {
         console.error(err)
         document.body.textContent = `Strata could not start: ${err.message}`
       })
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true })
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', start, { once: true })
   else start()
 }

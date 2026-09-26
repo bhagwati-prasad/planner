@@ -12,11 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http",
-        "grpc",
-        "websocket"
-      ]
+      "accepts": ["http", "grpc", "websocket"]
     },
     {
       "name": "out",
@@ -164,11 +160,7 @@
       "unit": "state",
       "rollup": {
         "rule": "worst",
-        "order": [
-          "closed",
-          "half-open",
-          "open"
-        ]
+        "order": ["closed", "half-open", "open"]
       }
     },
     "errors": {

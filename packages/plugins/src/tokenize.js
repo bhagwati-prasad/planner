@@ -16,19 +16,64 @@
  */
 
 const PUNCTUATORS = [
-  '>>>=', '...', '===', '!==', '**=', '<<=', '>>=', '>>>', '&&=', '||=', '??=',
-  '=>', '==', '!=', '<=', '>=', '&&', '||', '??', '?.', '++', '--', '+=', '-=', '*=', '%=', '&=', '|=', '^=', '**', '<<', '>>'
+  '>>>=',
+  '...',
+  '===',
+  '!==',
+  '**=',
+  '<<=',
+  '>>=',
+  '>>>',
+  '&&=',
+  '||=',
+  '??=',
+  '=>',
+  '==',
+  '!=',
+  '<=',
+  '>=',
+  '&&',
+  '||',
+  '??',
+  '?.',
+  '++',
+  '--',
+  '+=',
+  '-=',
+  '*=',
+  '%=',
+  '&=',
+  '|=',
+  '^=',
+  '**',
+  '<<',
+  '>>',
 ]
 
 /** Keywords after which a `/` starts a regular expression rather than a division. */
-const REGEX_AFTER = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await'])
+const REGEX_AFTER = new Set([
+  'return',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'new',
+  'delete',
+  'void',
+  'throw',
+  'case',
+  'do',
+  'else',
+  'yield',
+  'await',
+])
 
 const ID_START = /[A-Za-z_$\u0080-￿]/
 const ID_PART = /[\w$\u0080-￿]/
 
 export class SyntaxProblem extends Error {
   /** @param {string} message @param {number} line @param {number} column */
-  constructor (message, line, column) {
+  constructor(message, line, column) {
     super(`${message} (line ${line}, column ${column})`)
     this.name = 'SyntaxProblem'
     this.line = line
@@ -40,7 +85,7 @@ export class SyntaxProblem extends Error {
  * @param {string} src
  * @returns {Token[]}
  */
-export function tokenize (src) {
+export function tokenize(src) {
   /** @type {Token[]} */
   const tokens = []
   /** Open brackets; 'T' marks a template substitution `${`. */
@@ -54,13 +99,20 @@ export function tokenize (src) {
     const l = before.split('\n').length
     return [l, at - before.lastIndexOf('\n')]
   }
-  const problem = (message, at) => { const [l, c] = where(at); return new SyntaxProblem(message, l, c) }
+  const problem = (message, at) => {
+    const [l, c] = where(at)
+    return new SyntaxProblem(message, l, c)
+  }
   const push = (type, start, end) => {
     tokens.push({ type, value: src.slice(start, end), start, end, depth: stack.length, nl, line })
     nl = false
   }
   const countLines = (from, to) => {
-    for (let k = from; k < to; k++) if (src[k] === '\n') { line++; nl = true }
+    for (let k = from; k < to; k++)
+      if (src[k] === '\n') {
+        line++
+        nl = true
+      }
   }
   const regexAllowed = () => {
     const prev = tokens[tokens.length - 1]
@@ -75,7 +127,10 @@ export function tokenize (src) {
     let k = from
     while (k < src.length) {
       const ch = src[k]
-      if (ch === '\\') { k += 2; continue }
+      if (ch === '\\') {
+        k += 2
+        continue
+      }
       if (ch === '`') return { end: k + 1, open: false }
       if (ch === '$' && src[k + 1] === '{') return { end: k + 2, open: true }
       k++
@@ -91,8 +146,26 @@ export function tokenize (src) {
   while (i < src.length) {
     const ch = src[i]
     // whitespace
-    if (ch === '\n') { line++; nl = true; i++; continue }
-    if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\f' || ch === '\v' || ch === ' ' || ch === '﻿' || ch === ' ' || ch === ' ') { i++; continue }
+    if (ch === '\n') {
+      line++
+      nl = true
+      i++
+      continue
+    }
+    if (
+      ch === ' ' ||
+      ch === '\t' ||
+      ch === '\r' ||
+      ch === '\f' ||
+      ch === '\v' ||
+      ch === ' ' ||
+      ch === '﻿' ||
+      ch === ' ' ||
+      ch === ' '
+    ) {
+      i++
+      continue
+    }
     // comments
     if (ch === '/' && src[i + 1] === '/') {
       const end = src.indexOf('\n', i)
@@ -125,7 +198,15 @@ export function tokenize (src) {
       const { end, open } = templateChunk(i + 1)
       const startLine = line
       countLines(i, end)
-      tokens.push({ type: 'template', value: src.slice(start, end), start, end, depth: stack.length, nl, line: startLine })
+      tokens.push({
+        type: 'template',
+        value: src.slice(start, end),
+        start,
+        end,
+        depth: stack.length,
+        nl,
+        line: startLine,
+      })
       nl = false
       if (open) stack.push('T')
       i = end
@@ -136,7 +217,15 @@ export function tokenize (src) {
       const { end, open } = templateChunk(i + 1)
       const startLine = line
       countLines(i, end)
-      tokens.push({ type: 'template', value: src.slice(start, end), start, end, depth: stack.length, nl, line: startLine })
+      tokens.push({
+        type: 'template',
+        value: src.slice(start, end),
+        start,
+        end,
+        depth: stack.length,
+        nl,
+        line: startLine,
+      })
       nl = false
       if (open) stack.push('T')
       i = end
@@ -161,8 +250,14 @@ export function tokenize (src) {
       i++
       while (i < src.length) {
         const c = src[i]
-        if (/[\w.]/.test(c)) { i++; continue }
-        if ((c === '+' || c === '-') && !hex && /[eE]/.test(src[i - 1])) { i++; continue }
+        if (/[\w.]/.test(c)) {
+          i++
+          continue
+        }
+        if ((c === '+' || c === '-') && !hex && /[eE]/.test(src[i - 1])) {
+          i++
+          continue
+        }
         break
       }
       push('number', start, i)
@@ -174,7 +269,10 @@ export function tokenize (src) {
       let inClass = false
       while (i < src.length) {
         const c = src[i]
-        if (c === '\\') { i += 2; continue }
+        if (c === '\\') {
+          i += 2
+          continue
+        }
         if (c === '\n') throw problem('Unterminated regular expression', start)
         if (c === '[') inClass = true
         else if (c === ']') inClass = false

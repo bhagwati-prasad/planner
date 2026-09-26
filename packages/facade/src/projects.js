@@ -22,7 +22,7 @@ export class ProjectHandle {
    * @param {Core} core
    * @param {(event: string, data: unknown) => void} emit
    */
-  constructor (strata, core, emit) {
+  constructor(strata, core, emit) {
     this.#strata = strata
     this.#core = core
     this.#nav = new Navigator(this, emit)
@@ -31,39 +31,62 @@ export class ProjectHandle {
       emit('change', { project: this, op, changes })
     })
     const offHistory = core.on('history', h => emit('history', { project: this, ...h }))
-    this.#unsubscribe = () => { offChange(); offHistory() }
+    this.#unsubscribe = () => {
+      offChange()
+      offHistory()
+    }
   }
 
   /** @internal */
-  get [CORE] () { return this.#core }
-  get strata () { return this.#strata }
-  get id () { return this.#core.project.id }
-  get name () { return this.#core.project.name }
-  get description () { return this.#core.project.description }
+  get [CORE]() {
+    return this.#core
+  }
+  get strata() {
+    return this.#strata
+  }
+  get id() {
+    return this.#core.project.id
+  }
+  get name() {
+    return this.#core.project.name
+  }
+  get description() {
+    return this.#core.project.description
+  }
   /** Model revision: operations applied since the project was created. */
-  get rev () { return this.#core.rev }
-  get closed () { return this.#closed }
+  get rev() {
+    return this.#core.rev
+  }
+  get closed() {
+    return this.#closed
+  }
   /** Breadcrumb navigation for this project. */
-  get nav () { return this.#nav }
-  get root () { return new SystemHandle(this, this.#core.rootSystemId) }
+  get nav() {
+    return this.#nav
+  }
+  get root() {
+    return new SystemHandle(this, this.#core.rootSystemId)
+  }
   /** The system currently being viewed (see nav). */
-  get current () { return this.#nav.current }
+  get current() {
+    return this.#nav.current
+  }
 
   /**
    * A system by id or name, editable (not through any placement).
    * @param {string} idOrName
    */
-  system (idOrName) {
+  system(idOrName) {
     return new SystemHandle(this, resolveSystemId(this, idOrName))
   }
 
   /** Every system in the project. */
-  systems () {
+  systems() {
     return Collection.from(this.#core.all('system').map(s => new SystemHandle(this, s.id)))
   }
 
   /** Library systems: reusable by reference, not owned by any composite. */
-  library () {
+  library() {
     return Collection.from(this.systems().filter(s => s.isLibrary))
   }
 
@@ -71,11 +94,16 @@ export class ProjectHandle {
    * A node anywhere in the project, by id or unique name.
    * @param {string} idOrName
    */
-  node (idOrName) {
+  node(idOrName) {
     if (this.#core.get('node', idOrName)) return new NodeHandle(this, idOrName)
     const matches = this.#core.nodes({ name: idOrName })
     if (matches.length === 1) return new NodeHandle(this, matches[0].id)
-    if (matches.length > 1) fail('AMBIGUOUS', `Several nodes are named '${idOrName}'; use an id or system.node(name)`, matches.map(n => n.id))
+    if (matches.length > 1)
+      fail(
+        'AMBIGUOUS',
+        `Several nodes are named '${idOrName}'; use an id or system.node(name)`,
+        matches.map(n => n.id)
+      )
     return fail('NOT_FOUND', `No node '${idOrName}' in project '${this.name}'`)
   }
 
@@ -83,11 +111,16 @@ export class ProjectHandle {
    * An edge by id, or by label when exactly one edge has it.
    * @param {string} idOrLabel
    */
-  edge (idOrLabel) {
+  edge(idOrLabel) {
     if (this.#core.get('edge', idOrLabel)) return new EdgeHandle(this, idOrLabel)
     const matches = this.#core.all('edge').filter(e => e.label === idOrLabel)
     if (matches.length === 1) return new EdgeHandle(this, matches[0].id)
-    if (matches.length > 1) fail('AMBIGUOUS', `Several edges are labelled '${idOrLabel}'; use an id or port.edges()`, matches.map(e => e.id))
+    if (matches.length > 1)
+      fail(
+        'AMBIGUOUS',
+        `Several edges are labelled '${idOrLabel}'; use an id or port.edges()`,
+        matches.map(e => e.id)
+      )
     return fail('NOT_FOUND', `No edge '${idOrLabel}' in project '${this.name}'`)
   }
 
@@ -95,7 +128,7 @@ export class ProjectHandle {
    * Nodes across the project, e.g. `{ extends: 'base:queue' }` or `{ status: 'planned' }`.
    * @param {import('../../core/src/core.js').NodeFilter} [filter]
    */
-  nodes (filter) {
+  nodes(filter) {
     return Collection.from(this.#core.nodes(filter).map(n => new NodeHandle(this, n.id)))
   }
 
@@ -104,13 +137,13 @@ export class ProjectHandle {
    * @param {string} name
    * @param {{ levelTag?: string, description?: string, contract?: object, tags?: string[] }} [options]
    */
-  createSystem (name, options = {}) {
+  createSystem(name, options = {}) {
     const id = this.dispatch({ type: 'system.create', payload: { name, ...options } })
     return new SystemHandle(this, id)
   }
 
   /** @param {string} name */
-  rename (name) {
+  rename(name) {
     this.dispatch({ type: 'project.update', payload: { changes: { name } } })
     return this
   }
@@ -119,7 +152,7 @@ export class ProjectHandle {
    * Applies a command. Every UI action, console call and script goes through here.
    * @param {{ type: string, payload?: any }} command
    */
-  dispatch (command) {
+  dispatch(command) {
     if (this.#closed) fail('INVALID', `Project '${this.name}' is closed`)
     return this.#core.dispatch(command)
   }
@@ -131,56 +164,88 @@ export class ProjectHandle {
    * @param {{ label?: string }} [options]
    * @returns {T}
    */
-  transaction (fn, options) {
+  transaction(fn, options) {
     if (this.#closed) fail('INVALID', `Project '${this.name}' is closed`)
     return this.#core.transaction(fn, options)
   }
 
-  undo () { return !!this.#core.undo() }
-  redo () { return !!this.#core.redo() }
-  get canUndo () { return this.#core.canUndo }
-  get canRedo () { return this.#core.canRedo }
+  undo() {
+    return !!this.#core.undo()
+  }
+  redo() {
+    return !!this.#core.redo()
+  }
+  get canUndo() {
+    return this.#core.canUndo
+  }
+  get canRedo() {
+    return this.#core.canRedo
+  }
   /** Forgets undo and redo history (the operation log is kept). */
-  clearHistory () { this.#core.clearHistory() }
+  clearHistory() {
+    this.#core.clearHistory()
+  }
 
   /** Operations applied in this session. */
-  get oplog () { return Collection.from(this.#core.oplog) }
+  get oplog() {
+    return Collection.from(this.#core.oplog)
+  }
 
   /** Problems across the whole project. */
-  problems () { return Collection.from(this.#core.problems()) }
+  problems() {
+    return Collection.from(this.#core.problems())
+  }
 
   /** Available commands with signatures. */
-  commands () { return Collection.from(this.#core.commands()) }
+  commands() {
+    return Collection.from(this.#core.commands())
+  }
 
   /** JSON-ready copy of the model. */
-  snapshot () { return this.#core.snapshot() }
+  snapshot() {
+    return this.#core.snapshot()
+  }
 
   /** Writes the project to the configured storage. */
-  async save () {
+  async save() {
     await this.#strata.projects.save(this)
     return this
   }
 
-  close () {
+  close() {
     this.#strata.projects.close(this)
   }
 
   /** @internal Called by ProjectsApi.close. */
-  _detach () {
+  _detach() {
     this.#unsubscribe()
     this.#closed = true
   }
 
   /** @param {{ depth?: number }} [options] */
-  format (options) { return this.#strata.format(this, options) }
-
-  toRow () {
-    return { id: this.id, name: this.name, systems: this.#core.all('system').length, nodes: this.#core.all('node').length, rev: this.rev }
+  format(options) {
+    return this.#strata.format(this, options)
   }
 
-  toJSON () { return this.toRow() }
-  toString () { return `Project<${this.#closed ? 'closed ' : ''}${this.#core.project?.name}>` }
-  [INSPECT] () { return this.toString() }
+  toRow() {
+    return {
+      id: this.id,
+      name: this.name,
+      systems: this.#core.all('system').length,
+      nodes: this.#core.all('node').length,
+      rev: this.rev,
+    }
+  }
+
+  toJSON() {
+    return this.toRow()
+  }
+  toString() {
+    return `Project<${this.#closed ? 'closed ' : ''}${this.#core.project?.name}>`
+  }
+  [INSPECT]() {
+    return this.toString()
+  }
 }
 
 /**
@@ -194,7 +259,7 @@ export class ProjectsApi {
    * @param {import('./strata.js').Strata} strata
    * @param {{ storage: import('./storage.js').StorageAdapter, makeCore: (snapshot?: object) => Core, emit: (event: string, data: unknown) => void, now: () => string, open: Map<string, ProjectHandle>, activate: (p: ProjectHandle|null) => void, active: () => ProjectHandle|null }} hooks
    */
-  constructor (strata, hooks) {
+  constructor(strata, hooks) {
     this.#strata = strata
     this.#hooks = hooks
   }
@@ -204,9 +269,10 @@ export class ProjectsApi {
    * @param {string} name
    * @param {{ id?: string, activate?: boolean }} [options]
    */
-  async create (name, { id, activate = true } = {}) {
+  async create(name, { id, activate = true } = {}) {
     const { makeCore, emit, open, storage } = this.#hooks
-    if (id && (open.has(id) || await storage.load(id))) fail('CONFLICT', `A project with id '${id}' already exists`)
+    if (id && (open.has(id) || (await storage.load(id))))
+      fail('CONFLICT', `A project with id '${id}' already exists`)
     const core = makeCore()
     core.dispatch({ type: 'project.init', payload: { name, id } })
     const project = new ProjectHandle(this.#strata, core, emit)
@@ -222,17 +288,26 @@ export class ProjectsApi {
    * @param {string} nameOrId
    * @param {{ activate?: boolean }} [options]
    */
-  async open (nameOrId, { activate = true } = {}) {
+  async open(nameOrId, { activate = true } = {}) {
     const { storage, makeCore, emit, open } = this.#hooks
     let project = open.get(nameOrId) ?? [...open.values()].find(p => p.name === nameOrId)
     if (!project) {
       const saved = await storage.list()
       const exact = saved.filter(r => r.id === nameOrId || r.name === nameOrId)
-      const matches = exact.length ? exact : saved.filter(r => r.name.toLowerCase() === String(nameOrId).toLowerCase())
-      if (matches.length > 1) fail('AMBIGUOUS', `Several projects are named '${nameOrId}'; open one by id (${matches.map(r => r.id).join(', ')})`)
+      const matches = exact.length
+        ? exact
+        : saved.filter(r => r.name.toLowerCase() === String(nameOrId).toLowerCase())
+      if (matches.length > 1)
+        fail(
+          'AMBIGUOUS',
+          `Several projects are named '${nameOrId}'; open one by id (${matches.map(r => r.id).join(', ')})`
+        )
       if (!matches.length) {
         const names = saved.map(r => `'${r.name}'`).join(', ')
-        fail('NOT_FOUND', `No project '${nameOrId}'. ${names ? `Saved projects: ${names}.` : 'No projects are saved yet.'} Create one with strata.projects.create('${nameOrId}').`)
+        fail(
+          'NOT_FOUND',
+          `No project '${nameOrId}'. ${names ? `Saved projects: ${names}.` : 'No projects are saved yet.'} Create one with strata.projects.create('${nameOrId}').`
+        )
       }
       const record = await storage.load(matches[0].id)
       if (!record) fail('NOT_FOUND', `Project '${nameOrId}' could not be loaded`)
@@ -245,18 +320,18 @@ export class ProjectsApi {
   }
 
   /** Saved projects, with whether each is open. */
-  async list () {
+  async list() {
     const saved = await this.#hooks.storage.list()
     return Collection.from(saved.map(r => ({ ...r, open: this.#hooks.open.has(r.id) })))
   }
 
   /** Projects open in this session. */
-  opened () {
+  opened() {
     return Collection.from(this.#hooks.open.values())
   }
 
   /** The active project, or null. */
-  get active () {
+  get active() {
     return this.#hooks.active()
   }
 
@@ -264,7 +339,7 @@ export class ProjectsApi {
    * Makes an open project the active one.
    * @param {ProjectHandle|string} projectOrId
    */
-  use (projectOrId) {
+  use(projectOrId) {
     const project = this.#resolveOpen(projectOrId)
     this.#hooks.activate(project)
     this.#hooks.emit('project', { action: 'activate', project })
@@ -272,15 +347,20 @@ export class ProjectsApi {
   }
 
   /** @param {ProjectHandle} project */
-  async save (project) {
-    await this.#hooks.storage.save({ id: project.id, name: project.name, updatedAt: this.#hooks.now(), snapshot: project.snapshot() })
+  async save(project) {
+    await this.#hooks.storage.save({
+      id: project.id,
+      name: project.name,
+      updatedAt: this.#hooks.now(),
+      snapshot: project.snapshot(),
+    })
   }
 
   /**
    * Closes an open project (unsaved changes stay unsaved).
    * @param {ProjectHandle|string} projectOrId
    */
-  close (projectOrId) {
+  close(projectOrId) {
     const project = this.#resolveOpen(projectOrId)
     const { open, emit } = this.#hooks
     open.delete(project.id)
@@ -293,7 +373,7 @@ export class ProjectsApi {
    * Deletes a saved project (closing it first). Confirmation is the caller's job.
    * @param {ProjectHandle|string} projectOrId
    */
-  async delete (projectOrId) {
+  async delete(projectOrId) {
     let id = projectOrId instanceof ProjectHandle ? projectOrId.id : projectOrId
     if (this.#hooks.open.has(id) || [...this.#hooks.open.values()].some(p => p.name === id)) {
       const project = this.#resolveOpen(id)
@@ -308,9 +388,10 @@ export class ProjectsApi {
     this.#hooks.emit('project', { action: 'delete', id })
   }
 
-  #resolveOpen (projectOrId) {
+  #resolveOpen(projectOrId) {
     if (projectOrId instanceof ProjectHandle) {
-      if (!this.#hooks.open.has(projectOrId.id)) fail('INVALID', `Project '${projectOrId.name}' is not open`)
+      if (!this.#hooks.open.has(projectOrId.id))
+        fail('INVALID', `Project '${projectOrId.name}' is not open`)
       return projectOrId
     }
     const open = this.#hooks.open
@@ -319,5 +400,7 @@ export class ProjectsApi {
     return project
   }
 
-  toString () { return 'strata.projects' }
+  toString() {
+    return 'strata.projects'
+  }
 }

@@ -22,7 +22,7 @@ export class ComponentsApi {
    * @param {import('../../core/src/index.js').Registry} registry
    * @param {(event: string, data: any) => void} emit
    */
-  constructor (registry, emit) {
+  constructor(registry, emit) {
     this.#registry = registry
     this.#emit = emit
   }
@@ -32,7 +32,7 @@ export class ComponentsApi {
    * @param {unknown} manifest
    * @param {{ replace?: boolean }} [options]
    */
-  register (manifest, options) {
+  register(manifest, options) {
     const m = this.#registry.register(manifest, options)
     this.#bundles.delete(typeRefOf(m))
     this.#emit('components', { action: 'register', typeRef: typeRefOf(m) })
@@ -48,7 +48,7 @@ export class ComponentsApi {
    * @param {{ replace?: boolean }} [options]
    * @returns {InstalledComponent}
    */
-  install (input, { replace = false } = {}) {
+  install(input, { replace = false } = {}) {
     const bundle = deepFreeze(structuredClone(readBundle(input)))
     const manifest = manifestOfBundle(bundle)
     const typeRef = `${manifest.id}@${manifest.version}`
@@ -56,7 +56,10 @@ export class ComponentsApi {
     if (this.#registry.get(typeRef)) {
       if (this.#bundles.get(typeRef)?.integrity === bundle.integrity) return info
       if (!replace) {
-        fail('CONFLICT', `${typeRef} is already installed with different contents. Give the new build a higher version, or pass { replace: true } to overwrite it.`)
+        fail(
+          'CONFLICT',
+          `${typeRef} is already installed with different contents. Give the new build a higher version, or pass { replace: true } to overwrite it.`
+        )
       }
     }
     this.#registry.register(manifest, { replace: true })
@@ -71,7 +74,7 @@ export class ComponentsApi {
    * @param {{ path: string, content: string|Uint8Array }[]} files
    * @param {{ inflateRaw?: (data: Uint8Array) => Uint8Array|Promise<Uint8Array> }} [options]
    */
-  pack (files, options) {
+  pack(files, options) {
     return packUpload(files, options)
   }
 
@@ -81,7 +84,7 @@ export class ComponentsApi {
    * @param {{ replace?: boolean, inflateRaw?: (data: Uint8Array) => Uint8Array|Promise<Uint8Array> }} [options]
    * @returns {Promise<{ component: InstalledComponent|null, problems: import('../../plugins/src/index.js').Problem[] }>}
    */
-  async upload (files, { replace, inflateRaw } = {}) {
+  async upload(files, { replace, inflateRaw } = {}) {
     const result = await packUpload(files, { inflateRaw })
     if (!result.bundle) return { component: null, problems: result.problems }
     return { component: this.install(result.bundle, { replace }), problems: result.problems }
@@ -92,11 +95,13 @@ export class ComponentsApi {
    * use it keep their properties and show as placeholders until it is installed again.
    * @param {string} ref id or id@version
    */
-  uninstall (ref) {
+  uninstall(ref) {
     const { id, version } = parseTypeRef(ref)
-    if (id.startsWith('base:')) fail('INVALID', `'${id}' is a built-in base type and cannot be uninstalled`)
+    if (id.startsWith('base:'))
+      fail('INVALID', `'${id}' is a built-in base type and cannot be uninstalled`)
     const versions = version ? [version] : this.#registry.versions(id)
-    if (!versions.length || (version && !this.#registry.get(ref))) fail('NOT_FOUND', `Component '${ref}' is not installed`)
+    if (!versions.length || (version && !this.#registry.get(ref)))
+      fail('NOT_FOUND', `Component '${ref}' is not installed`)
     for (const v of versions) {
       this.#registry.unregister(id, v)
       this.#bundles.delete(`${id}@${v}`)
@@ -110,42 +115,53 @@ export class ComponentsApi {
    * @param {string} name id, id@version or short name
    * @returns {ComponentBundle|null}
    */
-  bundle (name) {
+  bundle(name) {
     const m = this.#registry.find(name)
-    return m ? this.#bundles.get(typeRefOf(m)) ?? null : null
+    return m ? (this.#bundles.get(typeRefOf(m)) ?? null) : null
   }
 
   /** A manifest with inheritance applied. @param {string} name id, id@version or short name */
-  get (name) {
+  get(name) {
     return this.#registry.resolve(typeRefOf(this.#registry.require(name)))
   }
 
   /** Every version registered for an id. @param {string} id */
-  versions (id) {
+  versions(id) {
     return this.#registry.versions(id)
   }
 
   /**
    * Connection types (http, grpc, async-message, ...) with inheritance applied, latest versions.
    */
-  connectionTypes () {
-    return Collection.from(this.#registry.list({ kind: 'connection-type' }).filter(m => !m.abstract).map(m => this.#registry.resolve(typeRefOf(m))))
+  connectionTypes() {
+    return Collection.from(
+      this.#registry
+        .list({ kind: 'connection-type' })
+        .filter(m => !m.abstract)
+        .map(m => this.#registry.resolve(typeRefOf(m)))
+    )
   }
 
   /**
    * The latest version of every registered type.
    * @param {{ kind?: 'component'|'connection-type' }} [options]  only types of this kind
    */
-  list ({ kind } = {}) {
-    return Collection.from(this.#registry.list({ kind }).map(m => ({
-      id: m.id,
-      name: m.name,
-      version: m.version,
-      kind: m.kind ?? 'component',
-      category: m.category ?? '',
-      extends: m.extends ?? '',
-      abstract: m.abstract,
-      source: m.id.startsWith('base:') ? 'built-in' : this.#bundles.has(typeRefOf(m)) ? 'bundle' : 'manifest'
-    })))
+  list({ kind } = {}) {
+    return Collection.from(
+      this.#registry.list({ kind }).map(m => ({
+        id: m.id,
+        name: m.name,
+        version: m.version,
+        kind: m.kind ?? 'component',
+        category: m.category ?? '',
+        extends: m.extends ?? '',
+        abstract: m.abstract,
+        source: m.id.startsWith('base:')
+          ? 'built-in'
+          : this.#bundles.has(typeRefOf(m))
+            ? 'bundle'
+            : 'manifest',
+      }))
+    )
   }
 }

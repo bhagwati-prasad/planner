@@ -39,7 +39,7 @@ export const CLIP_FORMAT = 'strata/clip@1'
  * @param {Iterable<string>} ids node ids (edge ids are ignored: edges between copied nodes come along)
  * @returns {Clip}
  */
-export function copyNodes (project, ids) {
+export function copyNodes(project, ids) {
   const core = project[CORE]
   const nodes = [...new Set(ids)].map(id => core.get('node', id)).filter(Boolean)
   if (!nodes.length) fail('INVALID', 'Nothing to copy: select one or more nodes')
@@ -47,7 +47,9 @@ export function copyNodes (project, ids) {
   const position = n => {
     const [view] = core.viewsOf(n.systemId)
     const entry = view?.layout[n.id]
-    return entry && typeof entry.x === 'number' ? { x: entry.x, y: entry.y, w: entry.w, h: entry.h } : null
+    return entry && typeof entry.x === 'number'
+      ? { x: entry.x, y: entry.y, w: entry.w, h: entry.h }
+      : null
   }
   const placed = nodes.map(position)
   const xs = placed.filter(Boolean).map(p => p.x)
@@ -68,8 +70,22 @@ export function copyNodes (project, ids) {
       tags: [...n.tags],
       owner: n.owner,
       status: n.status,
-      extraPorts: core.portsOf(n.id).filter(port => !port.declared).map(port => ({ name: port.name, direction: port.direction, accepts: [...(port.accepts ?? [])] })),
-      at: p ? { x: p.x - origin.x, y: p.y - origin.y, ...(p.w ? { w: p.w } : {}), ...(p.h ? { h: p.h } : {}) } : null
+      extraPorts: core
+        .portsOf(n.id)
+        .filter(port => !port.declared)
+        .map(port => ({
+          name: port.name,
+          direction: port.direction,
+          accepts: [...(port.accepts ?? [])],
+        })),
+      at: p
+        ? {
+            x: p.x - origin.x,
+            y: p.y - origin.y,
+            ...(p.w ? { w: p.w } : {}),
+            ...(p.h ? { h: p.h } : {}),
+          }
+        : null,
     }
   })
 
@@ -88,7 +104,7 @@ export function copyNodes (project, ids) {
           to: { node: /** @type {number} */ (keyOf.get(to.nodeId)), port: to.name },
           connectionType: edge.connectionType,
           props: structuredClone(edge.props),
-          label: edge.label
+          label: edge.label,
         })
       }
     }
@@ -103,8 +119,9 @@ export function copyNodes (project, ids) {
  * @param {{ at?: { x: number, y: number } }} [options] where the clip's top-left lands (default: right of the existing nodes)
  * @returns {{ nodeIds: string[], edgeIds: string[], skipped: { name: string, reason: string }[] }}
  */
-export function pasteClip (system, clip, { at } = {}) {
-  if (!clip || clip.format !== CLIP_FORMAT || !Array.isArray(clip.nodes)) fail('INVALID', 'Not a Strata clip')
+export function pasteClip(system, clip, { at } = {}) {
+  if (!clip || clip.format !== CLIP_FORMAT || !Array.isArray(clip.nodes))
+    fail('INVALID', 'Not a Strata clip')
   const project = system.project
   const core = project[CORE]
   const [view] = core.viewsOf(system.id)
@@ -112,7 +129,8 @@ export function pasteClip (system, clip, { at } = {}) {
   const taken = new Set(core.nodesOf(system.id).map(n => n.name))
   const nameFor = name => {
     let candidate = name
-    for (let i = 1; taken.has(candidate); i++) candidate = i === 1 ? `${name} copy` : `${name} copy ${i}`
+    for (let i = 1; taken.has(candidate); i++)
+      candidate = i === 1 ? `${name} copy` : `${name} copy ${i}`
     taken.add(candidate)
     return candidate
   }
@@ -121,50 +139,94 @@ export function pasteClip (system, clip, { at } = {}) {
   const skipped = []
   const edgeIds = []
 
-  project.transaction(() => {
-    const layout = {}
-    for (const n of clip.nodes) {
-      try {
-        let id
-        if (n.kind === 'composite') {
-          if (!n.systemRef || !core.get('system', n.systemRef)) throw new Error('its system no longer exists')
-          id = project.dispatch({ type: 'node.place', payload: { systemId: system.id, systemRef: n.systemRef, placement: n.placement ?? 'reference', name: nameFor(n.name) } })
-        } else {
-          id = project.dispatch({
-            type: 'node.add',
-            payload: { systemId: system.id, typeRef: n.typeRef, name: nameFor(n.name), props: n.props, tags: n.tags, owner: n.owner, status: n.status, description: n.description }
-          })
-          for (const port of n.extraPorts ?? []) project.dispatch({ type: 'port.add', payload: { nodeId: id, ...port } })
+  project.transaction(
+    () => {
+      const layout = {}
+      for (const n of clip.nodes) {
+        try {
+          let id
+          if (n.kind === 'composite') {
+            if (!n.systemRef || !core.get('system', n.systemRef))
+              throw new Error('its system no longer exists')
+            id = project.dispatch({
+              type: 'node.place',
+              payload: {
+                systemId: system.id,
+                systemRef: n.systemRef,
+                placement: n.placement ?? 'reference',
+                name: nameFor(n.name),
+              },
+            })
+          } else {
+            id = project.dispatch({
+              type: 'component.add',
+              payload: {
+                systemId: system.id,
+                typeRef: n.typeRef,
+                name: nameFor(n.name),
+                props: n.props,
+                tags: n.tags,
+                owner: n.owner,
+                status: n.status,
+                description: n.description,
+              },
+            })
+            for (const port of n.extraPorts ?? [])
+              project.dispatch({ type: 'port.add', payload: { nodeId: id, ...port } })
+          }
+          created.set(n.key, id)
+          const rel = n.at ?? { x: 0, y: 0 }
+          layout[id] = {
+            x: target.x + rel.x,
+            y: target.y + rel.y,
+            ...(rel.w ? { w: rel.w } : {}),
+            ...(rel.h ? { h: rel.h } : {}),
+          }
+        } catch (err) {
+          skipped.push({ name: n.name, reason: /** @type {Error} */ (err).message })
         }
-        created.set(n.key, id)
-        const rel = n.at ?? { x: 0, y: 0 }
-        layout[id] = { x: target.x + rel.x, y: target.y + rel.y, ...(rel.w ? { w: rel.w } : {}), ...(rel.h ? { h: rel.h } : {}) }
-      } catch (err) {
-        skipped.push({ name: n.name, reason: /** @type {Error} */ (err).message })
       }
-    }
-    for (const e of clip.edges ?? []) {
-      const fromNode = created.get(e.from.node)
-      const toNode = created.get(e.to.node)
-      if (!fromNode || !toNode) continue
-      const fromPort = core.portsOf(fromNode).find(p => p.name === e.from.port)
-      const toPort = core.portsOf(toNode).find(p => p.name === e.to.port)
-      if (!fromPort || !toPort) continue
-      try {
-        edgeIds.push(project.dispatch({ type: 'edge.connect', payload: { fromPort: fromPort.id, toPort: toPort.id, connectionType: e.connectionType, props: e.props, label: e.label } }))
-      } catch (err) {
-        skipped.push({ name: `${e.from.port} → ${e.to.port}`, reason: /** @type {Error} */ (err).message })
+      for (const e of clip.edges ?? []) {
+        const fromNode = created.get(e.from.node)
+        const toNode = created.get(e.to.node)
+        if (!fromNode || !toNode) continue
+        const fromPort = core.portsOf(fromNode).find(p => p.name === e.from.port)
+        const toPort = core.portsOf(toNode).find(p => p.name === e.to.port)
+        if (!fromPort || !toPort) continue
+        try {
+          edgeIds.push(
+            project.dispatch({
+              type: 'edge.add',
+              payload: {
+                fromPort: fromPort.id,
+                toPort: toPort.id,
+                connectionType: e.connectionType,
+                props: e.props,
+                label: e.label,
+              },
+            })
+          )
+        } catch (err) {
+          skipped.push({
+            name: `${e.from.port} → ${e.to.port}`,
+            reason: /** @type {Error} */ (err).message,
+          })
+        }
       }
-    }
-    if (view && Object.keys(layout).length) project.dispatch({ type: 'view.layout', payload: { viewId: view.id, set: layout } })
-  }, { label: `Paste ${created.size} node(s)` })
+      if (view && Object.keys(layout).length)
+        project.dispatch({ type: 'view.layout', payload: { viewId: view.id, set: layout } })
+    },
+    { label: `Paste ${created.size} node(s)` }
+  )
 
   return { nodeIds: [...created.values()], edgeIds, skipped }
 }
 
 /** Top-left of free space to the right of what is already laid out. */
-function freeSpot (core, systemId, view) {
-  const entries = Object.entries(view?.layout ?? {}).filter(([id, e]) => core.get('node', id) && typeof e.x === 'number')
+function freeSpot(core, systemId, view) {
+  const entries = Object.entries(view?.layout ?? {}).filter(
+    ([id, e]) => core.get('node', id) && typeof e.x === 'number'
+  )
   if (!entries.length) return { x: 40, y: 40 }
   const right = Math.max(...entries.map(([, e]) => e.x + (e.w ?? 160)))
   const top = Math.min(...entries.map(([, e]) => e.y))

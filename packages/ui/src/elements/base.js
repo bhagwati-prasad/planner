@@ -16,11 +16,12 @@
  * @param {...any} children
  * @returns {HTMLElement}
  */
-export function h (tag, attrs, ...children) {
+export function h(tag, attrs, ...children) {
   const el = document.createElement(tag)
   for (const [key, value] of Object.entries(attrs ?? {})) {
     if (value === undefined || value === null || value === false) continue
-    if (key.startsWith('on') && typeof value === 'function') el.addEventListener(key.slice(2).toLowerCase(), value)
+    if (key.startsWith('on') && typeof value === 'function')
+      el.addEventListener(key.slice(2).toLowerCase(), value)
     else if (key === 'dataset') Object.assign(el.dataset, value)
     else if (key === 'value' && 'value' in el) /** @type {any} */ (el).value = value
     else if (key === 'checked' && 'checked' in el) /** @type {any} */ (el).checked = !!value
@@ -36,13 +37,13 @@ export function h (tag, attrs, ...children) {
  * @param {Element} el
  * @param {...any} children
  */
-export function fill (el, ...children) {
+export function fill(el, ...children) {
   el.replaceChildren()
   append(el, children)
   return el
 }
 
-function append (el, children) {
+function append(el, children) {
   for (const child of children) {
     if (child === null || child === undefined || child === false) continue
     if (Array.isArray(child)) append(el, child)
@@ -84,7 +85,7 @@ export class StrataElement extends HTMLElement {
   /** Element-specific CSS, added after BASE_CSS. */
   static css = ''
 
-  constructor () {
+  constructor() {
     super()
     const root = this.attachShadow({ mode: 'open' })
     const style = document.createElement('style')
@@ -95,26 +96,32 @@ export class StrataElement extends HTMLElement {
     root.append(this.content)
   }
 
-  get strata () { return this.#strata }
-  set strata (value) {
+  get strata() {
+    return this.#strata
+  }
+  set strata(value) {
     this.#strata = value
     this.#connect()
   }
 
-  get shell () { return this.#shell }
-  set shell (value) {
+  get shell() {
+    return this.#shell
+  }
+  set shell(value) {
     this.#shell = value
     this.#connect()
   }
 
-  connectedCallback () { this.#connect() }
+  connectedCallback() {
+    this.#connect()
+  }
 
-  disconnectedCallback () {
+  disconnectedCallback() {
     for (const off of this.#subscriptions) off()
     this.#subscriptions = []
   }
 
-  #connect () {
+  #connect() {
     if (!this.isConnected || !this.#strata || !this.#shell || this.#subscriptions.length) return
     this.#subscriptions = this.subscribe(this.#strata, this.#shell) ?? []
     this.update()
@@ -126,10 +133,12 @@ export class StrataElement extends HTMLElement {
    * @param {import('./shell.js').Shell} shell
    * @returns {(() => void)[]}
    */
-  subscribe (strata, shell) { return [] }
+  subscribe(strata, shell) {
+    return []
+  }
 
   /** Re-renders on the next frame (coalesces bursts of events). */
-  invalidate () {
+  invalidate() {
     if (this.#scheduled) return
     this.#scheduled = true
     requestAnimationFrame(() => {
@@ -139,13 +148,13 @@ export class StrataElement extends HTMLElement {
   }
 
   /** Renders the element; override. */
-  update () {}
+  update() {}
 
   /**
    * Runs a model change and reports failures to the user instead of throwing.
    * @param {() => void} fn
    */
-  attempt (fn) {
+  attempt(fn) {
     try {
       fn()
       return true
@@ -161,6 +170,6 @@ export class StrataElement extends HTMLElement {
  * @param {string} name
  * @param {CustomElementConstructor} ctor
  */
-export function define (name, ctor) {
+export function define(name, ctor) {
   if (!customElements.get(name)) customElements.define(name, ctor)
 }

@@ -12,9 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "db-protocol"
-      ]
+      "accepts": ["db-protocol"]
     }
   ],
   "properties": {
@@ -75,12 +73,7 @@
     },
     "isolationLevel": {
       "type": "enum",
-      "values": [
-        "read-uncommitted",
-        "read-committed",
-        "repeatable-read",
-        "serializable"
-      ],
+      "values": ["read-uncommitted", "read-committed", "repeatable-read", "serializable"],
       "default": "read-committed",
       "group": "Performance"
     },

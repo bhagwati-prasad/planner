@@ -3,15 +3,16 @@
  */
 import { fail } from './errors.js'
 
-const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/
+const SEMVER_RE =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/
 
 /** @param {unknown} version */
-export function isSemver (version) {
+export function isSemver(version) {
   return typeof version === 'string' && SEMVER_RE.test(version)
 }
 
 /** @param {string} version */
-export function parseSemver (version) {
+export function parseSemver(version) {
   const m = SEMVER_RE.exec(version)
   if (!m) fail('INVALID', `Not a semantic version: '${version}'`)
   return { major: +m[1], minor: +m[2], patch: +m[3], pre: m[4] ?? '' }
@@ -22,7 +23,7 @@ export function parseSemver (version) {
  * @param {string} b
  * @returns {number} negative, zero or positive
  */
-export function compareSemver (a, b) {
+export function compareSemver(a, b) {
   const x = parseSemver(a)
   const y = parseSemver(b)
   if (x.major !== y.major) return x.major - y.major
@@ -39,7 +40,7 @@ export function compareSemver (a, b) {
  * @param {string} version
  * @param {string} range
  */
-export function satisfies (version, range) {
+export function satisfies(version, range) {
   range = range.trim()
   if (range === '*' || range === '') return true
   const v = parseSemver(version)

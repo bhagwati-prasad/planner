@@ -7,11 +7,6 @@
     "strict": false,
     "noEmit": true
   },
-  "include": [
-    "packages/*/src/**/*.js"
-  ],
-  "exclude": [
-    "packages/cli/**",
-    "packages/server/**"
-  ]
+  "include": ["packages/*/src/**/*.js"],
+  "exclude": ["packages/cli/**", "packages/server/**"]
 }

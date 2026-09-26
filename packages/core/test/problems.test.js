@@ -20,7 +20,20 @@ test('problems cover placeholders, unmapped ports, unused library systems and ba
   const snap = core.snapshot()
   const node = snap.nodes.find(n => n.id === svc)
   node.props = { maxRps: 'lots', mystery: 1 }
-  const edge = { id: 'e-broken', systemId: root, fromPort: port(core, svc, 'out'), toPort: 'missing', connectionType: null, props: {}, label: '', createdBy: 'x', createdAt: 'x', updatedBy: 'x', updatedAt: 'x', rev: 1 }
+  const edge = {
+    id: 'e-broken',
+    systemId: root,
+    fromPort: port(core, svc, 'out'),
+    toPort: 'missing',
+    connectionType: null,
+    props: {},
+    label: '',
+    createdBy: 'x',
+    createdAt: 'x',
+    updatedBy: 'x',
+    updatedAt: 'x',
+    rev: 1,
+  }
   snap.edges.push(edge)
   const loaded = createCore({ registry: testRegistry(), snapshot: snap })
 
@@ -31,7 +44,7 @@ test('problems cover placeholders, unmapped ports, unused library systems and ba
     'warning:MISSING_COMPONENT',
     'warning:UNKNOWN_PROPERTY',
     'warning:UNMAPPED_BOUNDARY_PORT',
-    'info:UNUSED_SYSTEM'
+    'info:UNUSED_SYSTEM',
   ])
   const invalid = loaded.problems().find(p => p.code === 'INVALID_PROPERTY')
   assert.equal(invalid.id, svc)

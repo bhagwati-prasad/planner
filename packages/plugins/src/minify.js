@@ -9,7 +9,7 @@ import { tokenize } from './tokenize.js'
  * @param {string} code
  * @returns {string}
  */
-export function minify (code) {
+export function minify(code) {
   const tokens = tokenize(code)
   let out = ''
   let prev = null

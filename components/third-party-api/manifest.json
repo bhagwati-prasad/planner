@@ -12,10 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http",
-        "grpc"
-      ]
+      "accepts": ["http", "grpc"]
     }
   ],
   "properties": {

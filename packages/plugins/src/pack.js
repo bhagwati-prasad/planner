@@ -39,7 +39,7 @@ const MAX_BUNDLE_BYTES = 4 * 1024 * 1024
 const decoder = new TextDecoder('utf-8', { fatal: true })
 
 /** @param {string|Uint8Array} content @returns {string|null} text, or null for binary */
-export function asText (content) {
+export function asText(content) {
   if (typeof content === 'string') return content
   try {
     const text = decoder.decode(content)
@@ -50,11 +50,16 @@ export function asText (content) {
 }
 
 /** Files that never go into a bundle. @param {string} path */
-function ignored (path) {
+function ignored(path) {
   const parts = path.split('/')
-  return parts.some(p => p.startsWith('.') || p === 'node_modules' || p === '__MACOSX') ||
-    parts[0] === 'tests' || path === 'package.json' || path === 'package-lock.json' ||
-    path.endsWith('.strata.js') || /(^|\/)(Thumbs\.db|desktop\.ini)$/i.test(path)
+  return (
+    parts.some(p => p.startsWith('.') || p === 'node_modules' || p === '__MACOSX') ||
+    parts[0] === 'tests' ||
+    path === 'package.json' ||
+    path === 'package-lock.json' ||
+    path.endsWith('.strata.js') ||
+    /(^|\/)(Thumbs\.db|desktop\.ini)$/i.test(path)
+  )
 }
 
 /**
@@ -62,17 +67,24 @@ function ignored (path) {
  * removed when the manifest sits inside it (as in a zip of the folder).
  * @param {Record<string, string|Uint8Array>} files
  */
-export function normalizeFiles (files) {
+export function normalizeFiles(files) {
   /** @type {Record<string, string|Uint8Array>} */
   let out = {}
-  for (const [path, content] of Object.entries(files)) out[path.replace(/\\/g, '/').replace(/^(\.\/)+/, '').replace(/^\/+/, '')] = content
+  for (const [path, content] of Object.entries(files))
+    out[
+      path
+        .replace(/\\/g, '/')
+        .replace(/^(\.\/)+/, '')
+        .replace(/^\/+/, '')
+    ] = content
   if (!('manifest.json' in out)) {
     const manifests = Object.keys(out).filter(p => !ignored(p) && /^[^/]+\/manifest\.json$/.test(p))
     if (manifests.length === 1) {
       const prefix = manifests[0].slice(0, -'manifest.json'.length)
       /** @type {Record<string, string|Uint8Array>} */
       const stripped = {}
-      for (const [path, content] of Object.entries(out)) if (path.startsWith(prefix)) stripped[path.slice(prefix.length)] = content
+      for (const [path, content] of Object.entries(out))
+        if (path.startsWith(prefix)) stripped[path.slice(prefix.length)] = content
       out = stripped
     }
   }
@@ -83,16 +95,20 @@ export function normalizeFiles (files) {
  * Sorted-key JSON, so the integrity does not depend on property order.
  * @param {unknown} value
  */
-export function canonicalJson (value) {
+export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
   if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().filter(k => value[k] !== undefined).map(k => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(',')}}`
+    return `{${Object.keys(value)
+      .sort()
+      .filter(k => value[k] !== undefined)
+      .map(k => `${JSON.stringify(k)}:${canonicalJson(value[k])}`)
+      .join(',')}}`
   }
   return JSON.stringify(value ?? null)
 }
 
 /** @param {Omit<ComponentBundle, 'integrity'>} bundle */
-export function bundleIntegrity (bundle) {
+export function bundleIntegrity(bundle) {
   const { format, manifest, icon, modules, entry, assets } = bundle
   return integrityOf(canonicalJson({ format, manifest, icon, modules, entry, assets }))
 }
@@ -102,11 +118,18 @@ export function bundleIntegrity (bundle) {
  * @param {string} text
  * @returns {number}
  */
-export function jsonErrorOffset (text) {
+export function jsonErrorOffset(text) {
   let i = 0
-  const ws = () => { while (/[ \t\n\r]/.test(text[i] ?? '')) i++ }
-  const bad = () => { throw i }
-  const literal = word => { if (text.startsWith(word, i)) i += word.length; else bad() }
+  const ws = () => {
+    while (/[ \t\n\r]/.test(text[i] ?? '')) i++
+  }
+  const bad = () => {
+    throw i
+  }
+  const literal = word => {
+    if (text.startsWith(word, i)) i += word.length
+    else bad()
+  }
   const string = () => {
     if (text[i] !== '"') bad()
     i++
@@ -114,7 +137,10 @@ export function jsonErrorOffset (text) {
       if (i >= text.length || text[i] === '\n') bad()
       if (text[i] === '\\') {
         i++
-        if (text[i] === 'u') { if (!/^[0-9a-fA-F]{4}$/.test(text.slice(i + 1, i + 5))) bad(); i += 4 } else if (!'"\\/bfnrt'.includes(text[i])) bad()
+        if (text[i] === 'u') {
+          if (!/^[0-9a-fA-F]{4}$/.test(text.slice(i + 1, i + 5))) bad()
+          i += 4
+        } else if (!'"\\/bfnrt'.includes(text[i])) bad()
       }
       i++
     }
@@ -124,24 +150,49 @@ export function jsonErrorOffset (text) {
     ws()
     const ch = text[i]
     if (ch === '{') {
-      i++; ws()
-      if (text[i] === '}') { i++; return }
+      i++
+      ws()
+      if (text[i] === '}') {
+        i++
+        return
+      }
       for (;;) {
-        ws(); string(); ws()
+        ws()
+        string()
+        ws()
         if (text[i] !== ':') bad()
-        i++; value(); ws()
-        if (text[i] === ',') { i++; continue }
-        if (text[i] === '}') { i++; return }
+        i++
+        value()
+        ws()
+        if (text[i] === ',') {
+          i++
+          continue
+        }
+        if (text[i] === '}') {
+          i++
+          return
+        }
         bad()
       }
     }
     if (ch === '[') {
-      i++; ws()
-      if (text[i] === ']') { i++; return }
+      i++
+      ws()
+      if (text[i] === ']') {
+        i++
+        return
+      }
       for (;;) {
-        value(); ws()
-        if (text[i] === ',') { i++; continue }
-        if (text[i] === ']') { i++; return }
+        value()
+        ws()
+        if (text[i] === ',') {
+          i++
+          continue
+        }
+        if (text[i] === ']') {
+          i++
+          return
+        }
         bad()
       }
     }
@@ -154,7 +205,8 @@ export function jsonErrorOffset (text) {
     i += m[0].length
   }
   try {
-    value(); ws()
+    value()
+    ws()
     if (i < text.length) bad()
     return -1
   } catch (at) {
@@ -164,7 +216,7 @@ export function jsonErrorOffset (text) {
 }
 
 /** ' (line L, column C)' for a JSON syntax error. @param {string} text */
-function jsonWhere (text) {
+function jsonWhere(text) {
   const at = jsonErrorOffset(text)
   if (at < 0) return ''
   const before = text.slice(0, at)
@@ -177,7 +229,7 @@ function jsonWhere (text) {
  * @param {{ name?: string }} [options]  the folder name, for the output file name
  * @returns {PackResult}
  */
-export function packComponent (input, { name } = {}) {
+export function packComponent(input, { name } = {}) {
   const files = normalizeFiles(input)
   /** @type {Problem[]} */
   const problems = []
@@ -186,9 +238,14 @@ export function packComponent (input, { name } = {}) {
   const failed = () => problems.some(p => p.level === 'error')
   const result = () => ({ bundle: null, script: null, fileName: null, problems })
 
-  const paths = Object.keys(files).filter(p => !ignored(p)).sort()
+  const paths = Object.keys(files)
+    .filter(p => !ignored(p))
+    .sort()
   if (!paths.includes('manifest.json')) {
-    error('manifest.json', paths.length ? 'No manifest.json at the top of the folder' : 'The folder is empty')
+    error(
+      'manifest.json',
+      paths.length ? 'No manifest.json at the top of the folder' : 'The folder is empty'
+    )
     return result()
   }
 
@@ -213,7 +270,9 @@ export function packComponent (input, { name } = {}) {
 
   // Modules reachable from the entry and the migrations.
   const entries = [manifest.entry, ...Object.values(manifest.migrations ?? {})].filter(Boolean)
-  const jsFiles = Object.fromEntries(Object.entries(text).filter(([p]) => p.endsWith('.js') || p.endsWith('.json')))
+  const jsFiles = Object.fromEntries(
+    Object.entries(text).filter(([p]) => p.endsWith('.js') || p.endsWith('.json'))
+  )
   const graph = bundleModules(jsFiles, entries)
   problems.push(...graph.problems)
 
@@ -225,26 +284,48 @@ export function packComponent (input, { name } = {}) {
   }
   if (failed()) return result()
 
-  const used = new Set(['manifest.json', ...(manifest.icon ? [manifest.icon] : []), ...Object.keys(graph.modules)])
+  const used = new Set([
+    'manifest.json',
+    ...(manifest.icon ? [manifest.icon] : []),
+    ...Object.keys(graph.modules),
+  ])
   /** @type {Record<string, string>} */
   const assets = {}
   for (const [path, content] of Object.entries(text)) {
     if (used.has(path)) continue
-    if (path.endsWith('.js')) { warn(path, `Not imported by the entry or a migration, so it is left out of the bundle`); continue }
+    if (path.endsWith('.js')) {
+      warn(path, `Not imported by the entry or a migration, so it is left out of the bundle`)
+      continue
+    }
     assets[path] = content
   }
-  for (const path of binary) warn(path, 'Binary files are not bundled yet; embed images in the SVG icon or Markdown as data URLs')
+  for (const path of binary)
+    warn(
+      path,
+      'Binary files are not bundled yet; embed images in the SVG icon or Markdown as data URLs'
+    )
 
   /** @type {Record<string, string>} */
   const modules = {}
   for (const path of graph.order) if (graph.modules[path]) modules[path] = graph.modules[path].code
 
-  const body = { format: BUNDLE_FORMAT, manifest, icon, modules, entry: manifest.entry ?? null, assets }
+  const body = {
+    format: BUNDLE_FORMAT,
+    manifest,
+    icon,
+    modules,
+    entry: manifest.entry ?? null,
+    assets,
+  }
   /** @type {ComponentBundle} */
   const bundle = { ...body, integrity: bundleIntegrity(body) }
   const fileName = `${name || String(manifest.id).split(/[.:/]/).pop()}.strata.js`
   const script = componentScript(bundle, fileName)
-  if (script.length > MAX_BUNDLE_BYTES) warn(fileName, `The bundle is ${(script.length / 1048576).toFixed(1)} MB; large bundles slow down opening projects`)
+  if (script.length > MAX_BUNDLE_BYTES)
+    warn(
+      fileName,
+      `The bundle is ${(script.length / 1048576).toFixed(1)} MB; large bundles slow down opening projects`
+    )
   return { bundle, script, fileName, problems }
 }
 
@@ -254,7 +335,7 @@ export function packComponent (input, { name } = {}) {
  * @param {ComponentBundle} bundle
  * @param {string} [fileName]
  */
-export function componentScript (bundle, fileName = 'component.strata.js') {
+export function componentScript(bundle, fileName = 'component.strata.js') {
   const { id, version } = bundle.manifest
   return `// ${fileName} (generated by strata pack; do not edit)\n// ${id}@${version} · ${bundle.integrity}\n${SCRIPT_CALL}${JSON.stringify(bundle, null, 2)})\n`
 }
@@ -265,7 +346,7 @@ export function componentScript (bundle, fileName = 'component.strata.js') {
  * @param {string|object} input
  * @returns {ComponentBundle}
  */
-export function readBundle (input) {
+export function readBundle(input) {
   let bundle = input
   if (typeof input === 'string') {
     const text = input.trim()
@@ -277,25 +358,40 @@ export function readBundle (input) {
     try {
       bundle = JSON.parse(json)
     } catch {
-      throw new StrataError('INVALID', 'This is not a packed component: expected a .strata.js file made by strata pack')
+      throw new StrataError(
+        'INVALID',
+        'This is not a packed component: expected a .strata.js file made by strata pack'
+      )
     }
   }
   const b = /** @type {Record<string, any>} */ (bundle)
   const problems = []
-  if (!b || typeof b !== 'object') throw new StrataError('INVALID', 'A component bundle must be an object')
+  if (!b || typeof b !== 'object')
+    throw new StrataError('INVALID', 'A component bundle must be an object')
   if (b.format !== BUNDLE_FORMAT) problems.push(`format must be '${BUNDLE_FORMAT}'`)
   if (!b.manifest || typeof b.manifest !== 'object') problems.push('manifest is missing')
   if (b.icon !== null && typeof b.icon !== 'string') problems.push('icon must be SVG text or null')
-  if (b.entry !== null && typeof b.entry !== 'string') problems.push('entry must be a module path or null')
+  if (b.entry !== null && typeof b.entry !== 'string')
+    problems.push('entry must be a module path or null')
   for (const key of ['modules', 'assets']) {
-    if (!b[key] || typeof b[key] !== 'object' || Object.values(b[key]).some(v => typeof v !== 'string')) problems.push(`${key} must map paths to text`)
+    if (
+      !b[key] ||
+      typeof b[key] !== 'object' ||
+      Object.values(b[key]).some(v => typeof v !== 'string')
+    )
+      problems.push(`${key} must map paths to text`)
   }
-  if (b.entry && b.modules && !(b.entry in b.modules)) problems.push(`the entry '${b.entry}' is not among the modules`)
+  if (b.entry && b.modules && !(b.entry in b.modules))
+    problems.push(`the entry '${b.entry}' is not among the modules`)
   if (typeof b.integrity !== 'string') problems.push('integrity is missing')
-  if (problems.length) throw new StrataError('INVALID', `Invalid component bundle: ${problems.join('; ')}`, problems)
+  if (problems.length)
+    throw new StrataError('INVALID', `Invalid component bundle: ${problems.join('; ')}`, problems)
   const expected = bundleIntegrity(/** @type {ComponentBundle} */ (b))
   if (expected !== b.integrity) {
-    throw new StrataError('INVALID', `The bundle for ${b.manifest.id}@${b.manifest.version} was changed after it was packed (integrity mismatch). Pack it again with strata pack.`)
+    throw new StrataError(
+      'INVALID',
+      `The bundle for ${b.manifest.id}@${b.manifest.version} was changed after it was packed (integrity mismatch). Pack it again with strata pack.`
+    )
   }
   return /** @type {ComponentBundle} */ (b)
 }
@@ -305,7 +401,7 @@ export function readBundle (input) {
  * @param {ComponentBundle} bundle
  * @returns {Record<string, any>}
  */
-export function manifestOfBundle (bundle) {
+export function manifestOfBundle(bundle) {
   return bundle.icon ? { ...bundle.manifest, iconSvg: bundle.icon } : { ...bundle.manifest }
 }
 
@@ -314,10 +410,14 @@ export function manifestOfBundle (bundle) {
  * @param {PackResult} result
  * @returns {ComponentBundle}
  */
-export function requireBundle (result) {
+export function requireBundle(result) {
   const errors = result.problems.filter(p => p.level === 'error')
   if (errors.length || !result.bundle) {
-    throw new StrataError('INVALID', `The component could not be packed:\n${errors.map(formatProblem).join('\n')}`, errors)
+    throw new StrataError(
+      'INVALID',
+      `The component could not be packed:\n${errors.map(formatProblem).join('\n')}`,
+      errors
+    )
   }
   return result.bundle
 }

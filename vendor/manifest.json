@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "libraries": {
+    "d3": {
+      "version": "7.9.0",
+      "licence": "ISC",
+      "source": "npm d3@7.9.0 (sha512-e1U46jVP+w7Iut8Jt8ri1YsPOvFpg46k+K8TpCb0P+zjCkjkPnV7WzfDJzMHy1LnA+wj5pLT1wjO901gLXeEhA==): dist/d3.min.js and LICENSE, unmodified",
+      "global": "d3",
+      "files": {
+        "d3/LICENSE": "sha256-PmhJYn90/3PCV6OuHvtXQBXZT8EDXAXsPBWAUWXvy8Q=",
+        "d3/d3.min.js": "sha256-8glLv2FBs1lyLE/kVOtsSw8OQswQzHr5IfwVj864ZTk="
+      }
+    },
+    "three": {
+      "version": "0.186.1",
+      "licence": "MIT",
+      "source": "npm three@0.186.1 (sha512-blFeqb49wRCSGUGj7gtpfnSGHy2lwDk94RhUmS1c/hTby70kvChbWpkJ4Pm1390LqzzvTmzgXKHPEafJwCb8jA==): build/three.module.js, build/three.core.js and LICENSE, unmodified",
+      "global": "THREE",
+      "files": {
+        "three/LICENSE": "sha256-izeOvmDi/lABWMsKxxy16LfZKVPCq8xjoOuQSZZTtbw=",
+        "three/three.core.js": "sha256-nt3gArBmqaBWdqYSf2dzW2K685m96lKfL34xZX2naeY=",
+        "three/three.module.js": "sha256-kFIELWdssP3B3f7+GTBT80t6wFE6YW/axFNdSZh4Euo="
+      }
+    }
+  }
+}

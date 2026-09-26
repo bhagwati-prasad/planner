@@ -33,7 +33,7 @@ export const TOKENS = Object.freeze({
   heatHigh: '--sg-heat-high',
   fontFamily: '--sg-font-family',
   fontSize: '--sg-font-size',
-  radius: '--sg-radius'
+  radius: '--sg-radius',
 })
 
 export const LIGHT = Object.freeze({
@@ -65,7 +65,7 @@ export const LIGHT = Object.freeze({
   heatHigh: '#dc2626',
   fontFamily: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
   fontSize: '12px',
-  radius: '6'
+  radius: '6',
 })
 
 export const DARK = Object.freeze({
@@ -91,21 +91,28 @@ export const DARK = Object.freeze({
   guide: '#f472b6',
   sticky: '#713f12',
   stickyText: '#fef3c7',
-  region: 'rgba(96, 165, 250, 0.1)'
+  region: 'rgba(96, 165, 250, 0.1)',
 })
 
 /**
  * Inline style declarations for a theme ('light', 'dark' or a partial token object over light).
  * @param {'light'|'dark'|Partial<Record<keyof typeof TOKENS, string>>} theme
  */
-export function themeStyle (theme) {
-  const tokens = theme === 'dark' ? DARK : theme === 'light' || !theme ? LIGHT : { ...LIGHT, ...theme }
-  return Object.entries(TOKENS).map(([key, cssVar]) => `${cssVar}: ${tokens[key]};`).join(' ')
+export function themeStyle(theme) {
+  const tokens =
+    theme === 'dark' ? DARK : theme === 'light' || !theme ? LIGHT : { ...LIGHT, ...theme }
+  return Object.entries(TOKENS)
+    .map(([key, cssVar]) => `${cssVar}: ${tokens[key]};`)
+    .join(' ')
 }
 
 /** Resolved token values, for export where CSS variables are unavailable. @param {'light'|'dark'|Record<string, string>} theme */
-export function themeTokens (theme) {
-  return theme === 'dark' ? DARK : typeof theme === 'object' && theme ? { ...LIGHT, .../** @type {object} */ (theme) } : LIGHT
+export function themeTokens(theme) {
+  return theme === 'dark'
+    ? DARK
+    : typeof theme === 'object' && theme
+      ? { ...LIGHT, .../** @type {object} */ (theme) }
+      : LIGHT
 }
 
 /** @param {keyof typeof TOKENS} token */

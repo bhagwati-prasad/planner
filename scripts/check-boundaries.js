@@ -7,36 +7,18 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve, dirname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { boundaries } from '../tools/lint/guidelines.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
 
 /**
- * Allowed package dependencies (directory names under packages/). Every package may import
- * itself. The new packages follow the table in eng §6; the existing ones keep the imports they
- * have until the import-boundary lint rule (task 0003) enforces that table everywhere.
+ * Allowed package dependencies (directory names under packages/), read from the eng §6 table,
+ * the same source the strata/import-boundaries lint rule uses. Every package may import itself.
  */
-const ALLOWED = {
-  core: [],
-  // Plugins build on the core's registry and manifests (spec §4).
-  plugins: ['core'],
-  storage: ['core'],
-  comments: ['core'],
-  docs: ['core'],
-  plan: ['core'],
-  sim: ['core'],
-  debug: ['sim', 'core'],
-  test: ['sim', 'core'],
-  facade: ['core', 'plugins', 'storage', 'sim', 'debug', 'test', 'docs', 'plan', 'comments'],
-  // The diagram libraries know nothing about Strata (spec §4).
-  graph: [],
-  '3d': [],
-  // The UI may not reach past the facade (spec §18): no core.
-  ui: ['facade', 'graph', '3d'],
-  // Node only: the local server and the command line.
-  server: ['core', 'plugins', 'facade', 'storage'],
-  cli: ['core', 'plugins', 'facade', 'storage', 'server']
-}
+const ALLOWED = Object.fromEntries(
+  [...boundaries().packages].map(([pkg, deps]) => [pkg, [...deps]])
+)
 
 /**
  * Code that must run unchanged in a browser, a worker and Node. graph keeps its DOM
@@ -55,18 +37,39 @@ const HEADLESS = {
   plan: () => true,
   comments: () => true,
   graph: rel => !rel.split(sep).includes('dom'),
-  ui: rel => !rel.split(sep).includes('elements')
+  ui: rel => !rel.split(sep).includes('elements'),
 }
 
 /** Packages whose sources load in browsers: relative imports only. */
-const BROWSER = new Set(['core', 'plugins', 'facade', 'sim', 'debug', 'test', 'docs', 'plan', 'comments', 'storage', 'graph', '3d', 'ui'])
+const BROWSER = new Set([
+  'core',
+  'plugins',
+  'facade',
+  'sim',
+  'debug',
+  'test',
+  'docs',
+  'plan',
+  'comments',
+  'storage',
+  'graph',
+  '3d',
+  'ui',
+])
 
 const DOM_GLOBALS = [
-  'document', 'window', 'localStorage', 'sessionStorage', 'indexedDB',
-  'HTMLElement', 'customElements', 'navigator', 'location'
+  'document',
+  'window',
+  'localStorage',
+  'sessionStorage',
+  'indexedDB',
+  'HTMLElement',
+  'customElements',
+  'navigator',
+  'location',
 ]
 
-function walk (dir, out = []) {
+function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name)
     if (statSync(path).isDirectory()) walk(path, out)
@@ -76,7 +79,7 @@ function walk (dir, out = []) {
 }
 
 /** Removes comments and string/template contents so identifier checks ignore them. */
-function stripCode (src) {
+function stripCode(src) {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:\\])\/\/.*$/gm, '$1')
@@ -85,10 +88,13 @@ function stripCode (src) {
     .replace(/`(?:\\.|[^`\\])*`/g, '``')
 }
 
-const IMPORT_RE = /\bimport\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)|\bexport\s+(?:\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
+const IMPORT_RE =
+  /\bimport\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)|\bexport\s+(?:\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
 
 const problems = []
-const packages = readdirSync(packagesDir).filter(name => statSync(join(packagesDir, name)).isDirectory())
+const packages = readdirSync(packagesDir).filter(name =>
+  statSync(join(packagesDir, name)).isDirectory()
+)
 
 for (const pkg of packages) {
   if (!(pkg in ALLOWED)) {
@@ -97,7 +103,11 @@ for (const pkg of packages) {
   }
   const srcDir = join(packagesDir, pkg, 'src')
   let files = []
-  try { files = walk(srcDir) } catch { continue }
+  try {
+    files = walk(srcDir)
+  } catch {
+    continue
+  }
   for (const file of files) {
     const rel = relative(root, file)
     const src = readFileSync(file, 'utf8')
@@ -113,14 +123,17 @@ for (const pkg of packages) {
           problems.push(`${rel}: '${pkg}' may not depend on '${targetPkg}' (imports '${spec}')`)
         }
       } else if (BROWSER.has(pkg)) {
-        problems.push(`${rel}: '${pkg}' runs in browsers and imports '${spec}'; only relative imports are allowed`)
+        problems.push(
+          `${rel}: '${pkg}' runs in browsers and imports '${spec}'; only relative imports are allowed`
+        )
       }
     }
     if (HEADLESS[pkg]?.(relative(srcDir, file))) {
       const code = stripCode(src)
       for (const name of DOM_GLOBALS) {
         const re = new RegExp(`(?<![.\\w$])${name}(?![\\w$])`, 'g')
-        if (re.test(code)) problems.push(`${rel}: headless code references the browser global '${name}'`)
+        if (re.test(code))
+          problems.push(`${rel}: headless code references the browser global '${name}'`)
       }
     }
   }

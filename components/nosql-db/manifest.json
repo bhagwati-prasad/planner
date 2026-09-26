@@ -12,10 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "db-protocol",
-        "http"
-      ]
+      "accepts": ["db-protocol", "http"]
     }
   ],
   "properties": {
@@ -41,10 +38,7 @@
     },
     "consistency": {
       "type": "enum",
-      "values": [
-        "eventual",
-        "strong"
-      ],
+      "values": ["eventual", "strong"],
       "default": "eventual",
       "group": "Durability"
     },

@@ -10,10 +10,7 @@
   "properties": {
     "mode": {
       "type": "enum",
-      "values": [
-        "sync",
-        "async"
-      ],
+      "values": ["sync", "async"],
       "default": "async",
       "group": "Connection"
     },

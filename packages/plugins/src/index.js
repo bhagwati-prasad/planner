@@ -12,11 +12,28 @@
 export { sha256, toHex, toBase64, fromBase64, integrityOf } from './sha256.js'
 export { tokenize, SyntaxProblem } from './tokenize.js'
 export { transformModule, transformJson, ModuleError, MODULE_PARAMS } from './modules.js'
-export { bundleModules, emitScript, moduleTable, createModuleRuntime, normalizePath, resolveImport, formatProblem } from './bundle.js'
+export {
+  bundleModules,
+  emitScript,
+  moduleTable,
+  createModuleRuntime,
+  normalizePath,
+  resolveImport,
+  formatProblem,
+} from './bundle.js'
 export { validateManifest, checkIcon, PLUGIN_KINDS, MANIFEST_KEYS } from './manifest.js'
 export {
-  packComponent, componentScript, readBundle, manifestOfBundle, requireBundle, bundleIntegrity, canonicalJson,
-  normalizeFiles, asText, jsonErrorOffset, BUNDLE_FORMAT
+  packComponent,
+  componentScript,
+  readBundle,
+  manifestOfBundle,
+  requireBundle,
+  bundleIntegrity,
+  canonicalJson,
+  normalizeFiles,
+  asText,
+  jsonErrorOffset,
+  BUNDLE_FORMAT,
 } from './pack.js'
 export { readZip, isZip } from './zip.js'
 export { minify } from './minify.js'

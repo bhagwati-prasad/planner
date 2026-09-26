@@ -17,13 +17,21 @@ test('installing a packed component makes it usable like any type', async () => 
   strata.on('components', e => events.push(e))
   const { script } = packed()
   const info = strata.components.install(script)
-  assert.deepEqual(info, { id: 'acme.message-queue', version: '1.2.0', typeRef: 'acme.message-queue@1.2.0', name: 'Message Queue' })
+  assert.deepEqual(info, {
+    id: 'acme.message-queue',
+    version: '1.2.0',
+    typeRef: 'acme.message-queue@1.2.0',
+    name: 'Message Queue',
+  })
   assert.deepEqual(events, [{ action: 'install', typeRef: 'acme.message-queue@1.2.0' }])
 
   const p = await strata.projects.create('queues')
   const q = p.root.add('message-queue', { name: 'Orders queue' })
   assert.equal(q.type, 'acme.message-queue@1.2.0')
-  assert.deepEqual(q.ports().map(port => port.name), ['in', 'out', 'dlq'])
+  assert.deepEqual(
+    q.ports().map(port => port.name),
+    ['in', 'out', 'dlq']
+  )
   assert.equal(q.props.capacity, 100000)
 
   const row = strata.components.list().find(c => c.id === 'acme.message-queue')
@@ -31,7 +39,10 @@ test('installing a packed component makes it usable like any type', async () => 
   assert.equal(strata.components.list().find(c => c.id === 'base:queue')?.source, 'built-in')
   assert.match(strata.components.get('message-queue').iconSvg ?? '', /^<svg/)
   assert.equal(strata.components.bundle('message-queue')?.entry, 'index.js')
-  assert.ok(Object.isFrozen(strata.components.bundle('message-queue')?.modules), 'stored bundles are frozen copies')
+  assert.ok(
+    Object.isFrozen(strata.components.bundle('message-queue')?.modules),
+    'stored bundles are frozen copies'
+  )
 })
 
 test('reinstalling: identical is a no-op, different contents need a new version or replace', () => {
@@ -44,15 +55,32 @@ test('reinstalling: identical is a no-op, different contents need a new version 
   assert.equal(count, 0)
 
   const changed = packed({ ...messageQueueFolder(), 'README.md': '# Changed\n' }).bundle
-  assert.throws(() => strata.components.install(changed), err => err.code === 'CONFLICT' && /higher version, or pass \{ replace: true \}/.test(err.message))
+  assert.throws(
+    () => strata.components.install(changed),
+    err =>
+      err.code === 'CONFLICT' && /higher version, or pass \{ replace: true \}/.test(err.message)
+  )
   strata.components.install(changed, { replace: true })
-  assert.equal(strata.components.bundle('acme.message-queue@1.2.0')?.assets['README.md'], '# Changed\n')
+  assert.equal(
+    strata.components.bundle('acme.message-queue@1.2.0')?.assets['README.md'],
+    '# Changed\n'
+  )
 
   const manifest = JSON.parse(messageQueueFolder()['manifest.json'])
-  const v2 = packed({ ...messageQueueFolder(), 'manifest.json': JSON.stringify({ ...manifest, version: '2.0.0' }) }).bundle
+  const v2 = packed({
+    ...messageQueueFolder(),
+    'manifest.json': JSON.stringify({ ...manifest, version: '2.0.0' }),
+  }).bundle
   strata.components.install(v2)
-  assert.deepEqual(strata.components.versions('acme.message-queue'), ['1.2.0', '2.0.0'], 'versions coexist')
-  assert.throws(() => strata.components.install({ ...bundle, integrity: 'sha256-AAAA' }), /integrity mismatch/)
+  assert.deepEqual(
+    strata.components.versions('acme.message-queue'),
+    ['1.2.0', '2.0.0'],
+    'versions coexist'
+  )
+  assert.throws(
+    () => strata.components.install({ ...bundle, integrity: 'sha256-AAAA' }),
+    /integrity mismatch/
+  )
 })
 
 test('uninstalling leaves placeholders that keep their properties', async () => {
@@ -65,15 +93,29 @@ test('uninstalling leaves placeholders that keep their properties', async () => 
   assert.equal(p.node(q.id).props.capacity, 500)
   assert.ok(p.problems().some(problem => /not installed/.test(problem.message)))
   assert.throws(() => strata.components.uninstall('base:queue'), /built-in base type/)
-  assert.throws(() => strata.components.uninstall('acme.nothing'), err => err.code === 'NOT_FOUND')
+  assert.throws(
+    () => strata.components.uninstall('acme.nothing'),
+    err => err.code === 'NOT_FOUND'
+  )
 })
 
 test('upload packs a zip or a folder with the same packer and installs it', async () => {
   const strata = quiet()
-  const folder = Object.fromEntries(Object.entries(messageQueueFolder()).map(([path, content]) => [`message-queue/${path}`, content]))
-  const { component, problems } = await strata.components.upload([{ path: 'message-queue.zip', content: makeZip(folder) }])
+  const folder = Object.fromEntries(
+    Object.entries(messageQueueFolder()).map(([path, content]) => [
+      `message-queue/${path}`,
+      content,
+    ])
+  )
+  const { component, problems } = await strata.components.upload([
+    { path: 'message-queue.zip', content: makeZip(folder) },
+  ])
   assert.equal(component?.typeRef, 'acme.message-queue@1.2.0')
-  assert.deepEqual(problems.map(p => p.level), ['warning'], 'the unused module is reported')
+  assert.deepEqual(
+    problems.map(p => p.level),
+    ['warning'],
+    'the unused module is reported'
+  )
   assert.equal(strata.components.bundle('message-queue')?.integrity, packed().bundle.integrity)
 
   const broken = await strata.components.upload([{ path: 'q/manifest.json', content: '{}' }])

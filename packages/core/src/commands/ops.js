@@ -7,40 +7,55 @@ import { didYouMean, fail, suggest } from '../errors.js'
 import { validateValue } from '../props.js'
 import { isPlainObject } from '../plain.js'
 import { PORT_DIRECTIONS } from '../registry.js'
-import { acceptsOf, boundaryPortsOf, edgesAtPort, edgesOf, nodesOf, portsOf, viewsOf } from '../model.js'
+import {
+  acceptsOf,
+  boundaryPortsOf,
+  edgesAtPort,
+  edgesOf,
+  nodesOf,
+  portsOf,
+  viewsOf,
+} from '../model.js'
 
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
 
-export const DEFAULT_LAYER = Object.freeze({ id: 'default', name: 'Default', locked: false, hidden: false })
+export const DEFAULT_LAYER = Object.freeze({
+  id: 'default',
+  name: 'Default',
+  locked: false,
+  hidden: false,
+})
 
 // ---------------------------------------------------------------------------------------------
 // Input checks
 // ---------------------------------------------------------------------------------------------
 
 /** @param {unknown} value @param {string} label */
-export function requireString (value, label) {
-  if (typeof value !== 'string' || !value.trim()) fail('INVALID', `${label} must be a non-empty string`)
+export function requireString(value, label) {
+  if (typeof value !== 'string' || !value.trim())
+    fail('INVALID', `${label} must be a non-empty string`)
   return /** @type {string} */ (value)
 }
 
 /** @param {unknown} value @param {string} label @returns {string|undefined} */
-export function optionalString (value, label) {
+export function optionalString(value, label) {
   if (value === undefined) return undefined
   if (typeof value !== 'string') fail('INVALID', `${label} must be a string`)
   return value
 }
 
 /** @param {unknown} value @param {string} label @returns {string|null|undefined} */
-export function nullableString (value, label) {
+export function nullableString(value, label) {
   if (value === undefined || value === null) return /** @type {null|undefined} */ (value)
   if (typeof value !== 'string') fail('INVALID', `${label} must be a string or null`)
   return value
 }
 
 /** @param {unknown} value @param {string} label */
-export function stringList (value, label) {
+export function stringList(value, label) {
   if (value === undefined) return undefined
-  if (!Array.isArray(value) || value.some(v => typeof v !== 'string')) fail('INVALID', `${label} must be a list of strings`)
+  if (!Array.isArray(value) || value.some(v => typeof v !== 'string'))
+    fail('INVALID', `${label} must be a list of strings`)
   return /** @type {string[]} */ (value)
 }
 
@@ -51,14 +66,15 @@ export function stringList (value, label) {
  * @param {string} label
  * @returns {T|undefined}
  */
-export function oneOf (value, options, label) {
+export function oneOf(value, options, label) {
   if (value === undefined) return undefined
-  if (!options.includes(/** @type {T} */ (value))) fail('INVALID', `${label} must be one of ${options.map(o => JSON.stringify(o)).join(', ')}`)
+  if (!options.includes(/** @type {T} */ (value)))
+    fail('INVALID', `${label} must be one of ${options.map(o => JSON.stringify(o)).join(', ')}`)
   return /** @type {T} */ (value)
 }
 
 /** @param {unknown} value @param {string} label */
-export function plainObject (value, label) {
+export function plainObject(value, label) {
   if (value === undefined) return undefined
   if (!isPlainObject(value)) fail('INVALID', `${label} must be an object`)
   return /** @type {Record<string, any>} */ (value)
@@ -70,9 +86,10 @@ export function plainObject (value, label) {
  * @param {string[]} allowed
  * @param {string} label
  */
-export function onlyKeys (obj, allowed, label) {
+export function onlyKeys(obj, allowed, label) {
   for (const key of Object.keys(obj)) {
-    if (!allowed.includes(key)) fail('INVALID', `${label}: '${key}' cannot be changed here (allowed: ${allowed.join(', ')})`)
+    if (!allowed.includes(key))
+      fail('INVALID', `${label}: '${key}' cannot be changed here (allowed: ${allowed.join(', ')})`)
   }
 }
 
@@ -81,7 +98,7 @@ export function onlyKeys (obj, allowed, label) {
  * @param {Iterable<string>} taken
  * @param {string} base
  */
-export function uniqueName (taken, base) {
+export function uniqueName(taken, base) {
   const names = new Set(taken)
   if (!names.has(base)) return base
   for (let i = 2; ; i++) if (!names.has(`${base} ${i}`)) return `${base} ${i}`
@@ -97,7 +114,7 @@ export function uniqueName (taken, base) {
  * @param {{ id?: string, name: string, levelTag?: string|null, description?: string, ownerNodeId?: string|null, contract?: object, rollups?: object, tags?: string[] }} fields
  * @param {{ defaultView?: boolean }} [options]
  */
-export function createSystem (ctx, fields, { defaultView = true } = {}) {
+export function createSystem(ctx, fields, { defaultView = true } = {}) {
   const id = fields.id ?? ctx.newId()
   ctx.tx.create('system', {
     id,
@@ -107,7 +124,7 @@ export function createSystem (ctx, fields, { defaultView = true } = {}) {
     contract: fields.contract ?? {},
     rollups: fields.rollups ?? {},
     tags: fields.tags ?? [],
-    ownerNodeId: fields.ownerNodeId ?? null
+    ownerNodeId: fields.ownerNodeId ?? null,
   })
   if (defaultView) createView(ctx, id, { name: 'Logical', kind: 'logical' })
   return id
@@ -118,7 +135,7 @@ export function createSystem (ctx, fields, { defaultView = true } = {}) {
  * @param {string} systemId
  * @param {{ id?: string, name: string, kind?: string, layout?: object, hidden?: string[], layers?: object[], filters?: object, styles?: object }} fields
  */
-export function createView (ctx, systemId, fields) {
+export function createView(ctx, systemId, fields) {
   const id = fields.id ?? ctx.newId()
   ctx.tx.create('view', {
     id,
@@ -129,7 +146,7 @@ export function createView (ctx, systemId, fields) {
     hidden: fields.hidden ?? [],
     layers: fields.layers ?? [DEFAULT_LAYER],
     filters: fields.filters ?? {},
-    styles: fields.styles ?? {}
+    styles: fields.styles ?? {},
   })
   return id
 }
@@ -140,12 +157,12 @@ export function createView (ctx, systemId, fields) {
  * @param {string} nodeId
  * @param {string} systemId
  */
-export function createMirrorPorts (ctx, nodeId, systemId) {
+export function createMirrorPorts(ctx, nodeId, systemId) {
   for (const bp of boundaryPortsOf(ctx.tx, systemId)) createMirrorPort(ctx, nodeId, bp)
 }
 
 /** @param {Ctx} ctx @param {string} nodeId @param {any} bp */
-export function createMirrorPort (ctx, nodeId, bp) {
+export function createMirrorPort(ctx, nodeId, bp) {
   const id = ctx.newId()
   ctx.tx.create('port', {
     id,
@@ -154,7 +171,7 @@ export function createMirrorPort (ctx, nodeId, bp) {
     direction: bp.direction,
     accepts: null,
     declared: true,
-    boundaryPortId: bp.id
+    boundaryPortId: bp.id,
   })
   return id
 }
@@ -170,12 +187,16 @@ export function createMirrorPort (ctx, nodeId, bp) {
  * @param {Record<string, unknown>} props
  * @param {string} label
  */
-export function validateProps (manifest, props, label) {
+export function validateProps(manifest, props, label) {
   if (!manifest) return
   const known = Object.keys(manifest.properties)
   for (const [key, value] of Object.entries(props)) {
     const schema = manifest.properties[key]
-    if (!schema) fail('INVALID', `Unknown property '${key}' for ${label} (${manifest.typeRef}).${didYouMean(suggest(key, known))}`)
+    if (!schema)
+      fail(
+        'INVALID',
+        `Unknown property '${key}' for ${label} (${manifest.typeRef}).${didYouMean(suggest(key, known))}`
+      )
     validateValue(schema, value, `${label}.${key}`)
   }
 }
@@ -185,36 +206,63 @@ export function validateProps (manifest, props, label) {
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * The port an edge names, or E_PORT_NOT_FOUND.
+ * @param {any} src
+ * @param {string} id
+ */
+function requirePort(src, id) {
+  if (!src.has('port', id)) fail('E_PORT_NOT_FOUND', `Port '${id}' not found`, { portId: id })
+  return src.get('port', id)
+}
+
+/**
  * Validates an edge between two ports and picks its connection type.
  * @param {import('../model.js').Source} src
  * @param {string} fromPortId
  * @param {string} toPortId
  * @param {string|null|undefined} connectionType
  */
-export function checkConnection (src, fromPortId, toPortId, connectionType) {
-  const from = src.require('port', fromPortId)
-  const to = src.require('port', toPortId)
+export function checkConnection(src, fromPortId, toPortId, connectionType) {
+  const from = requirePort(src, fromPortId)
+  const to = requirePort(src, toPortId)
   if (from.id === to.id) fail('INVALID', 'An edge cannot connect a port to itself')
   const fromNode = src.require('node', from.nodeId)
   const toNode = src.require('node', to.nodeId)
   if (fromNode.systemId !== toNode.systemId) {
-    fail('INVALID', `'${fromNode.name}' and '${toNode.name}' are in different systems; connect through boundary ports instead`)
+    fail(
+      'INVALID',
+      `'${fromNode.name}' and '${toNode.name}' are in different systems; connect through boundary ports instead`
+    )
   }
-  if (from.direction === 'in') fail('INVALID', `Port '${fromNode.name}.${from.name}' is an input and cannot start an edge`)
-  if (to.direction === 'out') fail('INVALID', `Port '${toNode.name}.${to.name}' is an output and cannot end an edge`)
+  if (from.direction === 'in')
+    fail('INVALID', `Port '${fromNode.name}.${from.name}' is an input and cannot start an edge`)
+  if (to.direction === 'out')
+    fail('INVALID', `Port '${toNode.name}.${to.name}' is an output and cannot end an edge`)
   const fromAccepts = acceptsOf(src, from)
   const toAccepts = acceptsOf(src, to)
   let type = connectionType ?? null
   if (type === null) {
-    if (fromAccepts.length && toAccepts.length) type = fromAccepts.find(t => toAccepts.includes(t)) ?? null
+    if (fromAccepts.length && toAccepts.length)
+      type = fromAccepts.find(t => toAccepts.includes(t)) ?? null
     else type = fromAccepts[0] ?? toAccepts[0] ?? null
     if (type === null && fromAccepts.length && toAccepts.length) {
-      fail('INVALID', `'${fromNode.name}.${from.name}' (${fromAccepts.join(', ')}) and '${toNode.name}.${to.name}' (${toAccepts.join(', ')}) share no connection type`)
+      fail(
+        'INVALID',
+        `'${fromNode.name}.${from.name}' (${fromAccepts.join(', ')}) and '${toNode.name}.${to.name}' (${toAccepts.join(', ')}) share no connection type`
+      )
     }
   } else {
     requireString(type, 'connectionType')
-    if (fromAccepts.length && !fromAccepts.includes(type)) fail('INVALID', `Port '${fromNode.name}.${from.name}' does not accept '${type}' (accepts ${fromAccepts.join(', ')})`)
-    if (toAccepts.length && !toAccepts.includes(type)) fail('INVALID', `Port '${toNode.name}.${to.name}' does not accept '${type}' (accepts ${toAccepts.join(', ')})`)
+    if (fromAccepts.length && !fromAccepts.includes(type))
+      fail(
+        'INVALID',
+        `Port '${fromNode.name}.${from.name}' does not accept '${type}' (accepts ${fromAccepts.join(', ')})`
+      )
+    if (toAccepts.length && !toAccepts.includes(type))
+      fail(
+        'INVALID',
+        `Port '${toNode.name}.${to.name}' does not accept '${type}' (accepts ${toAccepts.join(', ')})`
+      )
   }
   return { from, to, fromNode, toNode, systemId: fromNode.systemId, connectionType: type }
 }
@@ -226,20 +274,30 @@ export function checkConnection (src, fromPortId, toPortId, connectionType) {
  * @param {string} direction
  * @param {string} portId
  */
-export function checkBoundaryMapping (src, systemId, direction, portId) {
+export function checkBoundaryMapping(src, systemId, direction, portId) {
   const port = src.require('port', portId)
   const node = src.require('node', port.nodeId)
-  if (node.systemId !== systemId) fail('INVALID', `Port '${node.name}.${port.name}' is not inside this system`)
-  const ok = direction === 'both' ? port.direction === 'both'
-    : direction === 'in' ? port.direction !== 'out'
-      : port.direction !== 'in'
-  if (!ok) fail('INVALID', `A '${direction}' boundary port cannot map to the '${port.direction}' port '${node.name}.${port.name}'`)
+  if (node.systemId !== systemId)
+    fail('INVALID', `Port '${node.name}.${port.name}' is not inside this system`)
+  const ok =
+    direction === 'both'
+      ? port.direction === 'both'
+      : direction === 'in'
+        ? port.direction !== 'out'
+        : port.direction !== 'in'
+  if (!ok)
+    fail(
+      'INVALID',
+      `A '${direction}' boundary port cannot map to the '${port.direction}' port '${node.name}.${port.name}'`
+    )
   return port
 }
 
 /** @param {unknown} value @param {string} label */
-export function requireDirection (value, label) {
-  return /** @type {'in'|'out'|'both'} */ (oneOf(requireString(value, label), PORT_DIRECTIONS, label))
+export function requireDirection(value, label) {
+  return /** @type {'in'|'out'|'both'} */ (
+    oneOf(requireString(value, label), PORT_DIRECTIONS, label)
+  )
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -252,7 +310,7 @@ export function requireDirection (value, label) {
  * @param {string} systemId
  * @param {Iterable<string>} ids
  */
-export function removeFromViews (ctx, systemId, ids) {
+export function removeFromViews(ctx, systemId, ids) {
   const drop = new Set(ids)
   if (drop.size === 0) return
   for (const view of viewsOf(ctx.tx, systemId)) {
@@ -265,7 +323,7 @@ export function removeFromViews (ctx, systemId, ids) {
 }
 
 /** @param {Ctx} ctx @param {string} edgeId */
-export function removeEdge (ctx, edgeId) {
+export function removeEdge(ctx, edgeId) {
   const edge = ctx.tx.require('edge', edgeId)
   removeFromViews(ctx, edge.systemId, [edgeId])
   ctx.tx.remove('edge', edgeId)
@@ -276,7 +334,7 @@ export function removeEdge (ctx, edgeId) {
  * @param {Ctx} ctx
  * @param {string} portId
  */
-export function removePort (ctx, portId) {
+export function removePort(ctx, portId) {
   for (const edge of edgesAtPort(ctx.tx, portId)) removeEdge(ctx, edge.id)
   for (const bp of ctx.tx.find('boundaryPort', 'internalPortId', portId)) {
     ctx.tx.update('boundaryPort', bp.id, { internalPortId: null })
@@ -290,12 +348,16 @@ export function removePort (ctx, portId) {
  * @param {Ctx} ctx
  * @param {string} nodeId
  */
-export function removeNode (ctx, nodeId) {
+export function removeNode(ctx, nodeId) {
   const node = ctx.tx.require('node', nodeId)
   for (const port of portsOf(ctx.tx, nodeId)) removePort(ctx, port.id)
   removeFromViews(ctx, node.systemId, [nodeId])
   ctx.tx.remove('node', nodeId)
-  if (node.kind === 'composite' && node.placement === 'value' && ctx.tx.has('system', node.systemRef)) {
+  if (
+    node.kind === 'composite' &&
+    node.placement === 'value' &&
+    ctx.tx.has('system', node.systemRef)
+  ) {
     deleteSystemDeep(ctx, node.systemRef)
   }
 }
@@ -306,7 +368,7 @@ export function removeNode (ctx, nodeId) {
  * @param {Ctx} ctx
  * @param {string} bpId
  */
-export function removeBoundaryPort (ctx, bpId) {
+export function removeBoundaryPort(ctx, bpId) {
   ctx.tx.require('boundaryPort', bpId)
   for (const mirror of ctx.tx.find('port', 'boundaryPortId', bpId)) removePort(ctx, mirror.id)
   ctx.tx.remove('boundaryPort', bpId)
@@ -317,7 +379,7 @@ export function removeBoundaryPort (ctx, bpId) {
  * @param {Ctx} ctx
  * @param {string} systemId
  */
-export function deleteSystemDeep (ctx, systemId) {
+export function deleteSystemDeep(ctx, systemId) {
   for (const node of nodesOf(ctx.tx, systemId)) {
     if (ctx.tx.has('node', node.id)) removeNode(ctx, node.id)
   }
@@ -333,7 +395,7 @@ export function deleteSystemDeep (ctx, systemId) {
 const ENTITY_META = ['id', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt', 'rev']
 
 /** Entity fields without store metadata. */
-function fieldsOf (entity) {
+function fieldsOf(entity) {
   const out = { ...entity }
   for (const key of ENTITY_META) delete out[key]
   return out
@@ -348,7 +410,7 @@ function fieldsOf (entity) {
  * @param {string} destSystemId
  * @param {Map<string, string>} [idMap]
  */
-export function copyContents (ctx, srcSystemId, destSystemId, idMap = new Map()) {
+export function copyContents(ctx, srcSystemId, destSystemId, idMap = new Map()) {
   for (const node of nodesOf(ctx.tx, srcSystemId)) {
     const nodeId = ctx.newId()
     idMap.set(node.id, nodeId)
@@ -368,7 +430,9 @@ export function copyContents (ctx, srcSystemId, destSystemId, idMap = new Map())
         ...fieldsOf(port),
         id: portId,
         nodeId,
-        boundaryPortId: port.boundaryPortId ? (bpMap.get(port.boundaryPortId) ?? port.boundaryPortId) : null
+        boundaryPortId: port.boundaryPortId
+          ? (bpMap.get(port.boundaryPortId) ?? port.boundaryPortId)
+          : null,
       })
     }
   }
@@ -380,7 +444,7 @@ export function copyContents (ctx, srcSystemId, destSystemId, idMap = new Map())
       id: edgeId,
       systemId: destSystemId,
       fromPort: /** @type {string} */ (idMap.get(edge.fromPort)),
-      toPort: /** @type {string} */ (idMap.get(edge.toPort))
+      toPort: /** @type {string} */ (idMap.get(edge.toPort)),
     })
   }
   return idMap
@@ -393,9 +457,13 @@ export function copyContents (ctx, srcSystemId, destSystemId, idMap = new Map())
  * @param {{ ownerNodeId?: string|null, name?: string }} [options]
  * @returns {{ systemId: string, idMap: Map<string, string> }}
  */
-export function cloneSystem (ctx, srcSystemId, { ownerNodeId = null, name } = {}) {
+export function cloneSystem(ctx, srcSystemId, { ownerNodeId = null, name } = {}) {
   const src = ctx.tx.require('system', srcSystemId)
-  const systemId = createSystem(ctx, { ...fieldsOf(src), name: name ?? src.name, ownerNodeId }, { defaultView: false })
+  const systemId = createSystem(
+    ctx,
+    { ...fieldsOf(src), name: name ?? src.name, ownerNodeId },
+    { defaultView: false }
+  )
   const idMap = copyContents(ctx, srcSystemId, systemId)
   for (const bp of boundaryPortsOf(ctx.tx, srcSystemId)) {
     const bpId = ctx.newId()
@@ -404,14 +472,14 @@ export function cloneSystem (ctx, srcSystemId, { ownerNodeId = null, name } = {}
       ...fieldsOf(bp),
       id: bpId,
       systemId,
-      internalPortId: bp.internalPortId ? (idMap.get(bp.internalPortId) ?? null) : null
+      internalPortId: bp.internalPortId ? (idMap.get(bp.internalPortId) ?? null) : null,
     })
   }
   for (const view of viewsOf(ctx.tx, srcSystemId)) {
     createView(ctx, systemId, {
       ...fieldsOf(view),
       layout: remapKeys(view.layout, idMap),
-      hidden: view.hidden.map(id => idMap.get(id)).filter(Boolean)
+      hidden: view.hidden.map(id => idMap.get(id)).filter(Boolean),
     })
   }
   return { systemId, idMap }
@@ -422,7 +490,7 @@ export function cloneSystem (ctx, srcSystemId, { ownerNodeId = null, name } = {}
  * @param {Map<string, string>} idMap
  * @param {{ dx?: number, dy?: number }} [offset]
  */
-export function remapKeys (layout, idMap, { dx = 0, dy = 0 } = {}) {
+export function remapKeys(layout, idMap, { dx = 0, dy = 0 } = {}) {
   const out = {}
   for (const [key, entry] of Object.entries(layout)) {
     const id = idMap.get(key)
@@ -432,12 +500,13 @@ export function remapKeys (layout, idMap, { dx = 0, dy = 0 } = {}) {
 }
 
 /** @param {any} entry @param {number} dx @param {number} dy */
-export function offsetEntry (entry, dx, dy) {
+export function offsetEntry(entry, dx, dy) {
   if (!dx && !dy) return entry
   const out = { ...entry }
   if (typeof out.x === 'number') out.x += dx
   if (typeof out.y === 'number') out.y += dy
-  if (Array.isArray(out.waypoints)) out.waypoints = out.waypoints.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }))
+  if (Array.isArray(out.waypoints))
+    out.waypoints = out.waypoints.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }))
   return out
 }
 
@@ -446,7 +515,7 @@ export function offsetEntry (entry, dx, dy) {
  * @param {Record<string, any>} layout
  * @param {Iterable<string>} ids
  */
-export function centroid (layout, ids) {
+export function centroid(layout, ids) {
   let x = 0
   let y = 0
   let n = 0
@@ -460,4 +529,3 @@ export function centroid (layout, ids) {
   }
   return n ? { x: Math.round(x / n), y: Math.round(y / n) } : null
 }
-

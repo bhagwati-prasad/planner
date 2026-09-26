@@ -23,13 +23,13 @@ Tick a task here only when its "Done when" list is complete. If a task is split,
 Tooling, guardrails and CI first, then the thinnest end-to-end slice (one request through two components, drawn on a canvas, from file://) to prove the riskiest integration points in week one.
 
 - [x] [0001 Repository scaffold and npm workspaces](M00-foundation-and-walking-skeleton/0001-repo-scaffold.md)
-- [ ] [0002 Formatting, lint and type-check tooling](M00-foundation-and-walking-skeleton/0002-dev-tooling.md) (after 0001)
-- [ ] [0003 Custom lint rules for the non-negotiables](M00-foundation-and-walking-skeleton/0003-custom-lint-rules.md) (after 0002)
-- [ ] [0004 Test harness, fakes and property-test generators](M00-foundation-and-walking-skeleton/0004-test-harness.md) (after 0001)
-- [ ] [0005 In-house zero-dependency bundler](M00-foundation-and-walking-skeleton/0005-bundler.md) (after 0001)
-- [ ] [0006 Vendored D3 and Three.js with integrity pins](M00-foundation-and-walking-skeleton/0006-vendor-libs.md) (after 0005, 0007)
-- [ ] [0007 CI pipeline and browser test harness](M00-foundation-and-walking-skeleton/0007-ci-and-browser-tests.md) (after 0002, 0003, 0004, 0005)
-- [ ] [0008 Walking skeleton: minimal model and command bus](M00-foundation-and-walking-skeleton/0008-skeleton-core.md) (after 0004)
+- [x] [0002 Formatting, lint and type-check tooling](M00-foundation-and-walking-skeleton/0002-dev-tooling.md) (after 0001)
+- [x] [0003 Custom lint rules for the non-negotiables](M00-foundation-and-walking-skeleton/0003-custom-lint-rules.md) (after 0002)
+- [x] [0004 Test harness, fakes and property-test generators](M00-foundation-and-walking-skeleton/0004-test-harness.md) (after 0001)
+- [x] [0005 In-house zero-dependency bundler](M00-foundation-and-walking-skeleton/0005-bundler.md) (after 0001)
+- [x] [0006 Vendored D3 and Three.js with integrity pins](M00-foundation-and-walking-skeleton/0006-vendor-libs.md) (after 0005, 0007)
+- [x] [0007 CI pipeline and browser test harness](M00-foundation-and-walking-skeleton/0007-ci-and-browser-tests.md) (after 0002, 0003, 0004, 0005)
+- [x] [0008 Walking skeleton: minimal model and command bus](M00-foundation-and-walking-skeleton/0008-skeleton-core.md) (after 0004)
 - [ ] [0009 Walking skeleton: one request through two components](M00-foundation-and-walking-skeleton/0009-skeleton-sim.md) (after 0005, 0007, 0008)
 - [ ] [0010 Walking skeleton: draw and animate](M00-foundation-and-walking-skeleton/0010-skeleton-canvas.md) (after 0006, 0009)
 

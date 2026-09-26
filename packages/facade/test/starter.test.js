@@ -10,10 +10,12 @@ import { packComponent, validateManifest } from '../../plugins/src/index.js'
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 
 /** Every plugin folder of the starter library, as { name, files }. */
-function starterFolders () {
+function starterFolders() {
   const out = []
   for (const group of ['components', 'connection-types']) {
-    for (const name of readdirSync(join(ROOT, group)).filter(n => statSync(join(ROOT, group, n)).isDirectory()).sort()) {
+    for (const name of readdirSync(join(ROOT, group))
+      .filter(n => statSync(join(ROOT, group, n)).isDirectory())
+      .sort()) {
       const dir = join(ROOT, group, name)
       const files = {}
       const walk = d => {
@@ -30,7 +32,7 @@ function starterFolders () {
   return out
 }
 
-function starterStrata () {
+function starterStrata() {
   const strata = createStrata({ output: () => {} })
   for (const { name, files } of starterFolders()) {
     const result = packComponent(files, { name })
@@ -43,20 +45,30 @@ function starterStrata () {
 test('the starter library has the 19 components and 6 connection types of spec §8, all valid', () => {
   const folders = starterFolders()
   assert.equal(folders.filter(f => f.group === 'components').length, 19)
-  assert.deepEqual(folders.filter(f => f.group === 'connection-types').map(f => f.name), ['async-message', 'db-protocol', 'file-batch', 'grpc', 'http', 'websocket'])
+  assert.deepEqual(
+    folders.filter(f => f.group === 'connection-types').map(f => f.name),
+    ['async-message', 'db-protocol', 'file-batch', 'grpc', 'http', 'websocket']
+  )
   for (const { name, files } of folders) {
     const manifest = JSON.parse(new TextDecoder().decode(files['manifest.json']))
     assert.deepEqual(validateManifest(manifest, { files: Object.keys(files) }), [], name)
     const readme = new TextDecoder().decode(files['README.md'])
-    for (const key of Object.keys(manifest.properties)) assert.ok(readme.includes(`\`${key}\``), `${name}/README.md documents ${key}`)
+    for (const key of Object.keys(manifest.properties))
+      assert.ok(readme.includes(`\`${key}\``), `${name}/README.md documents ${key}`)
     if (manifest.kind !== 'connection-type') {
       assert.match(manifest.id, /^starter\.[a-z-]+$/)
       assert.ok(files['icon.svg'], `${name} has an icon`)
     }
   }
   const strata = starterStrata()
-  assert.equal(strata.components.list({ kind: 'component' }).filter(c => c.source === 'bundle').length, 19)
-  assert.deepEqual(strata.components.connectionTypes().map(t => t.id), ['async-message', 'db-protocol', 'file-batch', 'grpc', 'http', 'websocket'])
+  assert.equal(
+    strata.components.list({ kind: 'component' }).filter(c => c.source === 'bundle').length,
+    19
+  )
+  assert.deepEqual(
+    strata.components.connectionTypes().map(t => t.id),
+    ['async-message', 'db-protocol', 'file-batch', 'grpc', 'http', 'websocket']
+  )
 })
 
 test('a checkout flow built from starter parts picks sensible connection types', async () => {
@@ -66,35 +78,64 @@ test('a checkout flow built from starter parts picks sensible connection types',
   const web = root.add('client', { name: 'Web shop' })
   const cdn = root.add('cdn', { name: 'CDN' })
   const gw = root.add('api-gateway', { name: 'Gateway', props: { rateLimit: '1000/s' } })
-  const svc = root.add('starter.service', { name: 'Orders', props: { monthlyCost: 400, instances: 3 } })
+  const svc = root.add('starter.service', {
+    name: 'Orders',
+    props: { monthlyCost: 400, instances: 3 },
+  })
   const db = root.add('relational-db', { name: 'Orders DB', props: { monthlyCost: 600 } })
   const queue = root.add('message-queue', { name: 'Order events' })
   const workers = root.add('worker-pool', { name: 'Fulfilment' })
   const cache = root.add('starter.cache', { name: 'Sessions' })
 
   const types = [
-    root.connect(web, cdn), root.connect(cdn, gw), root.connect(gw, svc), root.connect(svc, db),
-    root.connect(svc, queue), root.connect(queue, workers), root.connect(workers, cache)
+    root.connect(web, cdn),
+    root.connect(cdn, gw),
+    root.connect(gw, svc),
+    root.connect(svc, db),
+    root.connect(svc, queue),
+    root.connect(queue, workers),
+    root.connect(workers, cache),
   ].map(e => e.type)
-  assert.deepEqual(types, ['http', 'http', 'http', 'db-protocol', 'async-message', 'async-message', null])
+  assert.deepEqual(types, [
+    'http',
+    'http',
+    'http',
+    'db-protocol',
+    'async-message',
+    'async-message',
+    null,
+  ])
 
-  const toDb = svc.port('out').edges().find(e => e.to.node.id === db.id)
+  const toDb = svc
+    .port('out')
+    .edges()
+    .find(e => e.to.node.id === db.id)
   assert.ok(toDb)
   assert.equal(toDb.manifest?.id, 'db-protocol')
   assert.equal(p.edge(toDb.id).type, 'db-protocol')
   toDb.update({ label: 'orders-db' })
   assert.equal(p.edge('orders-db').id, toDb.id)
-  assert.throws(() => p.edge('nope'), err => err.code === 'NOT_FOUND')
+  assert.throws(
+    () => p.edge('nope'),
+    err => err.code === 'NOT_FOUND'
+  )
   assert.equal(toDb.props.poolSize, 10, 'connection type defaults')
   assert.equal(toDb.props.timeout, '5s', 'inherited from base:connection')
   toDb.set({ poolSize: 25, retries: 2 })
   assert.equal(toDb.explain().poolSize.source, 'override')
-  assert.throws(() => toDb.set({ poolsize: 5 }), /Unknown property 'poolsize' .*Did you mean 'poolSize'\?/)
+  assert.throws(
+    () => toDb.set({ poolsize: 5 }),
+    /Unknown property 'poolsize' .*Did you mean 'poolSize'\?/
+  )
   assert.throws(() => toDb.set({ acquireTimeout: 'soon' }), /Invalid duration/)
   assert.equal(queue.port('out').edges()[0].props.mode, 'async')
 
   assert.throws(() => root.add('http'), /'http' is a connection type, not a component/)
-  assert.equal(root.add('service').type, 'starter.service@1.0.0', 'short names prefer the starter component over base:service')
+  assert.equal(
+    root.add('service').type,
+    'starter.service@1.0.0',
+    'short names prefer the starter component over base:service'
+  )
 
   const system = root.extract([svc, db, queue, workers], { name: 'Orders system' })
   assert.equal(system.rollup('monthlyCost'), 1000)
@@ -111,8 +152,15 @@ test('a checkout flow built from starter parts picks sensible connection types',
   const w1 = flat.root.add('worker-pool', { name: 'W' })
   flat.root.connect(s1, q1)
   flat.root.connect(q1, w1)
-  assert.equal(flat.root.rollup('latency.p99'), 150, 'the queue’s delivery delay and the workers do not slow the producer')
-  assert.deepEqual([...p.problems()].filter(pr => pr.severity !== 'info'), [])
+  assert.equal(
+    flat.root.rollup('latency.p99'),
+    150,
+    'the queue’s delivery delay and the workers do not slow the producer'
+  )
+  assert.deepEqual(
+    [...p.problems()].filter(pr => pr.severity !== 'info'),
+    []
+  )
 })
 
 test('edge properties of a missing connection type are kept and reported', async () => {
@@ -124,5 +172,8 @@ test('edge properties of a missing connection type are kept and reported', async
   assert.equal(p.problems().length, 0, 'an unknown type without values is fine')
   edge.set({ timeout: '2s' })
   assert.deepEqual(edge.props, { timeout: '2s' })
-  assert.deepEqual(p.problems().map(pr => pr.code), ['MISSING_CONNECTION_TYPE'])
+  assert.deepEqual(
+    p.problems().map(pr => pr.code),
+    ['MISSING_CONNECTION_TYPE']
+  )
 })

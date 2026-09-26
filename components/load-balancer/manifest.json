@@ -12,11 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http",
-        "grpc",
-        "websocket"
-      ]
+      "accepts": ["http", "grpc", "websocket"]
     },
     {
       "name": "out",
@@ -26,22 +22,13 @@
   "properties": {
     "layer": {
       "type": "enum",
-      "values": [
-        "l4",
-        "l7"
-      ],
+      "values": ["l4", "l7"],
       "default": "l7",
       "group": "Routing"
     },
     "algorithm": {
       "type": "enum",
-      "values": [
-        "round-robin",
-        "least-connections",
-        "weighted",
-        "ip-hash",
-        "consistent-hash"
-      ],
+      "values": ["round-robin", "least-connections", "weighted", "ip-hash", "consistent-hash"],
       "default": "round-robin",
       "group": "Routing"
     },

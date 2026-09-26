@@ -2,7 +2,16 @@
 // Task 0001: the repository layout of eng §3 and the test discovery behind `npm test`.
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
@@ -12,8 +21,11 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const RUNNER = join(ROOT, 'scripts/run-tests.js')
 
 /** Package names from the layout block of eng §3, the source of truth for the package list. */
-function packagesFromGuideline () {
-  const text = readFileSync(join(ROOT, 'docs/guidelines/engineering/03-repository-layout.md'), 'utf8')
+function packagesFromGuideline() {
+  const text = readFileSync(
+    join(ROOT, 'docs/guidelines/engineering/03-repository-layout.md'),
+    'utf8'
+  )
   const block = /```\n(strata\/[\s\S]*?)```/.exec(text)?.[1] ?? ''
   const lines = block.split('\n')
   const start = lines.findIndex(line => line.trim() === 'packages/')
@@ -29,7 +41,21 @@ function packagesFromGuideline () {
 describe('repository scaffold', () => {
   it('reads the fifteen packages of eng §3', () => {
     assert.deepEqual(packagesFromGuideline(), [
-      'core', 'facade', 'plugins', 'sim', 'debug', 'test', 'docs', 'plan', 'comments', 'storage', 'graph', '3d', 'ui', 'cli', 'server'
+      'core',
+      'facade',
+      'plugins',
+      'sim',
+      'debug',
+      'test',
+      'docs',
+      'plan',
+      'comments',
+      'storage',
+      'graph',
+      '3d',
+      'ui',
+      'cli',
+      'server',
     ])
   })
 
@@ -40,14 +66,17 @@ describe('repository scaffold', () => {
       for (const entry of ['src/index.js', 'README.md', 'package.json']) {
         if (!existsSync(join(dir, entry))) missing.push(`packages/${name}/${entry}`)
       }
-      if (!existsSync(join(dir, 'test')) || !statSync(join(dir, 'test')).isDirectory()) missing.push(`packages/${name}/test/`)
+      if (!existsSync(join(dir, 'test')) || !statSync(join(dir, 'test')).isDirectory())
+        missing.push(`packages/${name}/test/`)
     }
     assert.deepEqual(missing, [])
   })
 
   it('has no other packages than the ones eng §3 lists', () => {
     const listed = new Set(packagesFromGuideline())
-    const extra = readdirSync(join(ROOT, 'packages')).filter(name => statSync(join(ROOT, 'packages', name)).isDirectory() && !listed.has(name))
+    const extra = readdirSync(join(ROOT, 'packages')).filter(
+      name => statSync(join(ROOT, 'packages', name)).isDirectory() && !listed.has(name)
+    )
     assert.deepEqual(extra, [])
   })
 
@@ -66,7 +95,10 @@ describe('repository scaffold', () => {
     const wrong = []
     for (const name of packagesFromGuideline()) {
       const file = join(ROOT, 'packages', name, 'package.json')
-      if (!existsSync(file)) { wrong.push(`packages/${name}: no package.json`); continue }
+      if (!existsSync(file)) {
+        wrong.push(`packages/${name}: no package.json`)
+        continue
+      }
       const pkg = JSON.parse(readFileSync(file, 'utf8'))
       if (pkg.private !== true) wrong.push(`packages/${name}: not private`)
       if (pkg.type !== 'module') wrong.push(`packages/${name}: not "type": "module"`)
@@ -94,7 +126,10 @@ describe('npm test', () => {
     write('tools/bundler/test/bundle.test.js', passing)
     write('components/message-queue/tests/queue.test.js', passing)
     write('components/message-queue/index.js', 'export default {}\n')
-    write('node_modules/some-package/test/ignored.test.js', "throw new Error('node_modules must not be run')\n")
+    write(
+      'node_modules/some-package/test/ignored.test.js',
+      "throw new Error('node_modules must not be run')\n"
+    )
   })
 
   after(() => rmSync(fixture, { recursive: true, force: true }))
@@ -105,14 +140,21 @@ describe('npm test', () => {
   })
 
   it('discovers tests under packages/*/test, tools/**/test and components/*/tests and exits 0', () => {
-    const run = spawnSync(process.execPath, [RUNNER, '--root', fixture, '--list'], { encoding: 'utf8' })
+    const run = spawnSync(process.execPath, [RUNNER, '--root', fixture, '--list'], {
+      encoding: 'utf8',
+    })
     assert.equal(run.status, 0, run.stderr)
-    const found = run.stdout.trim().split('\n').map(line => line.trim()).filter(Boolean).sort()
+    const found = run.stdout
+      .trim()
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .sort()
     assert.deepEqual(found, [
       'components/message-queue/tests/queue.test.js',
       'packages/core/test/model.test.js',
       'tools/bundler/test/bundle.test.js',
-      'tools/test/scaffold.test.js'
+      'tools/test/scaffold.test.js',
     ])
     const tests = spawnSync(process.execPath, [RUNNER, '--root', fixture], { encoding: 'utf8' })
     assert.equal(tests.status, 0, tests.stdout + tests.stderr)
@@ -120,7 +162,10 @@ describe('npm test', () => {
   })
 
   it('exits non-zero when a discovered test fails', () => {
-    write('components/broken/tests/broken.test.js', "import { it } from 'node:test'\nit('fails', () => { throw new Error('no') })\n")
+    write(
+      'components/broken/tests/broken.test.js',
+      "import { it } from 'node:test'\nit('fails', () => { throw new Error('no') })\n"
+    )
     try {
       const run = spawnSync(process.execPath, [RUNNER, '--root', fixture], { encoding: 'utf8' })
       assert.notEqual(run.status, 0)
@@ -133,6 +178,15 @@ describe('npm test', () => {
   it('finds this file in the real repository', () => {
     const run = spawnSync(process.execPath, [RUNNER, '--list'], { cwd: ROOT, encoding: 'utf8' })
     assert.equal(run.status, 0, run.stderr)
-    assert.ok(run.stdout.split('\n').map(l => l.trim()).includes(relative(ROOT, fileURLToPath(import.meta.url)).split('\\').join('/')))
+    assert.ok(
+      run.stdout
+        .split('\n')
+        .map(l => l.trim())
+        .includes(
+          relative(ROOT, fileURLToPath(import.meta.url))
+            .split('\\')
+            .join('/')
+        )
+    )
   })
 })

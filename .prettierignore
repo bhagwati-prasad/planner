@@ -1,0 +1,15 @@
+# Generated, installed or vendored
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+vendor/
+package-lock.json
+*.strata.js
+
+# Prose keeps its authors' layout
+*.md
+
+# Fixtures that must stay badly formatted (tools/test/tooling.test.js)
+tools/test/fixtures/

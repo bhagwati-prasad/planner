@@ -19,7 +19,7 @@ import { snap } from './geometry.js'
  * @param {Rect} r
  * @param {number} grid
  */
-export function snapRect (r, grid) {
+export function snapRect(r, grid) {
   return { ...r, x: snap(r.x, grid), y: snap(r.y, grid) }
 }
 
@@ -31,10 +31,10 @@ export function snapRect (r, grid) {
  * @param {number} threshold world units
  * @returns {{ dx: number, dy: number, guides: Guide[] }}
  */
-export function smartGuides (moving, others, threshold) {
+export function smartGuides(moving, others, threshold) {
   const lines = r => ({
     x: [r.x, r.x + r.w / 2, r.x + r.w],
-    y: [r.y, r.y + r.h / 2, r.y + r.h]
+    y: [r.y, r.y + r.h / 2, r.y + r.h],
   })
   const m = lines(moving)
   let bestX = null
@@ -44,13 +44,15 @@ export function smartGuides (moving, others, threshold) {
     for (const mv of m.x) {
       for (const ov of o.x) {
         const d = ov - mv
-        if (Math.abs(d) <= threshold && (!bestX || Math.abs(d) < Math.abs(bestX.d))) bestX = { d, value: ov }
+        if (Math.abs(d) <= threshold && (!bestX || Math.abs(d) < Math.abs(bestX.d)))
+          bestX = { d, value: ov }
       }
     }
     for (const mv of m.y) {
       for (const ov of o.y) {
         const d = ov - mv
-        if (Math.abs(d) <= threshold && (!bestY || Math.abs(d) < Math.abs(bestY.d))) bestY = { d, value: ov }
+        if (Math.abs(d) <= threshold && (!bestY || Math.abs(d) < Math.abs(bestY.d)))
+          bestY = { d, value: ov }
       }
     }
   }
@@ -80,9 +82,11 @@ export function smartGuides (moving, others, threshold) {
  * @param {Rect[]} others
  * @param {{ grid?: number, threshold?: number, guides?: boolean }} options
  */
-export function snapMove (moving, others, { grid = 0, threshold = 6, guides = true } = {}) {
+export function snapMove(moving, others, { grid = 0, threshold = 6, guides = true } = {}) {
   const g = guides ? smartGuides(moving, others, threshold) : { dx: 0, dy: 0, guides: [] }
-  const x = g.dx !== 0 || g.guides.some(l => l.axis === 'x') ? moving.x + g.dx : snap(moving.x, grid)
-  const y = g.dy !== 0 || g.guides.some(l => l.axis === 'y') ? moving.y + g.dy : snap(moving.y, grid)
+  const x =
+    g.dx !== 0 || g.guides.some(l => l.axis === 'x') ? moving.x + g.dx : snap(moving.x, grid)
+  const y =
+    g.dy !== 0 || g.guides.some(l => l.axis === 'y') ? moving.y + g.dy : snap(moving.y, grid)
   return { x, y, guides: g.guides }
 }

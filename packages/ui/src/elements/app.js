@@ -22,15 +22,15 @@ export const DEFAULT_CONFIG = Object.freeze({
     left: ['strata-library', 'strata-tree'],
     center: ['strata-canvas'],
     right: ['strata-inspector'],
-    bottom: ['strata-problems', 'strata-oplog']
+    bottom: ['strata-problems', 'strata-oplog'],
   },
   overlays: ['strata-palette', 'strata-context-menu'],
   titles: {
     'strata-library': 'Library',
     'strata-tree': 'Systems',
     'strata-problems': 'Problems',
-    'strata-oplog': 'Console'
-  }
+    'strata-oplog': 'Console',
+  },
 })
 
 /** Design tokens (spec §16): every colour, size and font is a CSS custom property. */
@@ -54,6 +54,7 @@ export const TOKENS_CSS = `
   --st-success: #15803d;
   --st-shadow: 0 1px 4px rgba(0,0,0,0.12);
   --st-shadow-lg: 0 10px 30px rgba(0,0,0,0.2);
+  --st-scrim: rgba(0, 0, 0, 0.25);
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -111,7 +112,21 @@ const APP_CSS = `
 `
 
 /** Canvas-local shortcuts the diagram handles itself (see strata-graph). */
-const GRAPH_KEYS = new Set(['Enter', 'Escape', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Ctrl+A', '+', '-', '=', '0', ' '])
+const GRAPH_KEYS = new Set([
+  'Enter',
+  'Escape',
+  'Delete',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Ctrl+A',
+  '+',
+  '-',
+  '=',
+  '0',
+  ' ',
+])
 
 export class StrataApp extends HTMLElement {
   /** @type {any} */
@@ -124,31 +139,50 @@ export class StrataApp extends HTMLElement {
   #built = false
   #cleanup = []
 
-  constructor () {
+  constructor() {
     super()
     const root = this.attachShadow({ mode: 'open' })
     const style = document.createElement('style')
     style.textContent = APP_CSS
     this.#toasts = h('div', { class: 'toasts', role: 'status', 'aria-live': 'polite' })
-    this.#help = h('div', { class: 'help', hidden: true, onclick: e => { if (e.target === this.#help) this.#help.hidden = true } })
+    this.#help = h('div', {
+      class: 'help',
+      hidden: true,
+      onclick: e => {
+        if (e.target === this.#help) this.#help.hidden = true
+      },
+    })
     root.append(style, this.#toasts, this.#help)
   }
 
-  get strata () { return this.#strata }
-  set strata (value) { this.#strata = value; this.#build() }
-  get config () { return this.#config }
-  set config (value) { this.#config = value ?? DEFAULT_CONFIG }
+  get strata() {
+    return this.#strata
+  }
+  set strata(value) {
+    this.#strata = value
+    this.#build()
+  }
+  get config() {
+    return this.#config
+  }
+  set config(value) {
+    this.#config = value ?? DEFAULT_CONFIG
+  }
   /** The shell, once built. */
-  get shell () { return this.#shell }
+  get shell() {
+    return this.#shell
+  }
 
-  connectedCallback () { this.#build() }
+  connectedCallback() {
+    this.#build()
+  }
 
-  disconnectedCallback () {
+  disconnectedCallback() {
     for (const fn of this.#cleanup) fn()
     this.#cleanup = []
   }
 
-  #build () {
+  #build() {
     if (this.#built || !this.isConnected || !this.#strata) return
     this.#built = true
     installTokens(this.ownerDocument)
@@ -173,21 +207,42 @@ export class StrataApp extends HTMLElement {
       if (area === 'bottom' && tags.length > 1) {
         // The dock shows one panel at a time.
         const panels = tags.map(make)
-        const tabs = tags.map((tag, i) => h('button', {
-          role: 'tab',
-          'aria-selected': String(i === 0),
-          onclick: () => {
-            tabs.forEach((t, j) => t.setAttribute('aria-selected', String(j === i)))
-            panels.forEach((p, j) => { p.hidden = j !== i })
-          }
-        }, titles[tag] ?? tag))
-        panels.forEach((p, i) => { p.hidden = i !== 0 })
+        const tabs = tags.map((tag, i) =>
+          h(
+            'button',
+            {
+              role: 'tab',
+              'aria-selected': String(i === 0),
+              onclick: () => {
+                tabs.forEach((t, j) => t.setAttribute('aria-selected', String(j === i)))
+                panels.forEach((p, j) => {
+                  p.hidden = j !== i
+                })
+              },
+            },
+            titles[tag] ?? tag
+          )
+        )
+        panels.forEach((p, i) => {
+          p.hidden = i !== 0
+        })
         panels[0]?.addEventListener('count', e => {
           tabs[0].textContent = `${titles[tags[0]] ?? tags[0]}${e.detail.count ? ` (${e.detail.count})` : ''}`
         })
-        region.append(h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Dock' }, tabs), h('div', { class: 'panels' }, panels))
+        region.append(
+          h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Dock' }, tabs),
+          h('div', { class: 'panels' }, panels)
+        )
       } else if (area === 'left' || tags.length > 1) {
-        for (const tag of tags) region.append(h('section', { class: 'section', 'aria-label': titles[tag] ?? tag }, titles[tag] ? h('h1', null, titles[tag]) : null, make(tag)))
+        for (const tag of tags)
+          region.append(
+            h(
+              'section',
+              { class: 'section', 'aria-label': titles[tag] ?? tag },
+              titles[tag] ? h('h1', null, titles[tag]) : null,
+              make(tag)
+            )
+          )
       } else {
         for (const tag of tags) region.append(make(tag))
       }
@@ -200,7 +255,11 @@ export class StrataApp extends HTMLElement {
       shell.on('toggle-theme', () => {
         shell.theme = shell.theme === 'dark' ? 'light' : 'dark'
         applyTheme(shell.theme)
-        try { localStorage.setItem('strata.theme', shell.theme) } catch { /* storage unavailable */ }
+        try {
+          localStorage.setItem('strata.theme', shell.theme)
+        } catch {
+          /* storage unavailable */
+        }
         shell.emit('theme', shell.theme)
       }),
       shell.on('help', () => this.#showHelp())
@@ -211,12 +270,14 @@ export class StrataApp extends HTMLElement {
   }
 
   /** Global shortcuts. Typing in fields and keys the canvas handles itself are left alone. */
-  #key (event) {
+  #key(event) {
     const shell = this.#shell
     if (!shell) return
     const path = event.composedPath()
     const target = /** @type {HTMLElement} */ (path[0])
-    const typing = target?.matches?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+    const typing = target?.matches?.(
+      'input, textarea, select, [contenteditable=""], [contenteditable="true"]'
+    )
     const shortcut = shortcutOf(event)
     if (shortcut === 'Ctrl+K') {
       event.preventDefault()
@@ -234,35 +295,76 @@ export class StrataApp extends HTMLElement {
     if (action.available) shell.run(action.id)
   }
 
-  #toast (message, kind = 'info') {
+  #toast(message, kind = 'info') {
     const el = h('div', { class: `toast ${kind}` }, message)
     this.#toasts.append(el)
     setTimeout(() => el.remove(), kind === 'error' ? 6000 : 3000)
   }
 
-  #showHelp () {
+  #showHelp() {
     const shell = /** @type {Shell} */ (this.#shell)
     const rows = shell.actions().filter(a => a.shortcut)
     const canvas = [
-      ['Drag a shape', 'Move it (Alt: no snapping)'], ['Drag from a port', 'Connect'], ['Drag the background', 'Select an area (Shift adds)'],
-      ['Space + drag', 'Pan'], ['Ctrl + wheel', 'Zoom'], ['Double-click / Enter', 'Enter a composite'], ['Delete', 'Delete the selection'],
-      ['Arrows', 'Move the selection (Shift ×10)'], ['Tab', 'Move between shapes']
+      ['Drag a shape', 'Move it (Alt: no snapping)'],
+      ['Drag from a port', 'Connect'],
+      ['Drag the background', 'Select an area (Shift adds)'],
+      ['Space + drag', 'Pan'],
+      ['Ctrl + wheel', 'Zoom'],
+      ['Double-click / Enter', 'Enter a composite'],
+      ['Delete', 'Delete the selection'],
+      ['Arrows', 'Move the selection (Shift ×10)'],
+      ['Tab', 'Move between shapes'],
     ]
-    const close = h('button', { onclick: () => { this.#help.hidden = true } }, 'Close')
-    fill(this.#help, h('div', { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Keyboard shortcuts', onkeydown: e => { if (e.key === 'Escape') this.#help.hidden = true } },
-      close,
-      h('h2', null, 'Keyboard shortcuts'),
-      h('table', null, h('tbody', null,
-        rows.map(a => h('tr', null, h('td', null, h('kbd', null, displayShortcut(/** @type {string} */ (a.shortcut)))), h('td', null, a.title))),
-        canvas.map(([keys, what]) => h('tr', null, h('td', null, h('kbd', null, keys)), h('td', null, what)))
-      ))
-    ))
+    const close = h(
+      'button',
+      {
+        onclick: () => {
+          this.#help.hidden = true
+        },
+      },
+      'Close'
+    )
+    fill(
+      this.#help,
+      h(
+        'div',
+        {
+          role: 'dialog',
+          'aria-modal': 'true',
+          'aria-label': 'Keyboard shortcuts',
+          onkeydown: e => {
+            if (e.key === 'Escape') this.#help.hidden = true
+          },
+        },
+        close,
+        h('h2', null, 'Keyboard shortcuts'),
+        h(
+          'table',
+          null,
+          h(
+            'tbody',
+            null,
+            rows.map(a =>
+              h(
+                'tr',
+                null,
+                h('td', null, h('kbd', null, displayShortcut(/** @type {string} */ (a.shortcut)))),
+                h('td', null, a.title)
+              )
+            ),
+            canvas.map(([keys, what]) =>
+              h('tr', null, h('td', null, h('kbd', null, keys)), h('td', null, what))
+            )
+          )
+        )
+      )
+    )
     this.#help.hidden = false
     close.focus()
   }
 }
 
-function installTokens (doc) {
+function installTokens(doc) {
   if (doc.getElementById('strata-tokens')) return
   const style = doc.createElement('style')
   style.id = 'strata-tokens'
@@ -270,15 +372,19 @@ function installTokens (doc) {
   doc.head.append(style)
 }
 
-function initialTheme () {
+function initialTheme() {
   try {
     const saved = localStorage.getItem('strata.theme')
     if (saved === 'light' || saved === 'dark') return saved
-  } catch { /* storage unavailable */ }
-  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  } catch {
+    /* storage unavailable */
+  }
+  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
 }
 
-function applyTheme (theme) {
+function applyTheme(theme) {
   document.documentElement.dataset.theme = theme
 }
 

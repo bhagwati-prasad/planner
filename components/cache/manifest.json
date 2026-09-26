@@ -40,12 +40,7 @@
     },
     "eviction": {
       "type": "enum",
-      "values": [
-        "lru",
-        "lfu",
-        "ttl",
-        "random"
-      ],
+      "values": ["lru", "lfu", "ttl", "random"],
       "default": "lru",
       "group": "Behaviour"
     },
@@ -56,11 +51,7 @@
     },
     "writePolicy": {
       "type": "enum",
-      "values": [
-        "write-through",
-        "write-back",
-        "write-around"
-      ],
+      "values": ["write-through", "write-back", "write-around"],
       "default": "write-through",
       "group": "Behaviour"
     },

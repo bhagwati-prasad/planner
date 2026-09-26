@@ -12,16 +12,25 @@
   },
   "scripts": {
     "test": "node scripts/run-tests.js",
-    "check": "node scripts/check-boundaries.js",
-    "verify": "node scripts/check-boundaries.js && node scripts/run-tests.js && node scripts/run-browser-tests.js",
+    "check": "node tools/ci/check.js",
     "demo": "node examples/console-demo.js",
-    "typecheck": "npx -y -p typescript@5 tsc -p jsconfig.json --noEmit",
+    "typecheck": "node tools/checks.js typecheck",
     "test:browser": "node scripts/run-browser-tests.js",
     "serve": "node packages/cli/bin/strata.js serve",
     "strata": "node packages/cli/bin/strata.js",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "format": "node tools/checks.js format",
+    "format:check": "node tools/checks.js format:check",
+    "lint": "node tools/checks.js lint",
+    "vendor:verify": "node tools/vendor/verify.js"
   },
   "bin": {
     "strata": "packages/cli/bin/strata.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "eslint": "10.11.0",
+    "prettier": "3.9.9",
+    "typescript": "7.0.2"
   }
 }

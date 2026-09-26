@@ -129,7 +129,7 @@ The plugin model of §7 and the starter library of §8, with the build, the CLI 
 | Area | Where | Notes |
 | --- | --- | --- |
 | Module transform | `plugins/src/tokenize.js`, `modules.js` | Turns one ES module into a plain function for a small runtime. Every import and export form, `import.meta`, dynamic `import()` and JSON modules; strings, template literals, regexes and comments are tokenised so their contents are never mistaken for syntax. Line numbers are preserved. |
-| Bundler | `bundle.js` | Resolves the graph from entries (relative imports only), rejects cycles and missing exports with the file and line, emits IIFE or CommonJS scripts. The same code packs components and builds the app. |
+| Bundler | `bundle.js` | Resolves the graph from entries (relative imports, plus the vendored `d3` and `three` as globals), reports missing modules and exports and unsupported cycle bindings with an `E_BUNDLE_*` code, the file and the line, and emits IIFE or CommonJS scripts. The same code packs components and builds the app. |
 | Minifier | `minify.js` | Drops comments and indentation but keeps every line break, so semicolon insertion and meaning are unchanged (tested over every file in the repository). |
 | Packer | `pack.js` | A component folder becomes a bundle `{ format, manifest, icon, modules, entry, assets, integrity }` and its `.strata.js`. Deterministic: the same folder gives the same bytes in any file order. `readBundle` reads a script back without evaluating it and refuses a changed bundle. |
 | Validation | `manifest.js` | On top of the core's checks: an API range, reserved `base:` ids, namespaces, files the manifest names, explicit units, known keys with suggestions, icon hygiene, metric estimates. Every problem at once, as errors and warnings with file and line. |
@@ -148,7 +148,7 @@ Tests: the packer, bundler and validation in Node (including bundling and runnin
 ## Decisions in M4
 
 **Bundling**
-- **Imports are captured when a module starts, not live.** The runtime is a few lines and works in a page, a worker and Node. Native modules differ only for import cycles and for reassigned exported `let`s; the bundler rejects both with a message, and none of our code needs them.
+- **Imports are captured when a module starts, not live.** The runtime is a few lines and works in a page, a worker and Node. Each module registers its own export getters before its imports run, so across an import cycle hoisted function declarations and namespace imports behave exactly as native modules do (task 0005 checks this against Node's own loader). Any other binding crossing a cycle, and a reassigned exported `let`, would differ from native modules, so the bundler reports them (`E_BUNDLE_CYCLE`) instead.
 - **Line numbers survive.** Removed import and export statements leave their line breaks and the generated header shares the first line, so errors in packed components point at the author's lines. The V8 syntax check in `strata validate` reports the author's line too.
 - **Top-level await is not supported** in bundled modules (so `app/main.js` starts from a function).
 - **The minifier does not rename.** Mangling would save more but needs scope analysis; keeping line breaks makes the transform provably safe, and the budget is met without it.
@@ -167,7 +167,7 @@ Tests: the packer, bundler and validation in Node (including bundling and runnin
 - `strata serve` serves the repository (the development app at `/app/`) and redirects `/` there; its component directories default to `./components` and `./connection-types`, and `npm run serve` points them at the starter library.
 - Uploads last for the session; M5 stores them in IndexedDB (and, when served, may write them to `components/`).
 - `strata new project`, `script` and the R1/R2 commands answer with the milestone or release that brings them.
-- The typecheck covers the browser and headless packages; the Node-only packages (`strata-server`, `strata-cli`) would need `@types/node`, which the zero-dependency rule keeps out, so tests cover them.
+- The typecheck (`npm run typecheck`, TypeScript pinned as a dev dependency since task 0002) covers the browser and headless packages; the Node-only packages (`server`, `cli`) would need `@types/node`, which is not on the approved dev-dependency list of eng §16, so tests cover them.
 
 Known gaps, kept for later: behaviour hooks run only in tests until the simulation worker (R1); migrations are loaded and checked by `strata test-component` but nothing runs them yet, because upgrading a node to a newer component version (with the property diff of §7) is still to come; binary assets are not bundled; the offline page does not persist anything yet (M5).
 

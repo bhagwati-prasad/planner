@@ -12,16 +12,12 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http"
-      ]
+      "accepts": ["http"]
     },
     {
       "name": "out",
       "direction": "out",
-      "accepts": [
-        "http"
-      ]
+      "accepts": ["http"]
     }
   ],
   "properties": {

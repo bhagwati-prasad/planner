@@ -15,9 +15,15 @@ before(async () => {
   browser = await chromium.launch()
   page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
   page.on('pageerror', err => errors.push(err.message))
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()) })
+  page.on('console', msg => {
+    if (msg.type() === 'error') errors.push(msg.text())
+  })
   await page.goto(`${server.url}/examples/graph-demo.html`)
-  await page.waitForFunction(() => window.graph && document.querySelectorAll('.sg-node').length > 0, null, { timeout: 10000 })
+  await page.waitForFunction(
+    () => window.graph && document.querySelectorAll('.sg-node').length > 0,
+    null,
+    { timeout: 10000 }
+  )
 })
 
 after(async () => {
@@ -27,7 +33,10 @@ after(async () => {
 
 test('the demo loads under the strict CSP and renders the sample diagram', async () => {
   assert.equal(await page.evaluate(() => document.querySelectorAll('#canvas .sg-node').length), 6)
-  assert.equal(await page.evaluate(() => document.querySelectorAll('#minimap rect').length > 6), true)
+  assert.equal(
+    await page.evaluate(() => document.querySelectorAll('#minimap rect').length > 6),
+    true
+  )
   assert.deepEqual(errors, [])
 })
 
@@ -51,17 +60,33 @@ test('adding, connecting to empty space and undo work end to end', async () => {
   await page.mouse.down()
   await page.mouse.move(port.a.x + 60, port.a.y + 200, { steps: 6 })
   await page.mouse.up()
-  const after = await page.evaluate(() => ({ nodes: window.getData().nodes.length, edges: window.getData().edges.length }))
+  const after = await page.evaluate(() => ({
+    nodes: window.getData().nodes.length,
+    edges: window.getData().edges.length,
+  }))
   assert.deepEqual(after, { nodes: 7, edges: 6 })
   await page.click('#undo')
-  assert.deepEqual(await page.evaluate(() => ({ nodes: window.getData().nodes.length, edges: window.getData().edges.length })), { nodes: 6, edges: 5 }, 'node and edge undo together')
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      nodes: window.getData().nodes.length,
+      edges: window.getData().edges.length,
+    })),
+    { nodes: 6, edges: 5 },
+    'node and edge undo together'
+  )
 })
 
 test('theme, routing and export controls', async () => {
   await page.click('#theme')
-  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.sg-background')).fill), 'rgb(28, 25, 23)')
+  assert.equal(
+    await page.evaluate(() => getComputedStyle(document.querySelector('.sg-background')).fill),
+    'rgb(28, 25, 23)'
+  )
   await page.selectOption('#routing', 'curved')
-  assert.match(await page.evaluate(() => document.querySelector('.sg-edge-path').getAttribute('d')), / C/)
+  assert.match(
+    await page.evaluate(() => document.querySelector('.sg-edge-path').getAttribute('d')),
+    / C/
+  )
   const svg = await page.evaluate(() => window.graph.exportSVG())
   assert.ok(svg.includes('Payment service'))
   assert.deepEqual(errors, [])

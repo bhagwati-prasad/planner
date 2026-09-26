@@ -26,12 +26,7 @@
     },
     "routingPolicy": {
       "type": "enum",
-      "values": [
-        "simple",
-        "weighted",
-        "geo",
-        "failover"
-      ],
+      "values": ["simple", "weighted", "geo", "failover"],
       "default": "simple",
       "group": "Routing"
     },

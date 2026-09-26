@@ -12,7 +12,7 @@ const K = new Uint32Array([
   0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
   0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
   0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ])
 
 const encoder = new TextEncoder()
@@ -21,7 +21,7 @@ const encoder = new TextEncoder()
  * @param {string|Uint8Array} input text (hashed as UTF-8) or bytes
  * @returns {Uint8Array} the 32-byte digest
  */
-export function sha256 (input) {
+export function sha256(input) {
   const data = typeof input === 'string' ? encoder.encode(input) : input
   const bitLength = data.length * 8
   const padded = new Uint8Array(((data.length + 9 + 63) >> 6) << 6)
@@ -31,7 +31,9 @@ export function sha256 (input) {
   view.setUint32(padded.length - 8, Math.floor(bitLength / 0x100000000))
   view.setUint32(padded.length - 4, bitLength >>> 0)
 
-  const h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19])
+  const h = new Uint32Array([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+  ])
   const w = new Uint32Array(64)
   for (let offset = 0; offset < padded.length; offset += 64) {
     for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + i * 4)
@@ -50,10 +52,23 @@ export function sha256 (input) {
       const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10))
       const maj = (a & b) ^ (a & c) ^ (b & c)
       const t2 = (S0 + maj) >>> 0
-      hh = g; g = f; f = e; e = (d + t1) >>> 0
-      d = c; c = b; b = a; a = (t1 + t2) >>> 0
+      hh = g
+      g = f
+      f = e
+      e = (d + t1) >>> 0
+      d = c
+      c = b
+      b = a
+      a = (t1 + t2) >>> 0
     }
-    h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh
+    h[0] += a
+    h[1] += b
+    h[2] += c
+    h[3] += d
+    h[4] += e
+    h[5] += f
+    h[6] += g
+    h[7] += hh
   }
   const out = new Uint8Array(32)
   const outView = new DataView(out.buffer)
@@ -62,7 +77,7 @@ export function sha256 (input) {
 }
 
 /** @param {Uint8Array} bytes */
-export function toHex (bytes) {
+export function toHex(bytes) {
   let s = ''
   for (const b of bytes) s += b.toString(16).padStart(2, '0')
   return s
@@ -71,7 +86,7 @@ export function toHex (bytes) {
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 /** @param {Uint8Array} bytes */
-export function toBase64 (bytes) {
+export function toBase64(bytes) {
   let s = ''
   let i = 0
   for (; i + 2 < bytes.length; i += 3) {
@@ -80,18 +95,23 @@ export function toBase64 (bytes) {
   }
   if (i < bytes.length) {
     const n = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8)
-    s += B64[n >> 18] + B64[(n >> 12) & 63] + (i + 1 < bytes.length ? B64[(n >> 6) & 63] : '=') + '='
+    s +=
+      B64[n >> 18] + B64[(n >> 12) & 63] + (i + 1 < bytes.length ? B64[(n >> 6) & 63] : '=') + '='
   }
   return s
 }
 
 /** @param {string} text */
-export function fromBase64 (text) {
+export function fromBase64(text) {
   const clean = text.replace(/[^A-Za-z0-9+/]/g, '')
-  const out = new Uint8Array(Math.floor(clean.length * 3 / 4))
+  const out = new Uint8Array(Math.floor((clean.length * 3) / 4))
   let o = 0
   for (let i = 0; i < clean.length; i += 4) {
-    const n = (B64.indexOf(clean[i]) << 18) | (B64.indexOf(clean[i + 1]) << 12) | ((B64.indexOf(clean[i + 2]) & 63) << 6) | (B64.indexOf(clean[i + 3]) & 63)
+    const n =
+      (B64.indexOf(clean[i]) << 18) |
+      (B64.indexOf(clean[i + 1]) << 12) |
+      ((B64.indexOf(clean[i + 2]) & 63) << 6) |
+      (B64.indexOf(clean[i + 3]) & 63)
     out[o++] = n >> 16
     if (i + 2 < clean.length) out[o++] = (n >> 8) & 255
     if (i + 3 < clean.length) out[o++] = n & 255
@@ -103,6 +123,6 @@ export function fromBase64 (text) {
  * Subresource-integrity style digest: 'sha256-<base64>'.
  * @param {string|Uint8Array} input
  */
-export function integrityOf (input) {
+export function integrityOf(input) {
   return `sha256-${toBase64(sha256(input))}`
 }

@@ -22,7 +22,7 @@ export const SHAPE_BY_BASE = Object.freeze({
   'base:proxy': 'hexagon',
   'base:cache': 'component',
   'base:timer': 'ellipse',
-  'base:service': 'box'
+  'base:service': 'box',
 })
 
 /** Where a port sits when its manifest does not say. */
@@ -36,7 +36,7 @@ const DASHED_TYPES = new Set(['async-message'])
  * (from its connection type), or a well-known async type that is not installed.
  * @param {any} edge an EdgeHandle
  */
-function isAsync (edge) {
+function isAsync(edge) {
   const mode = edge.props.mode
   return mode === undefined ? DASHED_TYPES.has(edge.type) : mode === 'async'
 }
@@ -53,20 +53,20 @@ export const ids = Object.freeze({
   bp: bpId => `bp:${bpId}`,
   map: bpId => `map:${bpId}`,
   ghost: nodeId => `ghost:${nodeId}`,
-  ghostEdge: edgeId => `ghostedge:${edgeId}`
+  ghostEdge: edgeId => `ghostedge:${edgeId}`,
 })
 
 /**
  * @param {string} id a graph id
  * @returns {{ kind: 'model'|'frame'|'bp'|'map'|'ghost'|'ghostedge', id: string }}
  */
-export function parseId (id) {
+export function parseId(id) {
   const m = /^(frame|bp|map|ghost|ghostedge):(.+)$/.exec(id)
   return m ? { kind: /** @type {any} */ (m[1]), id: m[2] } : { kind: 'model', id }
 }
 
 /** Default size of a shape. @param {string} shape */
-export function shapeSize (shape) {
+export function shapeSize(shape) {
   return BUILTIN_SHAPES[shape]?.size ?? DEFAULT_NODE_SIZE
 }
 
@@ -75,7 +75,7 @@ export function shapeSize (shape) {
  * the first base type in their lineage, else a box; missing components are placeholders.
  * @param {import('../../facade/src/index.js').NodeHandle} node
  */
-export function shapeFor (node) {
+export function shapeFor(node) {
   if (node.isComposite) return 'box'
   const manifest = node.manifest
   if (!manifest) return 'placeholder'
@@ -97,7 +97,7 @@ export function shapeFor (node) {
  * @param {{ viewId?: string }} [options]
  * @returns {GraphView}
  */
-export function toGraphData (system, { viewId } = {}) {
+export function toGraphData(system, { viewId } = {}) {
   const views = system.views()
   const view = views.find(v => v.id === viewId) ?? views[0] ?? null
   const layout = view?.layout ?? {}
@@ -121,10 +121,16 @@ export function toGraphData (system, { viewId } = {}) {
     if (typeof layout[n.id]?.x === 'number') continue
     const col = slot % AUTO.columns
     const row = Math.floor(slot / AUTO.columns)
-    autoPlaced[n.id] = { x: left + col * AUTO.dx, y: (bottom === null ? 40 : bottom + AUTO.gap) + row * AUTO.dy }
+    autoPlaced[n.id] = {
+      x: left + col * AUTO.dx,
+      y: (bottom === null ? 40 : bottom + AUTO.gap) + row * AUTO.dy,
+    }
     slot++
   }
-  const positionOf = n => (typeof layout[n.id]?.x === 'number' ? { x: layout[n.id].x, y: layout[n.id].y } : autoPlaced[n.id])
+  const positionOf = n =>
+    typeof layout[n.id]?.x === 'number'
+      ? { x: layout[n.id].x, y: layout[n.id].y }
+      : autoPlaced[n.id]
 
   /** @type {import('../../graph/src/data.js').NodeData[]} */
   const graphNodes = nodes.map(n => {
@@ -152,9 +158,9 @@ export function toGraphData (system, { viewId } = {}) {
           id: pe.id,
           side: manifestPorts.get(pe.name)?.side ?? SIDE_BY_DIRECTION[pe.direction],
           direction: pe.direction,
-          label: `${pe.name}${p.accepts.length ? ` (${p.accepts.join(', ')})` : ''}`
+          label: `${pe.name}${p.accepts.length ? ` (${p.accepts.join(', ')})` : ''}`,
         }
-      })
+      }),
     }
   })
   const shown = new Set(graphNodes.map(n => n.id))
@@ -176,7 +182,7 @@ export function toGraphData (system, { viewId } = {}) {
       label: e.label || undefined,
       waypoints: layout[e.id]?.waypoints,
       style: { ...(isAsync(edge) ? { dash: '6 4' } : {}), ...(view?.styles?.[e.id] ?? {}) },
-      layer: layout[e.id]?.layer
+      layer: layout[e.id]?.layer,
     })
   }
 
@@ -197,15 +203,15 @@ export function toGraphData (system, { viewId } = {}) {
       edges: graphEdges,
       frames,
       annotations: [],
-      layers: (view?.layers ?? []).map(l => ({ id: l.id, hidden: !!l.hidden, locked: !!l.locked }))
+      layers: (view?.layers ?? []).map(l => ({ id: l.id, hidden: !!l.hidden, locked: !!l.locked })),
     },
     viewId: view?.id ?? null,
-    autoPlaced
+    autoPlaced,
   }
 }
 
 /** @param {import('../../facade/src/index.js').NodeHandle} node */
-function sublabelFor (node) {
+function sublabelFor(node) {
   if (node.isComposite) {
     const child = node.child
     const count = child.nodes().length
@@ -216,8 +222,11 @@ function sublabelFor (node) {
 }
 
 /** The frame drawn around a system's contents when you are inside it. */
-function frameAround (nodes, system) {
-  let x1 = 0; let y1 = 0; let x2 = MIN_FRAME.w - 2 * FRAME_PADDING; let y2 = MIN_FRAME.h - 2 * FRAME_PADDING
+function frameAround(nodes, system) {
+  let x1 = 0
+  let y1 = 0
+  let x2 = MIN_FRAME.w - 2 * FRAME_PADDING
+  let y2 = MIN_FRAME.h - 2 * FRAME_PADDING
   if (nodes.length) {
     x1 = Math.min(...nodes.map(n => n.x))
     y1 = Math.min(...nodes.map(n => n.y))
@@ -239,7 +248,7 @@ function frameAround (nodes, system) {
     w: Math.round(w),
     h: Math.round(h),
     label: `${e.name}${e.levelTag ? ` · ${e.levelTag}` : ''}${system.readOnly ? ' · read-only' : ''}`,
-    locked: true
+    locked: true,
   }
 }
 
@@ -247,7 +256,7 @@ function frameAround (nodes, system) {
  * Boundary ports sit on the frame: inputs on the left edge, outputs on the right, level with
  * the node they map to when possible.
  */
-function placeBoundaryPorts (frame, bps, nodes, edges) {
+function placeBoundaryPorts(frame, bps, nodes, edges) {
   const byId = new Map(nodes.map(n => [n.id, n]))
   const sides = { left: [], right: [] }
   for (const bp of bps) {
@@ -266,7 +275,8 @@ function placeBoundaryPorts (frame, bps, nodes, edges) {
       nextFree = y + BP_SIZE.h + 12
       const x = side === 'left' ? frame.x - BP_SIZE.w / 2 : frame.x + frame.w - BP_SIZE.w / 2
       // Inside the system an input boundary port is where traffic comes from.
-      const direction = item.e.direction === 'in' ? 'out' : item.e.direction === 'out' ? 'in' : 'both'
+      const direction =
+        item.e.direction === 'in' ? 'out' : item.e.direction === 'out' ? 'in' : 'both'
       nodes.push({
         id: ids.bp(item.e.id),
         x,
@@ -277,7 +287,15 @@ function placeBoundaryPorts (frame, bps, nodes, edges) {
         label: item.e.name,
         locked: true,
         title: `Boundary port ${item.e.name} (${item.e.direction})`,
-        ports: [{ id: 'port', side: side === 'left' ? 'right' : 'left', offset: 0.5, direction, label: item.e.name }]
+        ports: [
+          {
+            id: 'port',
+            side: side === 'left' ? 'right' : 'left',
+            offset: 0.5,
+            direction,
+            label: item.e.name,
+          },
+        ],
       })
       if (item.internal && byId.has(item.internal.entity.nodeId)) {
         const inner = { node: item.internal.entity.nodeId, port: item.internal.id }
@@ -286,7 +304,7 @@ function placeBoundaryPorts (frame, bps, nodes, edges) {
           id: ids.map(item.e.id),
           source: item.e.direction === 'out' ? inner : outer,
           target: item.e.direction === 'out' ? outer : inner,
-          style: { dash: '3 3' }
+          style: { dash: '3 3' },
         })
       }
     }
@@ -297,7 +315,7 @@ function placeBoundaryPorts (frame, bps, nodes, edges) {
  * Context ghosts: the parent's nodes connected to this composite, drawn outside the frame
  * next to the boundary port their traffic uses.
  */
-function addGhosts (frame, via, bps, nodes, edges) {
+function addGhosts(frame, via, bps, nodes, edges) {
   const bpNodes = new Map(nodes.filter(n => n.id.startsWith('bp:')).map(n => [n.id, n]))
   const placed = new Map()
   const nextY = { left: frame.y, right: frame.y }
@@ -327,14 +345,19 @@ function addGhosts (frame, via, bps, nodes, edges) {
           label: neighbour.name,
           sublabel: `in ${neighbour.system.name}`,
           ghost: true,
-          ports: [{ id: 'g', side: side === 'left' ? 'right' : 'left', offset: 0.5 }]
+          ports: [{ id: 'g', side: side === 'left' ? 'right' : 'left', offset: 0.5 }],
         }
         placed.set(neighbour.id, ghost)
         nodes.push(ghost)
       }
       const g = { node: ghost.id, port: 'g' }
       const b = { node: bpNode.id, port: 'port' }
-      edges.push({ id: ids.ghostEdge(e.id), source: incoming ? g : b, target: incoming ? b : g, label: e.label || undefined })
+      edges.push({
+        id: ids.ghostEdge(e.id),
+        source: incoming ? g : b,
+        target: incoming ? b : g,
+        label: e.label || undefined,
+      })
     }
   }
 }
@@ -355,12 +378,20 @@ function addGhosts (frame, via, bps, nodes, edges) {
  * @param {{ strata: import('../../facade/src/index.js').Strata, system: import('../../facade/src/index.js').SystemHandle, viewId: string|null }} context
  * @returns {IntentResult}
  */
-export function applyIntent (intent, { strata, system, viewId }) {
+export function applyIntent(intent, { strata, system, viewId }) {
   const project = system.project
   const layoutCommand = set => ({ type: 'view.layout', payload: { viewId, set } })
-  const modelIds = list => list.map(parseId).filter(p => p.kind === 'model').map(p => p.id)
+  const modelIds = list =>
+    list
+      .map(parseId)
+      .filter(p => p.kind === 'model')
+      .map(p => p.id)
   const readOnly = () => {
-    if (system.readOnly) throw new StrataError('READ_ONLY', `'${system.name}' is placed by reference and is read-only here. Open the source system to edit it, or detach this node.`)
+    if (system.readOnly)
+      throw new StrataError(
+        'READ_ONLY',
+        `'${system.name}' is placed by reference and is read-only here. Open the source system to edit it, or detach this node.`
+      )
   }
 
   switch (intent.type) {
@@ -382,7 +413,10 @@ export function applyIntent (intent, { strata, system, viewId }) {
     case 'resize': {
       readOnly()
       const p = parseId(intent.id)
-      if (p.kind === 'model' && viewId) project.dispatch(layoutCommand({ [p.id]: { x: intent.x, y: intent.y, w: intent.w, h: intent.h } }))
+      if (p.kind === 'model' && viewId)
+        project.dispatch(
+          layoutCommand({ [p.id]: { x: intent.x, y: intent.y, w: intent.w, h: intent.h } })
+        )
       return {}
     }
     case 'connect': {
@@ -392,9 +426,15 @@ export function applyIntent (intent, { strata, system, viewId }) {
       if (s.kind === 'model' && t.kind === 'model') {
         system.connect(intent.source.port, intent.target.port)
       } else if (s.kind === 'bp' && t.kind === 'model') {
-        project.dispatch({ type: 'boundary.update', payload: { id: s.id, changes: { internalPortId: intent.target.port } } })
+        project.dispatch({
+          type: 'boundary.update',
+          payload: { id: s.id, changes: { internalPortId: intent.target.port } },
+        })
       } else if (s.kind === 'model' && t.kind === 'bp') {
-        project.dispatch({ type: 'boundary.update', payload: { id: t.id, changes: { internalPortId: intent.source.port } } })
+        project.dispatch({
+          type: 'boundary.update',
+          payload: { id: t.id, changes: { internalPortId: intent.source.port } },
+        })
       }
       return {}
     }
@@ -403,32 +443,51 @@ export function applyIntent (intent, { strata, system, viewId }) {
       const e = parseId(intent.edge)
       const to = parseId(intent.to.node)
       if (e.kind === 'model' && to.kind === 'model') {
-        project.dispatch({ type: 'edge.rewire', payload: { id: e.id, [intent.end === 'source' ? 'fromPort' : 'toPort']: intent.to.port } })
+        project.dispatch({
+          type: 'edge.rewire',
+          payload: { id: e.id, [intent.end === 'source' ? 'fromPort' : 'toPort']: intent.to.port },
+        })
       } else if (e.kind === 'map' && to.kind === 'model') {
-        project.dispatch({ type: 'boundary.update', payload: { id: e.id, changes: { internalPortId: intent.to.port } } })
+        project.dispatch({
+          type: 'boundary.update',
+          payload: { id: e.id, changes: { internalPortId: intent.to.port } },
+        })
       }
       return {}
     }
     case 'waypoints': {
       readOnly()
       const e = parseId(intent.edge)
-      if (e.kind === 'model' && viewId) project.dispatch(layoutCommand({ [e.id]: { waypoints: intent.waypoints } }))
+      if (e.kind === 'model' && viewId)
+        project.dispatch(layoutCommand({ [e.id]: { waypoints: intent.waypoints } }))
       return {}
     }
     case 'delete': {
       readOnly()
       const parsed = intent.ids.map(parseId)
-      const nodes = new Set(parsed.filter(p => p.kind === 'model' && isNode(system, p.id)).map(p => p.id))
-      project.transaction(() => {
-        for (const p of parsed) {
-          if (p.kind === 'model' && nodes.has(p.id)) project.dispatch({ type: 'node.remove', payload: { id: p.id } })
-        }
-        for (const p of parsed) {
-          if (p.kind === 'model' && !nodes.has(p.id) && edgeExists(system, p.id)) project.dispatch({ type: 'edge.remove', payload: { id: p.id } })
-          if (p.kind === 'bp') project.dispatch({ type: 'boundary.remove', payload: { id: p.id } })
-          if (p.kind === 'map' && bpExists(system, p.id)) project.dispatch({ type: 'boundary.update', payload: { id: p.id, changes: { internalPortId: null } } })
-        }
-      }, { label: 'Delete' })
+      const nodes = new Set(
+        parsed.filter(p => p.kind === 'model' && isNode(system, p.id)).map(p => p.id)
+      )
+      project.transaction(
+        () => {
+          for (const p of parsed) {
+            if (p.kind === 'model' && nodes.has(p.id))
+              project.dispatch({ type: 'node.remove', payload: { id: p.id } })
+          }
+          for (const p of parsed) {
+            if (p.kind === 'model' && !nodes.has(p.id) && edgeExists(system, p.id))
+              project.dispatch({ type: 'edge.remove', payload: { id: p.id } })
+            if (p.kind === 'bp')
+              project.dispatch({ type: 'boundary.remove', payload: { id: p.id } })
+            if (p.kind === 'map' && bpExists(system, p.id))
+              project.dispatch({
+                type: 'boundary.update',
+                payload: { id: p.id, changes: { internalPortId: null } },
+              })
+          }
+        },
+        { label: 'Delete' }
+      )
       return { select: [] }
     }
     case 'open': {
@@ -444,7 +503,10 @@ export function applyIntent (intent, { strata, system, viewId }) {
     case 'drop': {
       readOnly()
       const data = intent.data ?? {}
-      const at = { x: Math.round((intent.x - 80) / 10) * 10, y: Math.round((intent.y - 32) / 10) * 10 }
+      const at = {
+        x: Math.round((intent.x - 80) / 10) * 10,
+        y: Math.round((intent.y - 32) / 10) * 10,
+      }
       if (typeof data.typeRef === 'string') {
         const node = system.add(data.typeRef, { at })
         return { select: [node.id] }
@@ -459,28 +521,37 @@ export function applyIntent (intent, { strata, system, viewId }) {
       if (system.readOnly) return {}
       return { quickAdd: { source: intent.source, x: intent.x, y: intent.y } }
     case 'context':
-      return { contextMenu: { id: intent.id, kind: intent.kind, clientX: intent.clientX, clientY: intent.clientY, x: intent.x, y: intent.y } }
+      return {
+        contextMenu: {
+          id: intent.id,
+          kind: intent.kind,
+          clientX: intent.clientX,
+          clientY: intent.clientY,
+          x: intent.x,
+          y: intent.y,
+        },
+      }
     default:
       return {}
   }
 }
 
 /** @param {import('../../facade/src/index.js').SystemHandle} system @param {string} id */
-function isNode (system, id) {
+function isNode(system, id) {
   return system.nodes().some(n => n.id === id)
 }
 
 /** @param {import('../../facade/src/index.js').SystemHandle} system @param {string} id */
-function edgeExists (system, id) {
+function edgeExists(system, id) {
   return system.edges().some(e => e.id === id)
 }
 
 /** @param {import('../../facade/src/index.js').SystemHandle} system @param {string} id */
-function bpExists (system, id) {
+function bpExists(system, id) {
   return system.ports().some(bp => bp.id === id)
 }
 
 /** @param {import('../../facade/src/index.js').SystemHandle} system @param {string} id */
-function isNodeOrEdge (system, id) {
+function isNodeOrEdge(system, id) {
   return isNode(system, id) || edgeExists(system, id)
 }

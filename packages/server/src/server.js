@@ -18,7 +18,8 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ComponentCatalog } from './catalog.js'
 
-export const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+export const CSP =
+  "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -31,7 +32,7 @@ const TYPES = {
   '.md': 'text/markdown; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
   '.woff2': 'font/woff2',
-  '.zip': 'application/zip'
+  '.zip': 'application/zip',
 }
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
@@ -55,15 +56,18 @@ const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
  * @param {ServerOptions} [options]
  * @returns {Promise<RunningServer>}
  */
-export async function startServer ({
+export async function startServer({
   root = fileURLToPath(new URL('../../..', import.meta.url)),
   port = 0,
   host = '127.0.0.1',
   components = [],
   watch = false,
-  home = '/app/'
+  home = '/app/',
 } = {}) {
-  if (!LOOPBACK.has(host)) throw new Error(`strata serve binds to this machine only; '${host}' is not a loopback address (use 127.0.0.1)`)
+  if (!LOOPBACK.has(host))
+    throw new Error(
+      `strata serve binds to this machine only; '${host}' is not a loopback address (use 127.0.0.1)`
+    )
   const base = resolve(root)
   const catalog = new ComponentCatalog(components.map(dir => resolve(dir)))
   await catalog.scan()
@@ -75,7 +79,7 @@ export async function startServer ({
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'no-referrer',
     'cross-origin-opener-policy': 'same-origin',
-    'cache-control': 'no-store'
+    'cache-control': 'no-store',
   }
   const send = (res, status, body, type = 'text/plain; charset=utf-8', extra = {}) => {
     res.writeHead(status, { ...security, 'content-type': type, ...extra })
@@ -92,31 +96,49 @@ export async function startServer ({
       typeRef: e.bundle ? `${e.bundle.manifest.id}@${e.bundle.manifest.version}` : null,
       title: e.bundle?.manifest.name ?? e.name,
       fileName: e.fileName,
-      script: e.bundle ? `/api/components/${encodeURIComponent(`${e.bundle.manifest.id}@${e.bundle.manifest.version}`)}.strata.js` : null,
+      script: e.bundle
+        ? `/api/components/${encodeURIComponent(`${e.bundle.manifest.id}@${e.bundle.manifest.version}`)}.strata.js`
+        : null,
       integrity: e.bundle?.integrity ?? null,
-      problems: e.problems.map(p => ({ ...p, file: `${ComponentCatalog.relativeFolder(e.folder, base)}/${p.file}` })),
-      bundle: e.bundle
-    }))
+      problems: e.problems.map(p => ({
+        ...p,
+        file: `${ComponentCatalog.relativeFolder(e.folder, base)}/${p.file}`,
+      })),
+      bundle: e.bundle,
+    })),
   })
 
   const server = createServer(async (req, res) => {
     try {
-      const hostHeader = String(req.headers.host ?? '').replace(/:\d+$/, '').replace(/^\[(.*)\]$/, '$1')
-      if (!LOOPBACK.has(hostHeader)) return send(res, 403, 'Forbidden: strata serve only answers requests for localhost')
-      if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed', undefined, { allow: 'GET, HEAD' })
+      const hostHeader = String(req.headers.host ?? '')
+        .replace(/:\d+$/, '')
+        .replace(/^\[(.*)\]$/, '$1')
+      if (!LOOPBACK.has(hostHeader))
+        return send(res, 403, 'Forbidden: strata serve only answers requests for localhost')
+      if (req.method !== 'GET' && req.method !== 'HEAD')
+        return send(res, 405, 'Method not allowed', undefined, { allow: 'GET, HEAD' })
       const url = new URL(req.url ?? '/', 'http://localhost')
       const pathname = decodeURIComponent(url.pathname)
 
       if (pathname === '/' && home) return send(res, 302, '', undefined, { location: home })
-      if (pathname === '/api/health') return json(res, { ok: true, components: catalog.entries().length })
+      if (pathname === '/api/health')
+        return json(res, { ok: true, components: catalog.entries().length })
       if (pathname === '/api/components') return json(res, listing())
       if (pathname.startsWith('/api/components/') && pathname.endsWith('.strata.js')) {
         const ref = pathname.slice('/api/components/'.length, -'.strata.js'.length)
-        const entry = catalog.entries().find(e => e.bundle && `${e.bundle.manifest.id}@${e.bundle.manifest.version}` === ref)
-        return entry?.script ? send(res, 200, entry.script, TYPES['.js']) : send(res, 404, `No packed component ${ref}`)
+        const entry = catalog
+          .entries()
+          .find(e => e.bundle && `${e.bundle.manifest.id}@${e.bundle.manifest.version}` === ref)
+        return entry?.script
+          ? send(res, 200, entry.script, TYPES['.js'])
+          : send(res, 404, `No packed component ${ref}`)
       }
       if (pathname === '/api/events') {
-        res.writeHead(200, { ...security, 'content-type': 'text/event-stream', connection: 'keep-alive' })
+        res.writeHead(200, {
+          ...security,
+          'content-type': 'text/event-stream',
+          connection: 'keep-alive',
+        })
         res.write(': connected\n\n')
         clients.add(res)
         req.on('close', () => clients.delete(res))
@@ -127,10 +149,21 @@ export async function startServer ({
       let path = normalize(join(base, pathname))
       if (path !== base && !path.startsWith(base + sep)) return send(res, 403, 'Forbidden')
       // Dotfiles and dot-folders (.git, .env, ...) are never served.
-      if (path.slice(base.length).split(sep).some(part => part.startsWith('.'))) return send(res, 404, 'Not found')
+      if (
+        path
+          .slice(base.length)
+          .split(sep)
+          .some(part => part.startsWith('.'))
+      )
+        return send(res, 404, 'Not found')
       if ((await stat(path)).isDirectory()) path = join(path, 'index.html')
       const body = await readFile(path)
-      send(res, 200, req.method === 'HEAD' ? '' : body, TYPES[extname(path)] ?? 'application/octet-stream')
+      send(
+        res,
+        200,
+        req.method === 'HEAD' ? '' : body,
+        TYPES[extname(path)] ?? 'application/octet-stream'
+      )
     } catch {
       if (!res.headersSent) send(res, 404, 'Not found')
     }
@@ -143,7 +176,9 @@ export async function startServer ({
       for (const client of clients) client.write(payload)
     })
   }
-  const heartbeat = setInterval(() => { for (const client of clients) client.write(': ping\n\n') }, 25_000)
+  const heartbeat = setInterval(() => {
+    for (const client of clients) client.write(': ping\n\n')
+  }, 25_000)
   heartbeat.unref?.()
 
   await new Promise(resolve => server.listen(port, host, () => resolve(undefined)))
@@ -152,13 +187,14 @@ export async function startServer ({
   return {
     url: `http://${shown}:${address.port}`,
     catalog,
-    close: () => new Promise(resolve => {
-      clearInterval(heartbeat)
-      catalog.close()
-      for (const client of clients) client.end()
-      clients.clear()
-      server.closeAllConnections?.()
-      server.close(() => resolve())
-    })
+    close: () =>
+      new Promise(resolve => {
+        clearInterval(heartbeat)
+        catalog.close()
+        for (const client of clients) client.end()
+        clients.clear()
+        server.closeAllConnections?.()
+        server.close(() => resolve())
+      }),
   }
 }

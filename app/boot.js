@@ -10,7 +10,7 @@ import { installServedComponents, watchServedComponents } from './components.js'
  * @param {{ bundles?: object[], host?: HTMLElement }} [options]
  *   bundles: packed components registered before the app started (offline script tags)
  */
-export async function boot ({ bundles = [], host = document.body } = {}) {
+export async function boot({ bundles = [], host = document.body } = {}) {
   const strata = createStrata()
   const failed = []
   for (const bundle of bundles) {
@@ -21,7 +21,10 @@ export async function boot ({ bundles = [], host = document.body } = {}) {
     }
   }
   const served = await installServedComponents(strata, { replace: true })
-  if (served === null && !bundles.length) console.warn('Strata: no components were loaded (open the app through strata serve, or add packed components to strata.html).')
+  if (served === null && !bundles.length)
+    console.warn(
+      'Strata: no components were loaded (open the app through strata serve, or add packed components to strata.html).'
+    )
   if (strata.components.get('starter.service')) await buildSampleProject(strata)
   else await strata.projects.create('Untitled')
 

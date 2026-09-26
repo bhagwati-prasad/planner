@@ -10,12 +10,7 @@
   "properties": {
     "streaming": {
       "type": "enum",
-      "values": [
-        "unary",
-        "server",
-        "client",
-        "bidirectional"
-      ],
+      "values": ["unary", "server", "client", "bidirectional"],
       "default": "unary",
       "group": "gRPC"
     },

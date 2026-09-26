@@ -38,11 +38,7 @@
     },
     "concurrencyPolicy": {
       "type": "enum",
-      "values": [
-        "allow",
-        "forbid",
-        "replace"
-      ],
+      "values": ["allow", "forbid", "replace"],
       "default": "forbid",
       "group": "Jobs"
     }

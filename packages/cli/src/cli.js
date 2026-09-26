@@ -15,8 +15,7 @@ import { watch as watchFs } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { formatProblem } from '../../plugins/src/index.js'
-import { packFolder, componentFolders, startServer } from '../../server/src/index.js'
+import { formatProblem, packFolder, componentFolders, startServer } from '../../server/src/index.js'
 import { scaffoldComponent, BASE_TYPES } from './scaffold.js'
 import { installScriptTag } from './install.js'
 
@@ -30,7 +29,7 @@ const PLANNED = {
   lint: 'R1 (architecture rules)',
   docs: 'R2 (documentation)',
   tickets: 'R2 (execution plan)',
-  script: 'M5 (projects on disk)'
+  script: 'M5 (projects on disk)',
 }
 
 const USAGE = `Usage: strata <command> [options]
@@ -46,7 +45,9 @@ Working
   strata serve [--port 4321] [--components <dir>]... [--root <dir>] [--no-watch]
   strata repl [--components <dir>]...
 
-Coming later: ${Object.entries(PLANNED).map(([c, r]) => `${c} (${r})`).join(', ')}
+Coming later: ${Object.entries(PLANNED)
+  .map(([c, r]) => `${c} (${r})`)
+  .join(', ')}
 
 strata help <command> shows details; strata --version prints the version.`
 
@@ -78,7 +79,7 @@ packed on the fly, served at /api/components and repacked when they change.`,
   repl: `strata repl [--components <dir>]...
 
 An interactive Node session with \`strata\` (the console API) and every packed component
-from the given directories installed.`
+from the given directories installed.`,
 }
 
 /**
@@ -91,21 +92,32 @@ from the given directories installed.`
  * @param {string[]} argv
  * @param {Record<string, 'string'|'boolean'|'list'>} spec
  */
-export function parseArgs (argv, spec) {
+export function parseArgs(argv, spec) {
   const positionals = []
   /** @type {Record<string, any>} */
   const options = {}
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
-    if (!arg.startsWith('--')) { positionals.push(arg); continue }
-    let [name, value] = arg.slice(2).split(/=(.*)/s, 2)
-    if (name.startsWith('no-') && spec[name.slice(3)] === 'boolean') { options[name.slice(3)] = false; continue }
+    if (!arg.startsWith('--')) {
+      positionals.push(arg)
+      continue
+    }
+    const [name, inline] = arg.slice(2).split(/=(.*)/s, 2)
+    let value = inline
+    if (name.startsWith('no-') && spec[name.slice(3)] === 'boolean') {
+      options[name.slice(3)] = false
+      continue
+    }
     const type = spec[name]
     if (!type) throw new UsageError(`Unknown option --${name}`)
-    if (type === 'boolean') { options[name] = true; continue }
+    if (type === 'boolean') {
+      options[name] = true
+      continue
+    }
     if (value === undefined) {
       value = argv[++i]
-      if (value === undefined || value.startsWith('--')) throw new UsageError(`--${name} needs a value`)
+      if (value === undefined || value.startsWith('--'))
+        throw new UsageError(`--${name} needs a value`)
     }
     if (type === 'list') (options[name] ??= []).push(value)
     else options[name] = value
@@ -121,7 +133,7 @@ export class UsageError extends Error {}
  * @param {Io} [io]
  * @returns {Promise<number>} the exit code
  */
-export async function main (argv, io = {}) {
+export async function main(argv, io = {}) {
   const cwd = io.cwd ?? process.cwd()
   const out = io.stdout ?? process.stdout
   const err = io.stderr ?? process.stderr
@@ -140,12 +152,18 @@ export async function main (argv, io = {}) {
       case '-v':
         say(`strata ${VERSION}`)
         return 0
-      case 'new': return await newCommand(rest, { cwd, say })
-      case 'pack': return await packCommand(rest, { cwd, say, complain, signal: io.signal })
-      case 'validate': return await validateCommand(rest, { cwd, say, complain })
-      case 'test-component': return await testComponentCommand(rest, { cwd, say, complain })
-      case 'serve': return await serveCommand(rest, { cwd, say, signal: io.signal })
-      case 'repl': return await replCommand(rest, { cwd })
+      case 'new':
+        return await newCommand(rest, { cwd, say })
+      case 'pack':
+        return await packCommand(rest, { cwd, say, complain, signal: io.signal })
+      case 'validate':
+        return await validateCommand(rest, { cwd, say, complain })
+      case 'test-component':
+        return await testComponentCommand(rest, { cwd, say, complain })
+      case 'serve':
+        return await serveCommand(rest, { cwd, say, signal: io.signal })
+      case 'repl':
+        return await replCommand(rest, { cwd })
       default:
         if (PLANNED[command]) {
           complain(`strata ${command} arrives in ${PLANNED[command]}.`)
@@ -165,7 +183,7 @@ export async function main (argv, io = {}) {
 }
 
 /** Prints problems relative to the working directory; returns true when there are errors. */
-function report (problems, folder, { cwd, say, complain }) {
+function report(problems, folder, { cwd, say, complain }) {
   const prefix = relative(cwd, folder).split(sep).join('/')
   for (const p of problems) {
     const line = formatProblem({ ...p, file: prefix ? `${prefix}/${p.file}` : p.file })
@@ -175,7 +193,7 @@ function report (problems, folder, { cwd, say, complain }) {
   return problems.some(p => p.level === 'error')
 }
 
-async function requireFolder (cwd, dir) {
+async function requireFolder(cwd, dir) {
   if (!dir) throw new UsageError('Name the component folder')
   const path = resolve(cwd, dir)
   try {
@@ -187,17 +205,32 @@ async function requireFolder (cwd, dir) {
   return path
 }
 
-async function newCommand (argv, { cwd, say }) {
-  const { positionals, options } = parseArgs(argv, { extends: 'string', id: 'string', dir: 'string', force: 'boolean' })
+async function newCommand(argv, { cwd, say }) {
+  const { positionals, options } = parseArgs(argv, {
+    extends: 'string',
+    id: 'string',
+    dir: 'string',
+    force: 'boolean',
+  })
   const [kind, name] = positionals
-  if (kind === 'project') throw new UsageError('strata new project arrives with projects on disk (M5); create one in the app or with strata.projects.create()')
+  if (kind === 'project')
+    throw new UsageError(
+      'strata new project arrives with projects on disk (M5); create one in the app or with strata.projects.create()'
+    )
   if (kind !== 'component' || !name) throw new UsageError('Usage: strata new component <name>')
-  if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new UsageError(`Component names are lowercase words joined by hyphens, e.g. message-queue (got '${name}')`)
-  if (options.extends && !BASE_TYPES.includes(options.extends)) throw new UsageError(`--extends must be one of ${BASE_TYPES.join(', ')}`)
+  if (!/^[a-z][a-z0-9-]*$/.test(name))
+    throw new UsageError(
+      `Component names are lowercase words joined by hyphens, e.g. message-queue (got '${name}')`
+    )
+  if (options.extends && !BASE_TYPES.includes(options.extends))
+    throw new UsageError(`--extends must be one of ${BASE_TYPES.join(', ')}`)
   const folder = resolve(cwd, options.dir ?? 'components', name)
   try {
     await access(folder)
-    if (!options.force) throw new UsageError(`${relative(cwd, folder)} already exists; pick another name or pass --force`)
+    if (!options.force)
+      throw new UsageError(
+        `${relative(cwd, folder)} already exists; pick another name or pass --force`
+      )
   } catch (e) {
     if (e instanceof UsageError) throw e
   }
@@ -217,7 +250,7 @@ async function newCommand (argv, { cwd, say }) {
  * @param {any} ctx
  * @param {{ out?: string, install?: string }} options
  */
-async function packOne (folder, ctx, { out, install }) {
+async function packOne(folder, ctx, { out, install }) {
   const result = await packFolder(folder)
   const failed = report(result.problems, folder, ctx)
   if (failed || !result.bundle || !result.script || !result.fileName) {
@@ -227,22 +260,37 @@ async function packOne (folder, ctx, { out, install }) {
   const target = out ? resolve(ctx.cwd, out) : join(folder, result.fileName)
   await writeFile(target, result.script)
   const { id, version } = result.bundle.manifest
-  ctx.say(`✓ ${id}@${version} → ${relative(ctx.cwd, target)} (${(result.script.length / 1024).toFixed(1)} KB, ${Object.keys(result.bundle.modules).length} modules)`)
+  ctx.say(
+    `✓ ${id}@${version} → ${relative(ctx.cwd, target)} (${(result.script.length / 1024).toFixed(1)} KB, ${Object.keys(result.bundle.modules).length} modules)`
+  )
   if (install) {
     const html = resolve(ctx.cwd, install)
     const changed = await installScriptTag(html, target)
-    ctx.say(changed ? `  added to ${relative(ctx.cwd, html)}` : `  already in ${relative(ctx.cwd, html)}`)
+    ctx.say(
+      changed ? `  added to ${relative(ctx.cwd, html)}` : `  already in ${relative(ctx.cwd, html)}`
+    )
   }
   return target
 }
 
-async function packCommand (argv, ctx) {
-  const { positionals, options } = parseArgs(argv, { out: 'string', watch: 'boolean', install: 'string', all: 'boolean' })
+async function packCommand(argv, ctx) {
+  const { positionals, options } = parseArgs(argv, {
+    out: 'string',
+    watch: 'boolean',
+    install: 'string',
+    all: 'boolean',
+  })
   if (options.all) {
-    if (options.out) throw new UsageError('--out packs one component; with --all each bundle is written into its folder')
+    if (options.out)
+      throw new UsageError(
+        '--out packs one component; with --all each bundle is written into its folder'
+      )
     const dir = resolve(ctx.cwd, positionals[0] ?? 'components')
     const folders = await componentFolders(dir)
-    if (!folders.length) throw new UsageError(`No component folders (with a manifest.json) in ${relative(ctx.cwd, dir) || '.'}`)
+    if (!folders.length)
+      throw new UsageError(
+        `No component folders (with a manifest.json) in ${relative(ctx.cwd, dir) || '.'}`
+      )
     let failed = 0
     for (const folder of folders) if (!(await packOne(folder, ctx, options))) failed++
     ctx.say(`${folders.length - failed} of ${folders.length} packed`)
@@ -256,17 +304,23 @@ async function packCommand (argv, ctx) {
   const watcher = watchFs(folder, { recursive: true }, (event, file) => {
     if (file && /\.strata\.js$|(^|[\\/])\./.test(String(file))) return
     clearTimeout(timer)
-    timer = setTimeout(() => { packOne(folder, ctx, options).catch(e => ctx.complain(String(e))) }, 120)
+    timer = setTimeout(() => {
+      packOne(folder, ctx, options).catch(e => ctx.complain(String(e)))
+    }, 120)
   })
   await new Promise(resolve => {
-    const stop = () => { watcher.close(); clearTimeout(timer); resolve(undefined) }
+    const stop = () => {
+      watcher.close()
+      clearTimeout(timer)
+      resolve(undefined)
+    }
     ctx.signal?.addEventListener('abort', stop, { once: true })
     if (!ctx.signal) process.once('SIGINT', stop)
   })
   return 0
 }
 
-async function validateCommand (argv, ctx) {
+async function validateCommand(argv, ctx) {
   const { positionals } = parseArgs(argv, {})
   const folder = await requireFolder(ctx.cwd, positionals[0])
   const result = await packFolder(folder)
@@ -277,11 +331,13 @@ async function validateCommand (argv, ctx) {
     return 1
   }
   const { id, version } = result.bundle?.manifest ?? {}
-  ctx.say(`✓ ${id}@${version} is valid${warnings ? ` (${warnings} warning${warnings > 1 ? 's' : ''})` : ''}`)
+  ctx.say(
+    `✓ ${id}@${version} is valid${warnings ? ` (${warnings} warning${warnings > 1 ? 's' : ''})` : ''}`
+  )
   return 0
 }
 
-async function testComponentCommand (argv, ctx) {
+async function testComponentCommand(argv, ctx) {
   const { positionals } = parseArgs(argv, {})
   const folder = await requireFolder(ctx.cwd, positionals[0])
   const result = await packFolder(folder)
@@ -301,7 +357,10 @@ async function testComponentCommand (argv, ctx) {
   const code = await new Promise(resolve => {
     // A parent test runner's context would redirect the child's report; drop it.
     const { NODE_TEST_CONTEXT, ...env } = process.env
-    const child = spawn(process.execPath, ['--test', '--test-reporter=spec', ...tests], { cwd: folder, env })
+    const child = spawn(process.execPath, ['--test', '--test-reporter=spec', ...tests], {
+      cwd: folder,
+      env,
+    })
     child.stdout.on('data', d => ctx.say(String(d).trimEnd()))
     child.stderr.on('data', d => ctx.complain(String(d).trimEnd()))
     child.on('close', resolve)
@@ -310,10 +369,13 @@ async function testComponentCommand (argv, ctx) {
 }
 
 /** Test files (*.test.js) under `dir`, sorted. @param {string} dir @returns {Promise<string[]>} */
-async function testFiles (dir) {
+async function testFiles(dir) {
   try {
     const entries = await readdir(dir, { withFileTypes: true, recursive: true })
-    return entries.filter(e => e.isFile() && /\.test\.m?js$/.test(e.name)).map(e => join(e.parentPath ?? e.path, e.name)).sort()
+    return entries
+      .filter(e => e.isFile() && /\.test\.m?js$/.test(e.name))
+      .map(e => join(e.parentPath ?? e.path, e.name))
+      .sort()
   } catch (e) {
     if (e.code === 'ENOENT') return []
     throw e
@@ -321,30 +383,43 @@ async function testFiles (dir) {
 }
 
 /** Directories that exist among the defaults. */
-async function existing (cwd, dirs) {
+async function existing(cwd, dirs) {
   const out = []
   for (const dir of dirs) {
-    try { if ((await stat(resolve(cwd, dir))).isDirectory()) out.push(resolve(cwd, dir)) } catch {}
+    try {
+      if ((await stat(resolve(cwd, dir))).isDirectory()) out.push(resolve(cwd, dir))
+    } catch {}
   }
   return out
 }
 
-async function serveCommand (argv, { cwd, say, signal }) {
-  const { options } = parseArgs(argv, { port: 'string', components: 'list', root: 'string', watch: 'boolean', host: 'string' })
+async function serveCommand(argv, { cwd, say, signal }) {
+  const { options } = parseArgs(argv, {
+    port: 'string',
+    components: 'list',
+    root: 'string',
+    watch: 'boolean',
+    host: 'string',
+  })
   const port = Number(options.port ?? 4321)
-  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new UsageError(`--port must be a port number (got ${options.port})`)
-  const components = options.components ? options.components.map(d => resolve(cwd, d)) : await existing(cwd, ['components', 'connection-types'])
+  if (!Number.isInteger(port) || port < 0 || port > 65535)
+    throw new UsageError(`--port must be a port number (got ${options.port})`)
+  const components = options.components
+    ? options.components.map(d => resolve(cwd, d))
+    : await existing(cwd, ['components', 'connection-types'])
   const server = await startServer({
     root: options.root ? resolve(cwd, options.root) : REPO,
     port,
     host: options.host ?? '127.0.0.1',
     components,
-    watch: options.watch !== false
+    watch: options.watch !== false,
   })
   say(`Strata is running at ${server.url}/`)
   const entries = server.catalog.entries()
   const ok = entries.filter(e => e.bundle).length
-  say(`  components: ${ok} packed${entries.length - ok ? `, ${entries.length - ok} with errors (see ${server.url}/api/components)` : ''} from ${components.map(d => relative(cwd, d) || '.').join(', ') || 'no folders'}`)
+  say(
+    `  components: ${ok} packed${entries.length - ok ? `, ${entries.length - ok} with errors (see ${server.url}/api/components)` : ''} from ${components.map(d => relative(cwd, d) || '.').join(', ') || 'no folders'}`
+  )
   if (options.watch !== false && components.length) say('  watching for changes')
   say('Press Ctrl+C to stop.')
   await new Promise(resolve => {
@@ -356,10 +431,12 @@ async function serveCommand (argv, { cwd, say, signal }) {
   return 0
 }
 
-async function replCommand (argv, { cwd }) {
+async function replCommand(argv, { cwd }) {
   const { options } = parseArgs(argv, { components: 'list' })
   const { startRepl } = await import('./repl.js')
-  const dirs = options.components ? options.components.map(d => resolve(cwd, d)) : await existing(cwd, ['components', 'connection-types'])
+  const dirs = options.components
+    ? options.components.map(d => resolve(cwd, d))
+    : await existing(cwd, ['components', 'connection-types'])
   await startRepl({ dirs })
   return 0
 }
