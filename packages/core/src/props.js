@@ -14,11 +14,9 @@ import {
   PROPERTY_TYPES,
   checkDistribution,
   checkValue,
-  durationMs,
-  perSecond,
-  sizeBytes,
   unitProblem,
 } from './schema.js'
+import { durationMs, perSecond, sizeBytes } from './units.js'
 
 export { DISTRIBUTION_KINDS, PROPERTY_TYPES }
 

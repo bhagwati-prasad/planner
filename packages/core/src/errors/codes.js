@@ -38,6 +38,11 @@ const DESCRIPTIONS = {
 
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',
 
+  E_UNIT_PARSE: 'A quantity is not written in a form its unit understands',
+  E_UNIT_VALUE:
+    'A value is not canonical for its quantity, such as money in fractions of a micro-unit',
+  E_UNIT_UNKNOWN: 'No quantity of that name converts units',
+
   E_SCHEMA_TYPE: 'A value has the wrong type for its property or state schema',
   E_SCHEMA_RANGE: "A value is below its schema's min or above its max",
   E_SCHEMA_ENUM: "A value is not one of its enum's options",

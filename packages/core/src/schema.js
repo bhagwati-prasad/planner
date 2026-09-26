@@ -14,6 +14,7 @@
  */
 import { isPlainObject } from './plain.js'
 import { err, ok } from './result.js'
+import { decimal, durationMs, perSecond, sizeBytes } from './units.js'
 
 export const PROPERTY_TYPES = Object.freeze([
   'number',
@@ -51,97 +52,6 @@ const DISTRIBUTION_PARAMS = {
   exponential: ['mean', 'rate'],
   lognormal: ['median', 'p99'],
   empirical: ['values', 'buckets'],
-}
-
-const DURATION_UNITS = {
-  ms: 1,
-  s: 1000,
-  sec: 1000,
-  m: 60_000,
-  min: 60_000,
-  h: 3_600_000,
-  hr: 3_600_000,
-  d: 86_400_000,
-  w: 604_800_000,
-}
-const BYTE_UNITS = {
-  b: 1,
-  kb: 1e3,
-  mb: 1e6,
-  gb: 1e9,
-  tb: 1e12,
-  pb: 1e15,
-  kib: 1024,
-  mib: 1024 ** 2,
-  gib: 1024 ** 3,
-  tib: 1024 ** 4,
-  pib: 1024 ** 5,
-}
-const RATE_UNITS = {
-  s: 1,
-  sec: 1,
-  second: 1,
-  m: 1 / 60,
-  min: 1 / 60,
-  minute: 1 / 60,
-  h: 1 / 3600,
-  hr: 1 / 3600,
-  hour: 1 / 3600,
-  d: 1 / 86400,
-  day: 1 / 86400,
-}
-
-/**
- * Milliseconds in a duration: a number (already ms) or a string such as '250ms', '1.5s', '4d'
- * or '1h30m'. Undefined when it is neither.
- * @param {unknown} value
- * @returns {number|undefined}
- */
-export function durationMs(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
-  if (typeof value !== 'string') return undefined
-  const src = value.trim()
-  const re = /(\d+(?:\.\d+)?)\s*(ms|sec|min|hr|s|m|h|d|w)/gy
-  let total = 0
-  let consumed = 0
-  for (let match = re.exec(src); match; match = re.exec(src)) {
-    total +=
-      Number(match[1]) * DURATION_UNITS[/** @type {keyof typeof DURATION_UNITS} */ (match[2])]
-    consumed = re.lastIndex
-    while (src[consumed] === ' ') consumed++
-    re.lastIndex = consumed
-  }
-  return consumed === 0 || consumed !== src.length ? undefined : total
-}
-
-/**
- * Bytes in a size: a number (already bytes) or a string such as '512B', '10 MB' or '1.5GiB'.
- * Undefined when it is neither.
- * @param {unknown} value
- * @returns {number|undefined}
- */
-export function sizeBytes(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
-  const m = typeof value === 'string' && /^\s*(\d+(?:\.\d+)?)\s*([kmgtp]i?b|b)\s*$/i.exec(value)
-  if (!m) return undefined
-  return Number(m[1]) * BYTE_UNITS[/** @type {keyof typeof BYTE_UNITS} */ (m[2].toLowerCase())]
-}
-
-/**
- * Events per second in a rate: a number (already per second) or a string such as '500/s' or
- * '30 req/min'. Undefined when it is neither.
- * @param {unknown} value
- * @returns {number|undefined}
- */
-export function perSecond(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
-  const m =
-    typeof value === 'string' &&
-    /^\s*(\d+(?:\.\d+)?)\s*(?:[a-z]+\s*)?\/\s*(second|minute|hour|day|sec|min|hr|s|m|h|d)\s*$/i.exec(
-      value
-    )
-  if (!m) return undefined
-  return Number(m[1]) * RATE_UNITS[/** @type {keyof typeof RATE_UNITS} */ (m[2].toLowerCase())]
 }
 
 /** How each unit-bearing type parses, and how to describe a value that does not. */
@@ -435,7 +345,8 @@ export function checkValue(schema, value, path = 'value', options = {}) {
       const max = Number(schema.max ?? 100)
       if (value < min || value > max)
         return err('E_SCHEMA_RANGE', { path, message: `${path} must be between ${min} and ${max}` })
-      return ok(value)
+      // Written in percentage points; stored as a fraction (eng §8).
+      return ok(Number(decimal(value, -2)))
     }
     case 'distribution':
       return checkDistribution(value, path)
