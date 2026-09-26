@@ -5,13 +5,13 @@
 //   node scripts/dev-server.js [--port 4321]
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { startServer as start } from '../packages/strata-server/src/index.js'
+import { startServer as start } from '../packages/server/src/index.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-export const STARTER_DIRS = Object.freeze([resolve(root, 'starter/components'), resolve(root, 'starter/connection-types')])
+export const STARTER_DIRS = Object.freeze([resolve(root, 'components'), resolve(root, 'connection-types')])
 
 /**
- * @param {import('../packages/strata-server/src/server.js').ServerOptions} [options]
+ * @param {import('../packages/server/src/server.js').ServerOptions} [options]
  */
 export function startServer (options = {}) {
   return start({ root, components: [...STARTER_DIRS], ...options })

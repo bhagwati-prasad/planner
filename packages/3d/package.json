@@ -1,0 +1,14 @@
+{
+  "name": "strata-3d",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Three.js stack and isometric views, lazy-loaded.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

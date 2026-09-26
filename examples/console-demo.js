@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The console session from spec §16, run headlessly in Node: `npm run demo`.
 // The starter component library arrives in M4, so this registers three stand-ins first.
-import { createStrata } from '../packages/strata/src/index.js'
+import { createStrata } from '../packages/facade/src/index.js'
 
 const strata = createStrata()
 

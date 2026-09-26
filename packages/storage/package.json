@@ -1,0 +1,14 @@
+{
+  "name": "strata-storage",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Storage adapters: IndexedDB, sessionStorage, localStorage, files, the Node filesystem and, later, remote storage.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

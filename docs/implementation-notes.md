@@ -97,7 +97,7 @@ The workspace from §9, as Web Components in `strata-ui`. Every element reaches 
 | Area | Module | Notes |
 | --- | --- | --- |
 | View adapter | `adapter.js` (headless) | `toGraphData(system, {viewId})` turns the current system into strata-graph data; `applyIntent(intent, ...)` turns graph intents into facade calls. Node-tested. |
-| Clipboard | `strata/src/clipboard.js` | `strata.copy`, `paste`, `duplicate`: a `strata/clip@1` JSON payload of nodes, their internal edges and positions; pasting is one transaction and reports what it had to skip. |
+| Clipboard | `facade/src/clipboard.js` | `strata.copy`, `paste`, `duplicate`: a `strata/clip@1` JSON payload of nodes, their internal edges and positions; pasting is one transaction and reports what it had to skip. |
 | Shell | `elements/shell.js`, `actions.js` | Selection (graph ids), one action registry (id, title, group, shortcut, enabled, run) that the palette, context menu, toolbar and keyboard all read. |
 | App | `elements/app.js` | `<strata-app>`: regions from a JSON config, design tokens, theme (light, dark, or the OS preference), toasts, global shortcuts, the shortcuts overlay. |
 | Canvas | `elements/canvas.js` | Hosts the graph and minimap; breadcrumb, page (view) tabs, zoom level, empty-state hint, error badges; drill-down transitions; a remembered viewport per system and page. |
@@ -105,7 +105,7 @@ The workspace from §9, as Web Components in `strata-ui`. Every element reaches 
 | Overlays | `palette.js`, `menu.js` | Command palette (commands, add, find anywhere), context menu per target kind, toolbar with mode tabs. |
 | Entry page | `app/` | Loads D3, creates `strata` with a sample "Checkout" project, mounts the workspace. `window.strata` is the full console API. |
 
-Tests: the adapter in Node; the workspace in Chromium (`packages/strata-ui/test/browser/app.browser.js`), driving the real page with mouse and keyboard: adding from the library, the inspector, drill-down and back, palette, context menu, find, drag and drop, connecting ports, theme, console, problems, tree, swapping a region, the shortcuts overlay.
+Tests: the adapter in Node; the workspace in Chromium (`packages/ui/test/browser/app.browser.js`), driving the real page with mouse and keyboard: adding from the library, the inspector, drill-down and back, palette, context menu, find, drag and drop, connecting ports, theme, console, problems, tree, swapping a region, the shortcuts overlay.
 
 ## Decisions in M3
 
@@ -128,18 +128,18 @@ The plugin model of §7 and the starter library of §8, with the build, the CLI 
 
 | Area | Where | Notes |
 | --- | --- | --- |
-| Module transform | `strata-plugins/src/tokenize.js`, `modules.js` | Turns one ES module into a plain function for a small runtime. Every import and export form, `import.meta`, dynamic `import()` and JSON modules; strings, template literals, regexes and comments are tokenised so their contents are never mistaken for syntax. Line numbers are preserved. |
+| Module transform | `plugins/src/tokenize.js`, `modules.js` | Turns one ES module into a plain function for a small runtime. Every import and export form, `import.meta`, dynamic `import()` and JSON modules; strings, template literals, regexes and comments are tokenised so their contents are never mistaken for syntax. Line numbers are preserved. |
 | Bundler | `bundle.js` | Resolves the graph from entries (relative imports only), rejects cycles and missing exports with the file and line, emits IIFE or CommonJS scripts. The same code packs components and builds the app. |
 | Minifier | `minify.js` | Drops comments and indentation but keeps every line break, so semicolon insertion and meaning are unchanged (tested over every file in the repository). |
 | Packer | `pack.js` | A component folder becomes a bundle `{ format, manifest, icon, modules, entry, assets, integrity }` and its `.strata.js`. Deterministic: the same folder gives the same bytes in any file order. `readBundle` reads a script back without evaluating it and refuses a changed bundle. |
 | Validation | `manifest.js` | On top of the core's checks: an API range, reserved `base:` ids, namespaces, files the manifest names, explicit units, known keys with suggestions, icon hygiene, metric estimates. Every problem at once, as errors and warnings with file and line. |
 | Integrity | `sha256.js` | Synchronous SHA-256 in plain JavaScript, `sha256-<base64>` over a sorted-key JSON of the bundle. |
 | Upload | `zip.js`, `upload.js` | Reads a dropped `.strata.js`, a zip (stored or deflated; encrypted, ZIP64 and oversized archives refused) or a folder's files, and packs them like `strata pack`. |
-| Facade | `strata/src/components.js` | `strata.components.install`, `upload`, `pack`, `uninstall`, `bundle`, `versions`, `connectionTypes`, `list({ kind })`; a `components` event. Bundles are kept whole for the simulation worker (R1) and `.strata` exports (M5). |
+| Facade | `facade/src/components.js` | `strata.components.install`, `upload`, `pack`, `uninstall`, `bundle`, `versions`, `connectionTypes`, `list({ kind })`; a `components` event. Bundles are kept whole for the simulation worker (R1) and `.strata` exports (M5). |
 | Local server | `strata-server` | `strata serve`: static files with a strict CSP, `/api/components`, each packed script, and server-sent events when folders change. Loopback only, local Host headers only, GET and HEAD only, no dotfiles. |
 | CLI | `strata-cli` | `new component`, `pack` (`--out`, `--watch`, `--install`, `--all`), `validate`, `test-component`, `serve`, `repl`. Later commands say which release brings them. |
 | Build | `scripts/build.js` | `npm run build`: `dist/strata.js` (global `Strata`, 449 KB minified against the 600 KB budget of §19), `dist/strata.cjs`, the packed starter library and `dist/strata.html`, which runs from `file://`. |
-| Starter library (§8) | `starter/` | 19 components and 6 connection types as plugin folders (manifest, icon, README), all declarative for now. |
+| Starter library (§8) | `components/`, `connection-types/` | 19 components and 6 connection types as plugin folders (manifest, icon, README), all declarative for now. |
 
 Registration paths (§7): script tags in the offline page (`Strata.registerComponent`), the local server (`/api/components`, live reload), upload in the library panel (button or drop), and Node (`packFolder`, `strata repl`).
 

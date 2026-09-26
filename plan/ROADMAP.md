@@ -22,7 +22,7 @@ Tick a task here only when its "Done when" list is complete. If a task is split,
 
 Tooling, guardrails and CI first, then the thinnest end-to-end slice (one request through two components, drawn on a canvas, from file://) to prove the riskiest integration points in week one.
 
-- [ ] [0001 Repository scaffold and npm workspaces](M00-foundation-and-walking-skeleton/0001-repo-scaffold.md)
+- [x] [0001 Repository scaffold and npm workspaces](M00-foundation-and-walking-skeleton/0001-repo-scaffold.md)
 - [ ] [0002 Formatting, lint and type-check tooling](M00-foundation-and-walking-skeleton/0002-dev-tooling.md) (after 0001)
 - [ ] [0003 Custom lint rules for the non-negotiables](M00-foundation-and-walking-skeleton/0003-custom-lint-rules.md) (after 0002)
 - [ ] [0004 Test harness, fakes and property-test generators](M00-foundation-and-walking-skeleton/0004-test-harness.md) (after 0001)

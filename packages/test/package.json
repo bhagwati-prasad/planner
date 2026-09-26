@@ -1,0 +1,14 @@
+{
+  "name": "strata-test",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The test DSL, runner, architecture rule engine and reporters (pretty, JSON, JUnit XML).",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

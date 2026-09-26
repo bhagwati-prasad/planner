@@ -1,0 +1,14 @@
+{
+  "name": "strata-sim",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Discrete-event simulation kernel, method dispatch, scopes and stubs, snapshots, the run tree, chaos and metrics.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

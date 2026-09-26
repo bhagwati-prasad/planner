@@ -12,12 +12,12 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, relative, resolve, sep, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Script } from 'node:vm'
-import { bundleModules, emitScript, formatProblem, minify as minifyCode } from '../packages/strata-plugins/src/index.js'
-import { componentFolders, packFolder } from '../packages/strata-server/src/index.js'
-import { BEGIN_MARKER, END_MARKER } from '../packages/strata-cli/src/install.js'
+import { bundleModules, emitScript, formatProblem, minify as minifyCode } from '../packages/plugins/src/index.js'
+import { componentFolders, packFolder } from '../packages/server/src/index.js'
+import { BEGIN_MARKER, END_MARKER } from '../packages/cli/src/index.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const STARTER = [join(ROOT, 'starter/components'), join(ROOT, 'starter/connection-types')]
+const STARTER = [join(ROOT, 'components'), join(ROOT, 'connection-types')]
 /** Spec §19: core + UI under 600 KB minified, excluding D3. */
 const BUDGET = 600 * 1024
 
@@ -90,11 +90,11 @@ export async function build ({ out = join(ROOT, 'dist'), minify = true, componen
   await mkdir(join(outDir, 'vendor'), { recursive: true })
 
   const files = await sources()
-  const version = JSON.parse(await readFile(join(ROOT, 'packages/strata-cli/package.json'), 'utf8')).version
+  const version = JSON.parse(await readFile(join(ROOT, 'packages/cli/package.json'), 'utf8')).version
   const banner = `/*! Strata ${version} · built with the Strata bundler · D3 is loaded separately (vendor/d3.min.js, ISC) */`
   const app = script(files, 'app/offline.js', { format: 'iife', globalName: 'Strata', minify, banner })
   await writeFile(join(outDir, 'strata.js'), app.code)
-  const cjs = script(files, 'packages/strata/src/index.js', { format: 'cjs', minify, banner })
+  const cjs = script(files, 'packages/facade/src/index.js', { format: 'cjs', minify, banner })
   await writeFile(join(outDir, 'strata.cjs'), cjs.code)
 
   const scripts = []

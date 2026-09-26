@@ -1,7 +1,7 @@
 // strata-graph demo: a small standalone diagram editor. The graph only renders and reports
 // intents; this file is the host that owns the data, applies intents and keeps undo history.
 // In Strata the host is the view adapter in strata-ui (M3), which turns intents into commands.
-import { create, createMinimap } from '../packages/strata-graph/src/index.js'
+import { create, createMinimap } from '../packages/graph/src/index.js'
 
 const PORTS = {
   box: [{ id: 'in', side: 'left', direction: 'in' }, { id: 'out', side: 'right', direction: 'out' }],

@@ -11,36 +11,55 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
 
-/** Allowed package dependencies. Every package may import itself. */
+/**
+ * Allowed package dependencies (directory names under packages/). Every package may import
+ * itself. The new packages follow the table in eng §6; the existing ones keep the imports they
+ * have until the import-boundary lint rule (task 0003) enforces that table everywhere.
+ */
 const ALLOWED = {
-  'strata-core': [],
+  core: [],
   // Plugins build on the core's registry and manifests (spec §4).
-  'strata-plugins': ['strata-core'],
-  strata: ['strata-core', 'strata-plugins'],
-  // The diagram library knows nothing about Strata (spec §4).
-  'strata-graph': [],
-  // The UI may not reach past the facade (spec §16): no strata-core.
-  'strata-ui': ['strata', 'strata-graph'],
+  plugins: ['core'],
+  storage: ['core'],
+  comments: ['core'],
+  docs: ['core'],
+  plan: ['core'],
+  sim: ['core'],
+  debug: ['sim', 'core'],
+  test: ['sim', 'core'],
+  facade: ['core', 'plugins', 'storage', 'sim', 'debug', 'test', 'docs', 'plan', 'comments'],
+  // The diagram libraries know nothing about Strata (spec §4).
+  graph: [],
+  '3d': [],
+  // The UI may not reach past the facade (spec §18): no core.
+  ui: ['facade', 'graph', '3d'],
   // Node only: the local server and the command line.
-  'strata-server': ['strata-core', 'strata-plugins'],
-  'strata-cli': ['strata-core', 'strata-plugins', 'strata', 'strata-server']
+  server: ['core', 'plugins', 'facade', 'storage'],
+  cli: ['core', 'plugins', 'facade', 'storage', 'server']
 }
 
 /**
- * Code that must run unchanged in a browser, a worker and Node. strata-graph keeps its DOM
- * rendering under src/dom/; everything else in it is headless and tested in Node.
+ * Code that must run unchanged in a browser, a worker and Node. graph keeps its DOM
+ * rendering under src/dom/ and ui its elements under src/elements/; everything else in them
+ * is headless and tested in Node.
  * @type {Record<string, (relPath: string) => boolean>}
  */
 const HEADLESS = {
-  'strata-core': () => true,
-  'strata-plugins': () => true,
-  strata: () => true,
-  'strata-graph': rel => !rel.split(sep).includes('dom'),
-  'strata-ui': rel => !rel.split(sep).includes('elements')
+  core: () => true,
+  plugins: () => true,
+  facade: () => true,
+  sim: () => true,
+  debug: () => true,
+  test: () => true,
+  docs: () => true,
+  plan: () => true,
+  comments: () => true,
+  graph: rel => !rel.split(sep).includes('dom'),
+  ui: rel => !rel.split(sep).includes('elements')
 }
 
 /** Packages whose sources load in browsers: relative imports only. */
-const BROWSER = new Set(['strata-core', 'strata-plugins', 'strata', 'strata-graph', 'strata-ui'])
+const BROWSER = new Set(['core', 'plugins', 'facade', 'sim', 'debug', 'test', 'docs', 'plan', 'comments', 'storage', 'graph', '3d', 'ui'])
 
 const DOM_GLOBALS = [
   'document', 'window', 'localStorage', 'sessionStorage', 'indexedDB',

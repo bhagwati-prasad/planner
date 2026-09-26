@@ -4,7 +4,7 @@
 /**
  * Checkout: a web client and gateway in front of an Orders system (placed by value, with its
  * own service, database and queue) and a shared Auth system placed by reference.
- * @param {import('../packages/strata/src/index.js').Strata} strata
+ * @param {import('../packages/facade/src/index.js').Strata} strata
  */
 export async function buildSampleProject (strata) {
   const p = await strata.projects.create('Checkout')
