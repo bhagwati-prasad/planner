@@ -291,6 +291,8 @@ export function createRegistry ({ builtins = true } = {}) {
  * @property {PortSpec[]} ports
  * @property {Record<string, import('./props.js').PropertySchema>} properties
  * @property {Record<string, {unit?: string, rollup?: string, description?: string}>} metrics
+ * @property {string} [shape]    diagram shape name (strata-graph); defaults by base type
+ * @property {string} [iconSvg]  icon markup, attached when a packed bundle is registered (M4)
  *
  * @typedef {Manifest & { typeRef: string, lineage: string[], missingBase: string|null }} EffectiveManifest
  */

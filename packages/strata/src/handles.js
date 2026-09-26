@@ -8,6 +8,7 @@
 import { fail } from '../../strata-core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE, INSPECT } from './internal.js'
+import { pasteClip } from './clipboard.js'
 
 /** @typedef {import('./projects.js').ProjectHandle} ProjectHandle */
 /** @typedef {import('../../strata-core/src/index.js').Core} Core */
@@ -160,6 +161,22 @@ export class SystemHandle extends Handle {
     this.#writable()
     const ids = this.project.dispatch({ type: 'system.inline', payload: { nodeId: resolveNodeId(this, node) } })
     return Collection.from(ids.map(id => this.#node(id)))
+  }
+
+  /**
+   * Pastes a clip (from strata.copy) into this system as one undo step. Nodes that cannot be
+   * pasted (e.g. a composite whose system is gone, or one that would contain itself) are
+   * skipped and listed.
+   * @param {import('./clipboard.js').Clip} clip
+   * @param {{ at?: { x: number, y: number } }} [options] where the clip's top-left lands
+   * @returns {Collection & { skipped: { name: string, reason: string }[] }}
+   */
+  paste (clip, options) {
+    this.#writable()
+    const { nodeIds, skipped } = pasteClip(this, clip, options)
+    const out = /** @type {any} */ (Collection.from(nodeIds.map(id => this.#node(id))))
+    out.skipped = skipped
+    return out
   }
 
   /**

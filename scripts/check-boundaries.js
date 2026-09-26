@@ -16,7 +16,9 @@ const ALLOWED = {
   'strata-core': [],
   strata: ['strata-core'],
   // The diagram library knows nothing about Strata (spec §4).
-  'strata-graph': []
+  'strata-graph': [],
+  // The UI may not reach past the facade (spec §16): no strata-core.
+  'strata-ui': ['strata', 'strata-graph']
 }
 
 /**
@@ -27,11 +29,12 @@ const ALLOWED = {
 const HEADLESS = {
   'strata-core': () => true,
   strata: () => true,
-  'strata-graph': rel => !rel.split(sep).includes('dom')
+  'strata-graph': rel => !rel.split(sep).includes('dom'),
+  'strata-ui': rel => !rel.split(sep).includes('elements')
 }
 
 /** Packages whose sources load in browsers: relative imports only. */
-const BROWSER = new Set(['strata-core', 'strata', 'strata-graph'])
+const BROWSER = new Set(['strata-core', 'strata', 'strata-graph', 'strata-ui'])
 
 const DOM_GLOBALS = [
   'document', 'window', 'localStorage', 'sessionStorage', 'indexedDB',

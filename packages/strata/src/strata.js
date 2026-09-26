@@ -12,6 +12,7 @@ import { ProjectsApi } from './projects.js'
 import { EdgeHandle, NodeHandle, SystemHandle } from './handles.js'
 import { formatTarget } from './format.js'
 import { helpText, PLANNED } from './help.js'
+import { copyNodes } from './clipboard.js'
 
 /**
  * @typedef {object} Identity  local identity that signs operations (becomes an account in R4)
@@ -41,6 +42,8 @@ export class Strata {
   #active = null
   /** @type {{ projectId: string|null, ids: string[] }} */
   #selection = { projectId: null, ids: [] }
+  /** @type {import('./clipboard.js').Clip|null} */
+  #clipboard = null
 
   /** @param {StrataOptions} [options] */
   constructor ({ storage = createMemoryStorage(), registry = createRegistry(), identity = {}, clock = Date.now, random, output } = {}) {
@@ -132,6 +135,55 @@ export class Strata {
     this.#selection = { projectId: project.id, ids }
     this.#emitter.emit('select', { project, ids: [...ids] })
     return this.$
+  }
+
+  /** The last clip copied in this session (plain JSON), or null. */
+  get clipboard () { return this.#clipboard }
+
+  /**
+   * Copies nodes (default: the selected ones) with the edges between them.
+   * @param {Iterable<string|{ id: string }>} [items]
+   * @returns {import('./clipboard.js').Clip}
+   */
+  copy (items) {
+    const project = this.#requireProject()
+    const ids = items ? [...items].map(i => (typeof i === 'string' ? i : i.id)) : this.#selection.ids
+    this.#clipboard = copyNodes(project, ids)
+    this.#emitter.emit('clipboard', { clip: this.#clipboard })
+    return this.#clipboard
+  }
+
+  /**
+   * Pastes the clipboard (or a given clip) into a system (default: the current one) and
+   * selects what was pasted.
+   * @param {{ clip?: import('./clipboard.js').Clip, into?: SystemHandle, at?: { x: number, y: number } }} [options]
+   */
+  paste ({ clip = this.#clipboard ?? undefined, into, at } = {}) {
+    const project = this.#requireProject()
+    if (!clip) fail('INVALID', 'The clipboard is empty; copy something first with strata.copy()')
+    const target = into ?? project.nav.current
+    const pasted = target.paste(clip, { at })
+    if (pasted.length) this.select(pasted)
+    return pasted
+  }
+
+  /**
+   * Copies nodes and pastes them next to the originals (offset by 40), in the system of the
+   * first one. Returns the copies, which become the selection.
+   * @param {Iterable<string|{ id: string }>} [items] default: the selection
+   */
+  duplicate (items) {
+    const project = this.#requireProject()
+    const ids = items ? [...items].map(i => (typeof i === 'string' ? i : i.id)) : this.#selection.ids
+    const clip = copyNodes(project, ids)
+    const nodes = ids.map(id => project[CORE].get('node', id)).filter(Boolean)
+    const positions = nodes.map(n => new NodeHandle(project, n.id).position).filter(Boolean)
+    const at = positions.length
+      ? { x: Math.min(...positions.map(p => p.x)) + 40, y: Math.min(...positions.map(p => p.y)) + 40 }
+      : undefined
+    const pasted = new SystemHandle(project, nodes[0].systemId).paste(clip, { at })
+    if (pasted.length) this.select(pasted)
+    return pasted
   }
 
   /**

@@ -1,0 +1,14 @@
+{
+  "name": "strata-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Strata shell: Web Components for the workspace (canvas, library, inspector, dock) and the view adapter between the model and strata-graph. Talks to the model only through the strata facade.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
