@@ -6,13 +6,14 @@ import { mountStrata } from '../packages/ui/src/elements/index.js'
 import { buildSampleProject } from './sample.js'
 import { installServedComponents, watchServedComponents } from './components.js'
 import { browserSimHost } from './sim-host.js'
+import { browserAdapters } from './adapters.js'
 
 /**
  * @param {{ bundles?: object[], host?: HTMLElement }} [options]
  *   bundles: packed components registered before the app started (offline script tags)
  */
 export async function boot({ bundles = [], host = document.body } = {}) {
-  const strata = createStrata({ simHost: browserSimHost() })
+  const strata = createStrata({ ...browserAdapters(), simHost: browserSimHost() })
   const failed = []
   for (const bundle of bundles) {
     try {

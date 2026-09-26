@@ -1,10 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createStrata } from '../src/index.js'
+import { createFakeClock } from '../../../tools/testing/index.js'
 import { packComponent } from '../../plugins/src/index.js'
 import { messageQueueFolder, makeZip } from '../../plugins/test/fixtures.js'
 
-const quiet = () => createStrata({ output: () => {} })
+const quiet = () => createStrata({ clock: createFakeClock().now })
 const packed = (folder = messageQueueFolder()) => {
   const r = packComponent(folder, { name: 'message-queue' })
   assert.ok(r.bundle && r.script)

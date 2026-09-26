@@ -20,6 +20,7 @@ const DESCRIPTIONS = {
   UNSUPPORTED: 'The feature arrives in a later release',
 
   E_ERROR_CODE_UNREGISTERED: 'An error was raised with a code missing from this registry',
+  E_ADAPTER_MISSING: 'A required adapter (clock, random source) was not passed in at startup',
 
   E_BUNDLE_BARE_SPECIFIER:
     'A bundle imports an npm package; only relative imports, d3 and three are allowed',

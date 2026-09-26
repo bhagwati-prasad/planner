@@ -38,8 +38,8 @@ import {
  * @typedef {object} CoreOptions
  * @property {import('./registry.js').Registry} [registry]  component types (default: built-in base types)
  * @property {string} [actorId]   author recorded on every operation and entity
- * @property {() => number} [clock]  milliseconds since the epoch (inject for tests and replay)
- * @property {(n: number) => Uint8Array} [random]  random bytes for ULIDs (inject for tests)
+ * @property {import('./types.js').Clock} clock  the clock adapter (eng §6): the real one, or a fake in tests
+ * @property {import('./types.js').RandomBytes} [random]  random bytes for ULIDs (default: Web Crypto)
  * @property {Record<string, any>} [snapshot]  model to load, from `snapshot()`
  *
  * @typedef {object} NodeFilter
@@ -60,14 +60,21 @@ export class Core {
   #emitter = new Emitter()
   #registry
 
-  /** @param {CoreOptions} [options] */
-  constructor({
-    registry = createRegistry(),
-    actorId = 'local',
-    clock = Date.now,
-    random,
-    snapshot,
-  } = {}) {
+  /** @param {CoreOptions} options */
+  constructor(
+    {
+      registry = createRegistry(),
+      actorId = 'local',
+      clock,
+      random,
+      snapshot,
+    } = /** @type {any} */ ({})
+  ) {
+    if (typeof clock !== 'function')
+      fail(
+        'E_ADAPTER_MISSING',
+        'createCore needs a clock adapter: () => epoch milliseconds (eng §6)'
+      )
     this.#registry = registry
     this.#store = new Store()
     if (snapshot) this.#store.load(snapshot)

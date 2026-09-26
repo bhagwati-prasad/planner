@@ -2,8 +2,9 @@
 // The console session from spec §16, run headlessly in Node: `npm run demo`.
 // The starter component library arrives in M4, so this registers three stand-ins first.
 import { createStrata } from '../packages/facade/src/index.js'
+import { nodeAdapters } from '../packages/cli/src/adapters.js'
 
-const strata = createStrata()
+const strata = createStrata(nodeAdapters())
 
 strata.components.register({
   id: 'starter.api-gateway',

@@ -32,9 +32,9 @@ import { SimApi, inProcessSimHost } from './sim.js'
  * @property {import('./storage.js').StorageAdapter} [storage]  default: in-memory
  * @property {import('../../core/src/index.js').Registry} [registry]  default: built-in base types
  * @property {Partial<Identity>} [identity]
- * @property {() => number} [clock]
- * @property {(n: number) => Uint8Array} [random]
- * @property {(text: string) => void} [output]  where print() and help() write (default console.log)
+ * @property {import('../../core/src/types.js').Clock} clock  required: the clock adapter (eng §6)
+ * @property {import('../../core/src/types.js').RandomBytes} [random]  random bytes for ids (default: Web Crypto)
+ * @property {(text: string) => void} [output]  where print() and help() write (default: nowhere)
  * @property {import('./sim.js').SimHost} [simHost]  runs simulations (default: in the calling thread)
  */
 
@@ -55,19 +55,26 @@ export class Strata {
   #clipboard = null
 
   /** @param {StrataOptions} [options] */
-  constructor({
-    storage = createMemoryStorage(),
-    registry = createRegistry(),
-    identity = {},
-    clock = Date.now,
-    random,
-    output,
-    simHost = inProcessSimHost,
-  } = {}) {
+  constructor(
+    {
+      storage = createMemoryStorage(),
+      registry = createRegistry(),
+      identity = {},
+      clock,
+      random,
+      output = () => {},
+      simHost = inProcessSimHost,
+    } = /** @type {any} */ ({})
+  ) {
+    if (typeof clock !== 'function')
+      fail(
+        'E_ADAPTER_MISSING',
+        'createStrata needs a clock adapter: () => epoch milliseconds (eng §6). The app and the CLI pass real adapters; tests pass fakes from tools/testing'
+      )
     this.#registry = registry
     this.#clock = clock
     this.#random = random
-    this.#output = output ?? (text => console.log(text))
+    this.#output = output
     this.#identity = Object.freeze({
       id: identity.id ?? createUlidFactory({ now: clock, random })(),
       name: identity.name ?? 'Local user',

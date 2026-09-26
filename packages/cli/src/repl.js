@@ -6,10 +6,11 @@ import { start } from 'node:repl'
 import { relative } from 'node:path'
 import { createStrata } from '../../facade/src/index.js'
 import { componentFolders, packFolder } from '../../server/src/index.js'
+import { nodeAdapters } from './adapters.js'
 
 /** @param {{ dirs: string[] }} options */
 export async function startRepl({ dirs }) {
-  const strata = createStrata()
+  const strata = createStrata(nodeAdapters())
   let installed = 0
   for (const dir of dirs) {
     for (const folder of await componentFolders(dir)) {
