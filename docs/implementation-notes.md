@@ -22,7 +22,7 @@ What is built so far, and the decisions taken where the specification left room.
 
 ### strata (facade)
 
-`createStrata()` returns the object exposed as `strata` (§16): `projects` (create, open, list, use, close, delete, save through a storage adapter; an in-memory adapter for now), handles for systems, nodes, ports, edges and boundary ports, `nav` (drill-down breadcrumb), `$` and `select()`, `dispatch`, `transaction`, `undo`, `redo`, `on`, `print`, `format`, `help`, `components`, and `toTable()` on every collection. `strata.sim`, `test`, `debug`, `comments`, `docs` and `plan` exist as placeholders that name the release they arrive in.
+`createStrata()` returns the object exposed as `strata` (§16): `projects` (create, open, list, use, close, delete, save through a storage adapter; an in-memory adapter for now), handles for systems, nodes, ports, edges and boundary ports, `nav` (drill-down breadcrumb), `$` and `select()`, `dispatch`, `transaction`, `undo`, `redo`, `on`, `print`, `format`, `help`, `components`, and `toTable()` on every collection. `strata.sim.start()` runs the walking skeleton's single request (task 0010) through an injected simulation host: a Blob-URL worker in the offline app, and the kernel in the calling thread by default. `test`, `debug`, `comments`, `docs` and `plan` exist as placeholders that name the release they arrive in.
 
 ## Decisions where the spec was silent
 

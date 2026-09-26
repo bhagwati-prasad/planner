@@ -226,6 +226,7 @@ export class StrataToolbar extends StrataElement {
         )
       ),
       h('span', { class: 'spacer' }),
+      h('div', { class: 'group' }, button('sim.run', 'Run')),
       h('div', { class: 'group' }, button('edit.undo', 'Undo'), button('edit.redo', 'Redo')),
       h('div', { class: 'group' }, button('structure.extract', 'Extract'), button('nav.up', 'Up')),
       h(

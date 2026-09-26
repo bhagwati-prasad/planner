@@ -85,19 +85,19 @@ test('help lists topics, shows signatures with examples, and explains what arriv
   const { strata, printed } = createTestStrata()
   strata.help()
   assert.match(printed.at(-1), /strata.help\('system'\)/)
-  assert.match(printed.at(-1), /strata.sim .*\(R1\)/)
+  assert.match(printed.at(-1), /strata.test .*\(R1\)/)
   strata.help('system')
   assert.match(printed.at(-1), /sys.extract\(nodes, \{ name \}\)/)
   assert.match(printed.at(-1), /e\.g\. const orders = root.extract/)
-  strata.help('sim')
-  assert.match(printed.at(-1), /^strata.sim arrives in R1/)
+  strata.help('test')
+  assert.match(printed.at(-1), /^strata.test arrives in R1/)
   assert.match(strata.helpText('nope'), /No help topic 'nope'/)
 })
 
 test('namespaces from later releases explain themselves instead of failing obscurely', async () => {
   const { strata } = createTestStrata()
   assert.throws(
-    () => strata.sim.run({ scenario: 'checkout' }),
+    () => strata.test.run({ tags: ['slo'] }),
     err =>
       err instanceof StrataError && err.code === 'UNSUPPORTED' && /arrives in R1/.test(err.message)
   )

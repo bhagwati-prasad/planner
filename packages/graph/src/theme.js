@@ -139,6 +139,7 @@ export const STYLESHEET = `
 .sg-port:hover, .sg-port.sg-port-target { fill: ${v('portActive')}; stroke: ${v('portActive')}; }
 .sg-port-candidate { stroke: ${v('portActive')}; }
 .sg-edge-path { fill: none; stroke: ${v('edge')}; stroke-width: 1.5; }
+.sg-token { fill: ${v('accent')}; stroke: ${v('accentSoft')}; stroke-width: 2; pointer-events: none; }
 .sg-edge-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
 .sg-edge.sg-hover .sg-edge-path { stroke: ${v('accent')}; }
 .sg-edge.sg-selected .sg-edge-path { stroke: ${v('accent')}; stroke-width: 2.25; }

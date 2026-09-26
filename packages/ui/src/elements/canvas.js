@@ -158,6 +158,33 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
   }
 
   /** @param {'svg'|'png'} format */
+  /**
+   * Replays a finished run on the canvas (spec §11: animation replays the event stream, so its
+   * speed never changes results): each message's dot travels its edge in order, and the time a
+   * component spends before answering shows as a pause. One simulated millisecond takes 40 ms,
+   * kept between 0.3 s and 1.2 s per step so short hops stay visible.
+   * @param {{ trace: Array<{ atUs: number, event: string, message: { id: string, kind: string, edge: string } }> }} run
+   */
+  async animateRun(run) {
+    const graph = this.graph
+    if (!graph) return
+    const wallMs = (/** @type {number} */ us) => Math.min(1200, Math.max(300, (us / 1000) * 40))
+    let atUs = 0
+    for (const sent of run.trace.filter(t => t.event === 'sent')) {
+      const received = run.trace.find(
+        t => t.event === 'received' && t.message.id === sent.message.id
+      )
+      if (!received) continue
+      if (sent.atUs > atUs)
+        await new Promise(resolve => setTimeout(resolve, wallMs(sent.atUs - atUs)))
+      await graph.animateToken(sent.message.edge, {
+        durationMs: wallMs(received.atUs - sent.atUs),
+        reverse: sent.message.kind === 'response',
+      })
+      atUs = received.atUs
+    }
+  }
+
   async download(format) {
     if (!this.graph) return
     const name =

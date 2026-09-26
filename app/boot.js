@@ -5,13 +5,14 @@ import { createStrata } from '../packages/facade/src/index.js'
 import { mountStrata } from '../packages/ui/src/elements/index.js'
 import { buildSampleProject } from './sample.js'
 import { installServedComponents, watchServedComponents } from './components.js'
+import { browserSimHost } from './sim-host.js'
 
 /**
  * @param {{ bundles?: object[], host?: HTMLElement }} [options]
  *   bundles: packed components registered before the app started (offline script tags)
  */
 export async function boot({ bundles = [], host = document.body } = {}) {
-  const strata = createStrata()
+  const strata = createStrata({ simHost: browserSimHost() })
   const failed = []
   for (const bundle of bundles) {
     try {

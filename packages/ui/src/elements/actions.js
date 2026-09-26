@@ -126,6 +126,25 @@ export function registerDefaultActions(shell) {
     run: sh => sh.inspect(/** @type {any} */ (single()).id, { focus: 'name' }),
   })
 
+  // Simulate (spec §11): the walking skeleton's single request; run controls follow (spec §12)
+  const runOnce = async () => {
+    try {
+      const run = await s.sim.start({ system: current() })
+      await canvas()?.animateRun(run)
+      if (run.response) shell.notify(`Response in ${run.response.atUs / 1000} ms`, 'success')
+      else shell.notify('The request got no response', 'error')
+    } catch (err) {
+      shell.notify(/** @type {Error} */ (err).message, 'error')
+    }
+  }
+  add({
+    id: 'sim.run',
+    title: 'Run',
+    group: 'Simulate',
+    enabled: () => !!s.project && current().edges().length > 0,
+    run: () => void runOnce(),
+  })
+
   // Structure (spec §6)
   add({
     id: 'structure.extract',
