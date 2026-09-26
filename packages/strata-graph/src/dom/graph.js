@@ -61,8 +61,12 @@ const DEFAULTS = Object.freeze({
   portRadius: 4.5,
   /** @type {null | ((source: EndInfo, target: EndInfo) => boolean)} */
   canConnect: null,
+  /** @type {string} */
   dropType: 'application/x-strata',
-  ariaLabel: 'Diagram'
+  /** @type {string} */
+  ariaLabel: 'Diagram',
+  /** Keys that request deleting the selection. @type {string[]} */
+  deleteKeys: ['Delete', 'Backspace']
 })
 
 const MOVABLE = new Set(['node', 'frame', 'annotation'])
@@ -707,7 +711,7 @@ export class Graph {
       if (key === '-' || key === '_') { this.zoomBy(0.8); return }
       if (key === '0' && !event.ctrlKey && !event.metaKey) { this.fit({ animate: false }); return }
       if (this.#opts.readOnly) return
-      if ((key === 'Delete' || key === 'Backspace') && this.#selection.size) {
+      if (this.#opts.deleteKeys.includes(key) && this.#selection.size) {
         event.preventDefault()
         this.#emitIntent({ type: 'delete', ids: [...this.#selection] })
         return
@@ -1280,7 +1284,7 @@ export class Graph {
     const sel = layer.selectChildren('g.sg-node').data(nodes, d => d.id)
     const leaving = sel.exit()
     // Keep keyboard focus in the canvas when the focused node goes away (e.g. after Delete).
-    if (interactive && leaving.filter(function () { return this.contains(this.ownerDocument.activeElement) }).size()) {
+    if (interactive && leaving.filter(function () { return this.contains(/** @type {any} */ (this.getRootNode()).activeElement) }).size()) {
       this.#svg.node().focus({ preventScroll: true })
     }
     leaving.remove()

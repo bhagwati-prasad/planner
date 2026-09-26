@@ -128,6 +128,8 @@ export class ProjectHandle {
   redo () { return !!this.#core.redo() }
   get canUndo () { return this.#core.canUndo }
   get canRedo () { return this.#core.canRedo }
+  /** Forgets undo and redo history (the operation log is kept). */
+  clearHistory () { this.#core.clearHistory() }
 
   /** Operations applied in this session. */
   get oplog () { return Collection.from(this.#core.oplog) }
