@@ -41,7 +41,7 @@ The headless heart: immutable state, commands, undo, op log, graph invariants, r
 - [x] [0102 StrataError and the error code registry](M01-core/0102-errors.md) (after 0101)
 - [x] [0103 Injected id, clock, PRNG, scheduler and logger adapters](M01-core/0103-adapters.md) (after 0102)
 - [x] [0104 Command bus](M01-core/0104-command-bus.md) (after 0103)
-- [ ] [0105 Undo, redo and atomic batches](M01-core/0105-undo-batches.md) (after 0104)
+- [x] [0105 Undo, redo and atomic batches](M01-core/0105-undo-batches.md) (after 0104)
 - [ ] [0106 Operation log and command versions](M01-core/0106-op-log.md) (after 0105)
 - [ ] [0107 Schema validator for properties and state](M01-core/0107-schema-validator.md) (after 0102)
 - [ ] [0108 Canonical units and conversions](M01-core/0108-units.md) (after 0107)
