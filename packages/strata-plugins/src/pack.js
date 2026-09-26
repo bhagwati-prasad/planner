@@ -53,7 +53,8 @@ export function asText (content) {
 function ignored (path) {
   const parts = path.split('/')
   return parts.some(p => p.startsWith('.') || p === 'node_modules' || p === '__MACOSX') ||
-    parts[0] === 'tests' || path.endsWith('.strata.js') || /(^|\/)(Thumbs\.db|desktop\.ini)$/i.test(path)
+    parts[0] === 'tests' || path === 'package.json' || path === 'package-lock.json' ||
+    path.endsWith('.strata.js') || /(^|\/)(Thumbs\.db|desktop\.ini)$/i.test(path)
 }
 
 /**

@@ -20,7 +20,10 @@ const ALLOWED = {
   // The diagram library knows nothing about Strata (spec §4).
   'strata-graph': [],
   // The UI may not reach past the facade (spec §16): no strata-core.
-  'strata-ui': ['strata', 'strata-graph']
+  'strata-ui': ['strata', 'strata-graph'],
+  // Node only: the local server and the command line.
+  'strata-server': ['strata-core', 'strata-plugins'],
+  'strata-cli': ['strata-core', 'strata-plugins', 'strata', 'strata-server']
 }
 
 /**

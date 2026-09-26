@@ -1,0 +1,14 @@
+{
+  "name": "strata-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Strata local server (strata serve): serves the app on localhost with a strict CSP and discovers, packs and watches component folders.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

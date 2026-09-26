@@ -1,0 +1,17 @@
+{
+  "name": "strata-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The strata command: new, pack, validate, serve, test-component and repl.",
+  "type": "module",
+  "bin": {
+    "strata": "./bin/strata.js"
+  },
+  "main": "./src/cli.js",
+  "exports": {
+    ".": "./src/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

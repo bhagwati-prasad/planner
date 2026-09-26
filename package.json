@@ -17,6 +17,10 @@
     "demo": "node examples/console-demo.js",
     "typecheck": "npx -y -p typescript@5 tsc -p jsconfig.json --noEmit",
     "test:browser": "node scripts/run-browser-tests.js",
-    "serve": "node scripts/dev-server.js"
+    "serve": "node packages/strata-cli/bin/strata.js serve",
+    "strata": "node packages/strata-cli/bin/strata.js"
+  },
+  "bin": {
+    "strata": "packages/strata-cli/bin/strata.js"
   }
 }
