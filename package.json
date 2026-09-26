@@ -21,7 +21,8 @@
     "build": "node scripts/build.js",
     "format": "node tools/checks.js format",
     "format:check": "node tools/checks.js format:check",
-    "lint": "node tools/checks.js lint"
+    "lint": "node tools/checks.js lint",
+    "vendor:verify": "node tools/vendor/verify.js"
   },
   "bin": {
     "strata": "packages/cli/bin/strata.js"

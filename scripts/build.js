@@ -5,7 +5,8 @@
 //   dist/strata.cjs       CommonJS build of the facade for Node: require('./dist/strata.cjs')
 //   dist/strata.html      the offline app: open it from disk, no server needed
 //   dist/components/      the starter library, packed, one script tag each in strata.html
-//   dist/vendor/          D3, as shipped
+//   dist/vendor/          D3 as shipped, Three.js bundled to a classic script (THREE), and their
+//                         licences
 //
 //   node scripts/build.js [--out dist] [--no-minify]
 import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -66,6 +67,25 @@ function script(files, entry, { format, globalName, minify, banner }) {
 
   new Script(code, { filename: basename(entry) })
   return { code, modules: bundle.order.length }
+}
+
+/**
+ * Vendored Three.js (eng §3): its ES modules bundled to a classic script that defines `THREE`,
+ * with the copyright and licence the minifier would otherwise strip.
+ * @param {boolean} minify
+ */
+async function threeScript(minify) {
+  const dir = join(ROOT, 'vendor/three')
+  const files = {
+    'three.module.js': await readFile(join(dir, 'three.module.js'), 'utf8'),
+    'three.core.js': await readFile(join(dir, 'three.core.js'), 'utf8'),
+  }
+  const { version, licence } = JSON.parse(
+    await readFile(join(ROOT, 'vendor/manifest.json'), 'utf8')
+  ).libraries.three
+  const copyright = /Copyright .+/.exec(await readFile(join(dir, 'LICENSE'), 'utf8'))?.[0]
+  const banner = `/*! three.js ${version} · ${copyright} · ${licence} licence: LICENSE-three · bundled by the Strata bundler */`
+  return script(files, 'three.module.js', { format: 'iife', globalName: 'THREE', minify, banner })
 }
 
 const html = scripts => `<!doctype html>
@@ -138,6 +158,9 @@ export async function build({
 
   await cp(join(ROOT, 'vendor/d3/d3.min.js'), join(outDir, 'vendor/d3.min.js'))
   await cp(join(ROOT, 'vendor/d3/LICENSE'), join(outDir, 'vendor/LICENSE-d3'))
+  const three = await threeScript(minify)
+  await writeFile(join(outDir, 'vendor/three.js'), three.code)
+  await cp(join(ROOT, 'vendor/three/LICENSE'), join(outDir, 'vendor/LICENSE-three'))
   await writeFile(join(outDir, 'strata.html'), html(scripts))
 
   const kb = n => `${(n / 1024).toFixed(0)} KB`
@@ -145,6 +168,7 @@ export async function build({
     `strata.js   ${kb(app.code.length)} (${app.modules} modules${minify ? ', minified' : ''})${app.code.length > BUDGET ? ` — over the ${kb(BUDGET)} budget` : ''}`
   )
   log(`strata.cjs  ${kb(cjs.code.length)} (${cjs.modules} modules)`)
+  log(`three.js    ${kb(three.code.length)} (vendor/three.js, loaded lazily)`)
   log(`components  ${scripts.length} packed`)
   log(
     `Open ${relative(process.cwd(), join(outDir, 'strata.html')) || 'strata.html'} in a browser; no server needed.`
