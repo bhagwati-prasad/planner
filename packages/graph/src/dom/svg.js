@@ -10,7 +10,7 @@ export const SVG_NS = 'http://www.w3.org/2000/svg'
  * @param {Record<string, string|number>} [attrs]
  * @param {Document} [doc]
  */
-export function svgEl (tag, attrs = {}, doc = document) {
+export function svgEl(tag, attrs = {}, doc = document) {
   const el = doc.createElementNS(SVG_NS, tag)
   for (const [k, val] of Object.entries(attrs)) el.setAttribute(k, String(val))
   return el
@@ -23,7 +23,7 @@ export function svgEl (tag, attrs = {}, doc = document) {
  * @param {string} [weight]
  * @returns {(s: string) => number}
  */
-export function createMeasurer (fontFamily, fontSize, weight = '400') {
+export function createMeasurer(fontFamily, fontSize, weight = '400') {
   const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null
   const ctx = canvas?.getContext?.('2d')
   if (!ctx) return estimateMeasure(fontSize)
@@ -41,16 +41,72 @@ export function createMeasurer (fontFamily, fontSize, weight = '400') {
 }
 
 const ALLOWED_TAGS = new Set([
-  'svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon', 'text', 'tspan',
-  'defs', 'lineargradient', 'radialgradient', 'stop', 'title', 'desc', 'clippath', 'mask'
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'ellipse',
+  'rect',
+  'line',
+  'polyline',
+  'polygon',
+  'text',
+  'tspan',
+  'defs',
+  'lineargradient',
+  'radialgradient',
+  'stop',
+  'title',
+  'desc',
+  'clippath',
+  'mask',
 ])
 const ALLOWED_ATTRS = new Set([
-  'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'points',
-  'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap',
-  'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit', 'opacity',
-  'transform', 'viewbox', 'preserveaspectratio', 'font-size', 'font-weight', 'text-anchor',
-  'dominant-baseline', 'clip-rule', 'offset', 'stop-color', 'stop-opacity', 'gradientunits',
-  'gradienttransform', 'vector-effect', 'id', 'clip-path', 'mask', 'xmlns'
+  'd',
+  'x',
+  'y',
+  'x1',
+  'x2',
+  'y1',
+  'y2',
+  'cx',
+  'cy',
+  'r',
+  'rx',
+  'ry',
+  'width',
+  'height',
+  'points',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'stroke',
+  'stroke-width',
+  'stroke-opacity',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-miterlimit',
+  'opacity',
+  'transform',
+  'viewbox',
+  'preserveaspectratio',
+  'font-size',
+  'font-weight',
+  'text-anchor',
+  'dominant-baseline',
+  'clip-rule',
+  'offset',
+  'stop-color',
+  'stop-opacity',
+  'gradientunits',
+  'gradienttransform',
+  'vector-effect',
+  'id',
+  'clip-path',
+  'mask',
+  'xmlns',
 ])
 
 /**
@@ -62,12 +118,12 @@ const ALLOWED_ATTRS = new Set([
  * @param {string} idPrefix
  * @returns {SVGSVGElement|null}
  */
-export function sanitizeSvg (markup, idPrefix = 'icon') {
+export function sanitizeSvg(markup, idPrefix = 'icon') {
   if (typeof markup !== 'string' || !markup.trim() || typeof DOMParser === 'undefined') return null
   const doc = new DOMParser().parseFromString(markup, 'image/svg+xml')
   const root = doc.documentElement
   if (!root || root.localName !== 'svg' || doc.querySelector('parsererror')) return null
-  const clean = (el) => {
+  const clean = el => {
     for (const child of [...el.children]) {
       if (!ALLOWED_TAGS.has(child.localName.toLowerCase())) child.remove()
       else clean(child)
@@ -76,9 +132,16 @@ export function sanitizeSvg (markup, idPrefix = 'icon') {
       const name = attr.name.toLowerCase()
       const value = attr.value
       const external = /url\s*\(\s*['"]?\s*(?!#)/i.test(value) || /javascript:/i.test(value)
-      if (!ALLOWED_ATTRS.has(name) || external) { el.removeAttribute(attr.name); continue }
+      if (!ALLOWED_ATTRS.has(name) || external) {
+        el.removeAttribute(attr.name)
+        continue
+      }
       if (name === 'id') el.setAttribute('id', `${idPrefix}-${value}`)
-      if (/url\(\s*#/.test(value)) el.setAttribute(attr.name, value.replace(/url\(\s*#([^)\s]+)\s*\)/g, `url(#${idPrefix}-$1)`))
+      if (/url\(\s*#/.test(value))
+        el.setAttribute(
+          attr.name,
+          value.replace(/url\(\s*#([^)\s]+)\s*\)/g, `url(#${idPrefix}-$1)`)
+        )
     }
   }
   clean(root)

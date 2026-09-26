@@ -4,7 +4,14 @@
  * grid built from obstacle edges (orthogonal connector routing), penalising bends.
  * Pure functions; everything is in world coordinates.
  */
-import { expand, intersects, segmentCrossesRect, sideVector, strictlyInside, union } from './geometry.js'
+import {
+  expand,
+  intersects,
+  segmentCrossesRect,
+  sideVector,
+  strictlyInside,
+  union,
+} from './geometry.js'
 
 /** @typedef {import('./geometry.js').Point} Point */
 /** @typedef {import('./geometry.js').Rect} Rect */
@@ -35,7 +42,14 @@ const DEFAULTS = { stub: 20, margin: 12, bendPenalty: 24, maxObstacles: 80, reac
  * @param {RouteInput} input
  * @returns {Route}
  */
-export function routeEdge ({ source, target, routing = 'orthogonal', waypoints = [], obstacles = [], options = {} }) {
+export function routeEdge({
+  source,
+  target,
+  routing = 'orthogonal',
+  waypoints = [],
+  obstacles = [],
+  options = {},
+}) {
   const opts = { ...DEFAULTS, ...options }
   if (routing === 'curved') return curvedRoute(source, target, waypoints)
   let points
@@ -50,7 +64,7 @@ export function routeEdge ({ source, target, routing = 'orthogonal', waypoints =
     points,
     path: polylinePath(points, routing === 'orthogonal' ? opts.radius : 0),
     label: pointAlong(points, 0.5),
-    endAngle: endAngle(points)
+    endAngle: endAngle(points),
   }
 }
 
@@ -63,7 +77,7 @@ export function routeEdge ({ source, target, routing = 'orthogonal', waypoints =
  * @param {Partial<typeof DEFAULTS>} [options]
  * @returns {Point[]}
  */
-export function routeOrthogonal (source, target, obstacles = [], options = {}) {
+export function routeOrthogonal(source, target, obstacles = [], options = {}) {
   const opts = { ...DEFAULTS, ...options }
   const sv = sideVector(source.side)
   const tv = sideVector(target.side)
@@ -80,12 +94,13 @@ export function routeOrthogonal (source, target, obstacles = [], options = {}) {
   const startDir = source.side ? sv : null
   // Arriving at t1 we want to travel opposite to the target side's outward vector.
   const endDir = target.side ? { x: -tv.x, y: -tv.y } : null
-  const middle = searchGrid(s1, t1, near, startDir, endDir, opts.bendPenalty) ?? fallbackRoute(s1, t1, startDir)
+  const middle =
+    searchGrid(s1, t1, near, startDir, endDir, opts.bendPenalty) ?? fallbackRoute(s1, t1, startDir)
   return simplify([source, ...middle, target])
 }
 
 /** Corner-to-corner Z route used when the search finds nothing. */
-function fallbackRoute (s1, t1, startDir) {
+function fallbackRoute(s1, t1, startDir) {
   if (startDir && startDir.y !== 0) {
     const midY = (s1.y + t1.y) / 2
     return [s1, { x: s1.x, y: midY }, { x: t1.x, y: midY }, t1]
@@ -98,14 +113,30 @@ function fallbackRoute (s1, t1, startDir) {
  * A* over the grid of lines through obstacle edges and the two stub points.
  * @returns {Point[]|null}
  */
-function searchGrid (s1, t1, obstacles, startDir, endDir, bendPenalty) {
-  const xs = uniqueSorted([s1.x, t1.x, (s1.x + t1.x) / 2, ...obstacles.flatMap(r => [r.x, r.x + r.w])])
-  const ys = uniqueSorted([s1.y, t1.y, (s1.y + t1.y) / 2, ...obstacles.flatMap(r => [r.y, r.y + r.h])])
+function searchGrid(s1, t1, obstacles, startDir, endDir, bendPenalty) {
+  const xs = uniqueSorted([
+    s1.x,
+    t1.x,
+    (s1.x + t1.x) / 2,
+    ...obstacles.flatMap(r => [r.x, r.x + r.w]),
+  ])
+  const ys = uniqueSorted([
+    s1.y,
+    t1.y,
+    (s1.y + t1.y) / 2,
+    ...obstacles.flatMap(r => [r.y, r.y + r.h]),
+  ])
   const blocked = (x, y) => obstacles.some(r => strictlyInside(r, { x, y }))
   const xi = new Map(xs.map((v, i) => [v, i]))
   const yi = new Map(ys.map((v, i) => [v, i]))
-  const start = [/** @type {number} */ (xi.get(round3(s1.x))), /** @type {number} */ (yi.get(round3(s1.y)))]
-  const goal = [/** @type {number} */ (xi.get(round3(t1.x))), /** @type {number} */ (yi.get(round3(t1.y)))]
+  const start = [
+    /** @type {number} */ (xi.get(round3(s1.x))),
+    /** @type {number} */ (yi.get(round3(s1.y))),
+  ]
+  const goal = [
+    /** @type {number} */ (xi.get(round3(t1.x))),
+    /** @type {number} */ (yi.get(round3(t1.y))),
+  ]
   const W = xs.length
   const key = (i, j, d) => (j * W + i) * 5 + d // d: 0 none, 1 +x, 2 -x, 3 +y, 4 -y
   const DIRS = [null, [1, 0], [-1, 0], [0, 1], [0, -1]]
@@ -177,7 +208,7 @@ function searchGrid (s1, t1, obstacles, startDir, endDir, bendPenalty) {
  * @param {import('./geometry.js').Side|null} [firstSide]
  * @param {import('./geometry.js').Side|null} [lastSide]
  */
-export function orthogonalThrough (pts, firstSide, lastSide) {
+export function orthogonalThrough(pts, firstSide, lastSide) {
   const isH = side => side === 'left' || side === 'right'
   const out = [pts[0]]
   let horizontalFirst = firstSide ? isH(firstSide) : true
@@ -185,7 +216,8 @@ export function orthogonalThrough (pts, firstSide, lastSide) {
     if (i === pts.length - 1 && lastSide && i > 1) horizontalFirst = !isH(lastSide)
     const a = out[out.length - 1]
     const b = pts[i]
-    if (a.x !== b.x && a.y !== b.y) out.push(horizontalFirst ? { x: b.x, y: a.y } : { x: a.x, y: b.y })
+    if (a.x !== b.x && a.y !== b.y)
+      out.push(horizontalFirst ? { x: b.x, y: a.y } : { x: a.x, y: b.y })
     out.push(b)
     horizontalFirst = !horizontalFirst
   }
@@ -200,7 +232,7 @@ export function orthogonalThrough (pts, firstSide, lastSide) {
  * @param {Point[]} waypoints
  * @returns {Route}
  */
-function curvedRoute (source, target, waypoints) {
+function curvedRoute(source, target, waypoints) {
   if (waypoints.length) {
     const pts = [source, ...waypoints, target]
     let d = `M${fmt(pts[0].x)},${fmt(pts[0].y)}`
@@ -223,19 +255,24 @@ function curvedRoute (source, target, waypoints) {
   const c2 = { x: target.x + tv.x * reach, y: target.y + tv.y * reach }
   const path = `M${fmt(source.x)},${fmt(source.y)} C${fmt(c1.x)},${fmt(c1.y)} ${fmt(c2.x)},${fmt(c2.y)} ${fmt(target.x)},${fmt(target.y)}`
   const mid = cubicPoint(source, c1, c2, target, 0.5)
-  return { points: [source, target], path, label: mid, endAngle: Math.atan2(target.y - c2.y, target.x - c2.x) }
+  return {
+    points: [source, target],
+    path,
+    label: mid,
+    endAngle: Math.atan2(target.y - c2.y, target.x - c2.x),
+  }
 }
 
-function unit (a, b) {
+function unit(a, b) {
   const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
   return { x: (b.x - a.x) / len, y: (b.y - a.y) / len }
 }
 
-function cubicPoint (p0, p1, p2, p3, t) {
+function cubicPoint(p0, p1, p2, p3, t) {
   const u = 1 - t
   return {
     x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
-    y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
+    y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y,
   }
 }
 
@@ -244,7 +281,7 @@ function cubicPoint (p0, p1, p2, p3, t) {
  * @param {Point[]} pts
  * @param {number} [radius]
  */
-export function polylinePath (pts, radius = 0) {
+export function polylinePath(pts, radius = 0) {
   if (!pts.length) return ''
   let d = `M${fmt(pts[0].x)},${fmt(pts[0].y)}`
   for (let i = 1; i < pts.length; i++) {
@@ -252,7 +289,11 @@ export function polylinePath (pts, radius = 0) {
     const next = pts[i + 1]
     if (radius > 0 && next) {
       const prev = pts[i - 1]
-      const r = Math.min(radius, Math.hypot(p.x - prev.x, p.y - prev.y) / 2, Math.hypot(next.x - p.x, next.y - p.y) / 2)
+      const r = Math.min(
+        radius,
+        Math.hypot(p.x - prev.x, p.y - prev.y) / 2,
+        Math.hypot(next.x - p.x, next.y - p.y) / 2
+      )
       const a = towards(p, prev, r)
       const b = towards(p, next, r)
       d += ` L${fmt(a.x)},${fmt(a.y)} Q${fmt(p.x)},${fmt(p.y)} ${fmt(b.x)},${fmt(b.y)}`
@@ -263,9 +304,9 @@ export function polylinePath (pts, radius = 0) {
   return d
 }
 
-function towards (from, to, dist) {
+function towards(from, to, dist) {
   const len = Math.hypot(to.x - from.x, to.y - from.y) || 1
-  return { x: from.x + (to.x - from.x) * dist / len, y: from.y + (to.y - from.y) * dist / len }
+  return { x: from.x + ((to.x - from.x) * dist) / len, y: from.y + ((to.y - from.y) * dist) / len }
 }
 
 /**
@@ -273,7 +314,7 @@ function towards (from, to, dist) {
  * @param {Point[]} pts
  * @param {number} t 0..1
  */
-export function pointAlong (pts, t) {
+export function pointAlong(pts, t) {
   const lengths = []
   let total = 0
   for (let i = 1; i < pts.length; i++) {
@@ -286,7 +327,10 @@ export function pointAlong (pts, t) {
   for (let i = 0; i < lengths.length; i++) {
     if (remaining <= lengths[i] || i === lengths.length - 1) {
       const f = lengths[i] ? Math.min(1, remaining / lengths[i]) : 0
-      return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * f, y: pts[i].y + (pts[i + 1].y - pts[i].y) * f }
+      return {
+        x: pts[i].x + (pts[i + 1].x - pts[i].x) * f,
+        y: pts[i].y + (pts[i + 1].y - pts[i].y) * f,
+      }
     }
     remaining -= lengths[i]
   }
@@ -294,7 +338,7 @@ export function pointAlong (pts, t) {
 }
 
 /** Direction of the last segment, in radians. @param {Point[]} pts */
-function endAngle (pts) {
+function endAngle(pts) {
   for (let i = pts.length - 1; i > 0; i--) {
     const a = pts[i - 1]
     const b = pts[i]
@@ -307,7 +351,7 @@ function endAngle (pts) {
  * Drops repeated points and middle points of straight runs.
  * @param {Point[]} pts
  */
-export function simplify (pts) {
+export function simplify(pts) {
   const out = []
   for (const p of pts) {
     const last = out[out.length - 1]
@@ -328,17 +372,17 @@ export function simplify (pts) {
 const round3 = v => Math.round(v * 1000) / 1000
 
 /** @param {number[]} values */
-function uniqueSorted (values) {
+function uniqueSorted(values) {
   return [...new Set(values.map(round3))].sort((a, b) => a - b)
 }
 
 /** @param {Point} p */
-function rectOf (p) {
+function rectOf(p) {
   return { x: p.x, y: p.y, w: 0, h: 0 }
 }
 
 /** @param {number} v */
-function fmt (v) {
+function fmt(v) {
   return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100)
 }
 
@@ -346,9 +390,11 @@ function fmt (v) {
 export class MinHeap {
   /** @type {{ p: number, v: unknown }[]} */
   #items = []
-  get size () { return this.#items.length }
+  get size() {
+    return this.#items.length
+  }
   /** @param {number} priority @param {unknown} value */
-  push (priority, value) {
+  push(priority, value) {
     const items = this.#items
     items.push({ p: priority, v: value })
     let i = items.length - 1
@@ -359,7 +405,7 @@ export class MinHeap {
       i = parent
     }
   }
-  pop () {
+  pop() {
     const items = this.#items
     if (!items.length) return undefined
     const top = items[0].v

@@ -34,7 +34,16 @@
  * Delete removes, Escape cancels or clears, Ctrl/⌘+A selects all, +/− zoom, 0 fits.
  */
 import { GraphModel, DEFAULT_NODE_SIZE } from '../data.js'
-import { boundaryAnchor, center, expand, portAnchors, rectFromPoints, intersects, snap, union } from '../geometry.js'
+import {
+  boundaryAnchor,
+  center,
+  expand,
+  portAnchors,
+  rectFromPoints,
+  intersects,
+  snap,
+  union,
+} from '../geometry.js'
 import { routeEdge } from '../routing.js'
 import { SpatialIndex } from '../spatial.js'
 import { snapMove } from '../snap.js'
@@ -66,7 +75,7 @@ const DEFAULTS = Object.freeze({
   /** @type {string} */
   ariaLabel: 'Diagram',
   /** Keys that request deleting the selection. @type {string[]} */
-  deleteKeys: ['Delete', 'Backspace']
+  deleteKeys: ['Delete', 'Backspace'],
 })
 
 const MOVABLE = new Set(['node', 'frame', 'annotation'])
@@ -83,7 +92,7 @@ let instances = 0
  * @param {HTMLElement} host
  * @param {Partial<typeof DEFAULTS> & { d3?: any }} [options]
  */
-export function create (host, options) {
+export function create(host, options) {
   return new Graph(host, options)
 }
 
@@ -137,12 +146,15 @@ export class Graph {
    * @param {HTMLElement} host
    * @param {Partial<typeof DEFAULTS> & { d3?: any }} [options]
    */
-  constructor (host, options = {}) {
+  constructor(host, options = {}) {
     const { d3 = /** @type {any} */ (globalThis).d3, ...rest } = options
     if (!d3?.select || !d3.zoom || !d3.drag) {
-      throw new Error('strata-graph needs D3 (d3-selection, d3-zoom and d3-drag): load vendor/d3/d3.min.js first or pass { d3 }')
+      throw new Error(
+        'strata-graph needs D3 (d3-selection, d3-zoom and d3-drag): load vendor/d3/d3.min.js first or pass { d3 }'
+      )
     }
-    if (!host || typeof host.appendChild !== 'function') throw new Error('strata-graph needs a host element')
+    if (!host || typeof host.appendChild !== 'function')
+      throw new Error('strata-graph needs a host element')
     this.#d3 = d3
     this.#host = host
     this.#opts = { ...DEFAULTS, ...rest }
@@ -170,27 +182,45 @@ export class Graph {
   // ------------------------------------------------------------------------------------------
 
   /** The root <svg> element. */
-  get element () { return this.#svg.node() }
+  get element() {
+    return this.#svg.node()
+  }
   /** Current view transform: screen = world × k + (x, y). */
-  get transform () { return { ...this.#transform } }
+  get transform() {
+    return { ...this.#transform }
+  }
   /** Selected ids, in selection order. */
-  get selection () { return [...this.#selection] }
+  get selection() {
+    return [...this.#selection]
+  }
   /** What the last render drew. */
-  get stats () { return { ...this.#stats } }
+  get stats() {
+    return { ...this.#stats }
+  }
   /** Problems found in the last `setData`. */
-  get problems () { return [...this.#model.problems] }
-  get options () { return { ...this.#opts } }
+  get problems() {
+    return [...this.#model.problems]
+  }
+  get options() {
+    return { ...this.#opts }
+  }
   /** Size of the view in pixels. */
-  get size () { return { ...this.#size } }
+  get size() {
+    return { ...this.#size }
+  }
 
   /**
    * Rectangles of the visible nodes, frames and annotations (for overviews such as the minimap).
    * @returns {{ id: string, kind: string, x: number, y: number, w: number, h: number, ghost: boolean }[]}
    */
-  rects () {
+  rects() {
     const m = this.#model
     const out = []
-    for (const [kind, map] of /** @type {[string, Map<string, any>][]} */ ([['frame', m.frames], ['node', m.nodes], ['annotation', m.annotations]])) {
+    for (const [kind, map] of /** @type {[string, Map<string, any>][]} */ ([
+      ['frame', m.frames],
+      ['node', m.nodes],
+      ['annotation', m.annotations],
+    ])) {
       for (const item of map.values()) {
         if (m.isHidden(item)) continue
         out.push({ id: item.id, kind, ...this.#itemRect(item.id), ghost: !!item.ghost })
@@ -204,8 +234,9 @@ export class Graph {
    * @param {string} name
    * @param {import('./shapes.js').ShapeDef} def
    */
-  registerShape (name, def) {
-    if (!def || typeof def.render !== 'function') throw new Error(`Shape '${name}' needs a render(sel, d, ctx) function`)
+  registerShape(name, def) {
+    if (!def || typeof def.render !== 'function')
+      throw new Error(`Shape '${name}' needs a render(sel, d, ctx) function`)
     this.#shapes.set(name, def)
     this.#themeVersion++
     this.#render()
@@ -213,17 +244,19 @@ export class Graph {
   }
 
   /** @returns {string[]} */
-  get shapes () { return [...this.#shapes.keys()] }
+  get shapes() {
+    return [...this.#shapes.keys()]
+  }
 
   /**
    * Replaces the graph data and re-renders (idempotent).
    * @param {import('../data.js').GraphData} data
    * @returns {import('../data.js').DataProblem[]} what could not be drawn
    */
-  setData (data) {
+  setData(data) {
     this.#model = new GraphModel(data ?? {}, {
       portsOf: n => this.#shapeOf(n).ports?.(n) ?? [],
-      sizeOf: n => this.#shapeOf(n).size ?? DEFAULT_NODE_SIZE
+      sizeOf: n => this.#shapeOf(n).size ?? DEFAULT_NODE_SIZE,
     })
     for (const id of this.#selection) if (!this.#model.kindOf(id)) this.#selection.delete(id)
     for (const id of this.#routes.keys()) if (!this.#model.edges.has(id)) this.#routes.delete(id)
@@ -236,7 +269,7 @@ export class Graph {
    * Shows a selection (the host decides what is selected; clicks only request it).
    * @param {Iterable<string>} ids
    */
-  select (ids = []) {
+  select(ids = []) {
     this.#selection = new Set([...ids].filter(id => this.#model.kindOf(id)))
     this.#render()
     return this
@@ -247,7 +280,7 @@ export class Graph {
    * @param {Function} fn
    * @returns {() => void} unsubscribe
    */
-  on (event, fn) {
+  on(event, fn) {
     let set = this.#listeners.get(event)
     if (!set) this.#listeners.set(event, (set = new Set()))
     set.add(fn)
@@ -255,17 +288,22 @@ export class Graph {
   }
 
   /** @param {string} event @param {Function} fn */
-  off (event, fn) { this.#listeners.get(event)?.delete(fn) }
+  off(event, fn) {
+    this.#listeners.get(event)?.delete(fn)
+  }
 
   /**
    * Pans and zooms to show the given items.
    * @param {Iterable<string>} ids
    * @param {{ animate?: boolean, padding?: number, maxScale?: number }} [options]
    */
-  zoomTo (ids, { animate = true, padding = 60, maxScale = 1.5 } = {}) {
+  zoomTo(ids, { animate = true, padding = 60, maxScale = 1.5 } = {}) {
     const bounds = this.#model.bounds(ids)
     if (!bounds) return this
-    this.setTransform(fitTransform(bounds, this.#size, { padding, maxScale, minScale: this.#opts.minZoom }), { animate })
+    this.setTransform(
+      fitTransform(bounds, this.#size, { padding, maxScale, minScale: this.#opts.minZoom }),
+      { animate }
+    )
     return this
   }
 
@@ -273,9 +311,14 @@ export class Graph {
    * Fits everything in view.
    * @param {{ animate?: boolean, padding?: number, maxScale?: number }} [options]
    */
-  fit ({ animate = false, padding = 40, maxScale = 1 } = {}) {
+  fit({ animate = false, padding = 40, maxScale = 1 } = {}) {
     const bounds = this.#model.bounds()
-    this.setTransform(bounds ? fitTransform(bounds, this.#size, { padding, maxScale, minScale: this.#opts.minZoom }) : { x: 0, y: 0, k: 1 }, { animate })
+    this.setTransform(
+      bounds
+        ? fitTransform(bounds, this.#size, { padding, maxScale, minScale: this.#opts.minZoom })
+        : { x: 0, y: 0, k: 1 },
+      { animate }
+    )
     return this
   }
 
@@ -284,8 +327,13 @@ export class Graph {
    * @param {number} factor
    * @param {{ animate?: boolean }} [options]
    */
-  zoomBy (factor, { animate = false } = {}) {
-    const t = zoomAt(this.#transform, factor, { x: this.#size.width / 2, y: this.#size.height / 2 }, { minScale: this.#opts.minZoom, maxScale: this.#opts.maxZoom })
+  zoomBy(factor, { animate = false } = {}) {
+    const t = zoomAt(
+      this.#transform,
+      factor,
+      { x: this.#size.width / 2, y: this.#size.height / 2 },
+      { minScale: this.#opts.minZoom, maxScale: this.#opts.maxZoom }
+    )
     return this.setTransform(t, { animate })
   }
 
@@ -293,10 +341,11 @@ export class Graph {
    * @param {Transform} t
    * @param {{ animate?: boolean }} [options]
    */
-  setTransform (t, { animate = false } = {}) {
+  setTransform(t, { animate = false } = {}) {
     const d3 = this.#d3
     const z = d3.zoomIdentity.translate(t.x, t.y).scale(t.k)
-    if (animate && typeof this.#svg.transition === 'function') this.#svg.transition().duration(350).call(this.#zoom.transform, z)
+    if (animate && typeof this.#svg.transition === 'function')
+      this.#svg.transition().duration(350).call(this.#zoom.transform, z)
     else this.#svg.call(this.#zoom.transform, z)
     return this
   }
@@ -306,28 +355,36 @@ export class Graph {
    * @param {{ x: number, y: number }} point
    * @param {{ animate?: boolean }} [options]
    */
-  centerOn (point, { animate = false } = {}) {
+  centerOn(point, { animate = false } = {}) {
     const { k } = this.#transform
-    return this.setTransform({ x: this.#size.width / 2 - point.x * k, y: this.#size.height / 2 - point.y * k, k }, { animate })
+    return this.setTransform(
+      { x: this.#size.width / 2 - point.x * k, y: this.#size.height / 2 - point.y * k, k },
+      { animate }
+    )
   }
 
   /**
    * Client (page) coordinates to world coordinates.
    * @param {{ x: number, y: number }} client
    */
-  clientToWorld (client) {
+  clientToWorld(client) {
     const box = this.#svg.node().getBoundingClientRect()
     return screenToWorld(this.#transform, { x: client.x - box.left, y: client.y - box.top })
   }
 
   /** @param {{ x: number, y: number }} world */
-  worldToClient (world) {
+  worldToClient(world) {
     const box = this.#svg.node().getBoundingClientRect()
-    return { x: world.x * this.#transform.k + this.#transform.x + box.left, y: world.y * this.#transform.k + this.#transform.y + box.top }
+    return {
+      x: world.x * this.#transform.k + this.#transform.x + box.left,
+      y: world.y * this.#transform.k + this.#transform.y + box.top,
+    }
   }
 
   /** Bounds of some items, or of everything. @param {Iterable<string>} [ids] */
-  bounds (ids) { return this.#model.bounds(ids) }
+  bounds(ids) {
+    return this.#model.bounds(ids)
+  }
 
   /**
    * Overlays for simulation and review (spec §9, §10):
@@ -338,26 +395,27 @@ export class Graph {
    * @param {string} name
    * @param {any} spec
    */
-  setOverlay (name, spec) {
+  setOverlay(name, spec) {
     this.#overlays.set(name, spec)
     this.#render()
     return this
   }
 
   /** @param {string} name */
-  clearOverlay (name) {
+  clearOverlay(name) {
     this.#overlays.delete(name)
     this.#render()
     return this
   }
 
   /** @param {Partial<typeof DEFAULTS>} options */
-  setOptions (options) {
+  setOptions(options) {
     const { theme, ...rest } = options
     Object.assign(this.#opts, rest)
     if ('routing' in rest) this.#routes.clear()
     if ('grid' in rest || 'showGrid' in rest) this.#updateGrid()
-    if ('minZoom' in rest || 'maxZoom' in rest) this.#zoom.scaleExtent([this.#opts.minZoom, this.#opts.maxZoom])
+    if ('minZoom' in rest || 'maxZoom' in rest)
+      this.#zoom.scaleExtent([this.#opts.minZoom, this.#opts.maxZoom])
     if (theme !== undefined) this.setTheme(theme)
     this.#svg.classed('sg-readonly', !!this.#opts.readOnly).attr('aria-label', this.#opts.ariaLabel)
     this.#render()
@@ -368,7 +426,7 @@ export class Graph {
    * 'light', 'dark', or token overrides over light (see TOKENS).
    * @param {'light'|'dark'|Record<string, string>} theme
    */
-  setTheme (theme) {
+  setTheme(theme) {
     this.#opts.theme = theme
     this.#applyThemeTokens()
     this.#svg.attr('style', this.#rootStyle())
@@ -381,7 +439,7 @@ export class Graph {
    * Requests aligning the selection (emits a move intent).
    * @param {'left'|'center'|'right'|'top'|'middle'|'bottom'} mode
    */
-  align (mode) {
+  align(mode) {
     this.#emitArrange(items => alignItems(items, mode))
     return this
   }
@@ -390,7 +448,7 @@ export class Graph {
    * Requests spacing the selection evenly (emits a move intent).
    * @param {'horizontal'|'vertical'} axis
    */
-  distribute (axis) {
+  distribute(axis) {
     this.#emitArrange(items => distributeItems(items, axis))
     return this
   }
@@ -399,7 +457,7 @@ export class Graph {
    * Moves keyboard focus to a node (and scrolls it into view).
    * @param {string} id
    */
-  focus (id) {
+  focus(id) {
     const el = this.#layers.nodes?.node().querySelector(`[data-id="${cssEscape(id)}"]`)
     if (el) el.focus({ preventScroll: true })
     else this.#svg.node().focus({ preventScroll: true })
@@ -410,24 +468,37 @@ export class Graph {
    * @param {{ ids?: Iterable<string>, padding?: number, background?: boolean }} [options]
    * @returns {string}
    */
-  exportSVG ({ ids, padding = 24, background = true } = {}) {
+  exportSVG({ ids, padding = 24, background = true } = {}) {
     const only = ids ? new Set(ids) : null
     const bounds = this.#model.bounds(only ?? undefined) ?? { x: 0, y: 0, w: 1, h: 1 }
     const box = expand(bounds, padding)
     const doc = this.#svg.node().ownerDocument
-    const svg = svgEl('svg', {
-      class: 'sg-root',
-      width: Math.ceil(box.w),
-      height: Math.ceil(box.h),
-      viewBox: `${box.x} ${box.y} ${box.w} ${box.h}`
-    }, doc)
+    const svg = svgEl(
+      'svg',
+      {
+        class: 'sg-root',
+        width: Math.ceil(box.w),
+        height: Math.ceil(box.h),
+        viewBox: `${box.x} ${box.y} ${box.w} ${box.h}`,
+      },
+      doc
+    )
     const tokens = this.#tokens
-    const vars = Object.fromEntries(Object.entries(TOKENS).map(([key, cssVar]) => [cssVar, tokens[key]]))
+    const vars = Object.fromEntries(
+      Object.entries(TOKENS).map(([key, cssVar]) => [cssVar, tokens[key]])
+    )
     const style = svgEl('style', {}, doc)
     style.textContent = STYLESHEET.replace(/var\((--sg-[a-z-]+)\)/g, (m, name) => vars[name] ?? m)
     svg.appendChild(style)
     svg.appendChild(this.#defs(doc, true))
-    if (background) svg.appendChild(svgEl('rect', { x: box.x, y: box.y, width: box.w, height: box.h, fill: tokens.background }, doc))
+    if (background)
+      svg.appendChild(
+        svgEl(
+          'rect',
+          { x: box.x, y: box.y, width: box.w, height: box.h, fill: tokens.background },
+          doc
+        )
+      )
     const d3 = this.#d3
     const root = d3.select(svg).append('g').attr('class', 'sg-viewport')
     const layers = this.#makeLayers(root)
@@ -443,7 +514,7 @@ export class Graph {
    * @param {{ scale?: number, ids?: Iterable<string>, padding?: number, background?: boolean }} [options]
    * @returns {Promise<Blob>}
    */
-  async exportPNG ({ scale = 2, ...svgOptions } = {}) {
+  async exportPNG({ scale = 2, ...svgOptions } = {}) {
     const svgText = this.exportSVG(svgOptions)
     const match = /width="(\d+)" height="(\d+)"/.exec(svgText)
     const width = Number(match?.[1] ?? 1)
@@ -462,14 +533,16 @@ export class Graph {
       const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'))
       ctx.scale(scale, scale)
       ctx.drawImage(img, 0, 0, width, height)
-      return await new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('PNG encoding failed'))), 'image/png'))
+      return await new Promise((resolve, reject) =>
+        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('PNG encoding failed'))), 'image/png')
+      )
     } finally {
       URL.revokeObjectURL(url)
     }
   }
 
   /** Removes the diagram and its listeners. */
-  destroy () {
+  destroy() {
     cancelAnimationFrame(this.#raf)
     this.#resizeObserver?.disconnect()
     for (const fn of this.#cleanup) fn()
@@ -482,21 +555,25 @@ export class Graph {
   // Setup
   // ------------------------------------------------------------------------------------------
 
-  #applyThemeTokens () {
-    this.#tokens = /** @type {Record<string, string>} */ (themeTokens(/** @type {any} */ (this.#opts.theme)))
+  #applyThemeTokens() {
+    this.#tokens = /** @type {Record<string, string>} */ (
+      themeTokens(/** @type {any} */ (this.#opts.theme))
+    )
     this.#fontSize = parseFloat(this.#tokens.fontSize) || 12
     this.#measure = createMeasurer(this.#tokens.fontFamily, this.#fontSize)
     this.#measureBold = createMeasurer(this.#tokens.fontFamily, this.#fontSize, '600')
   }
 
-  #rootStyle () {
+  #rootStyle() {
     return `${themeStyle(/** @type {any} */ (this.#opts.theme))} display: block; width: 100%; height: 100%;`
   }
 
-  #buildDom () {
+  #buildDom() {
     const d3 = this.#d3
     const doc = this.#host.ownerDocument
-    this.#svg = d3.select(this.#host).append('svg')
+    this.#svg = d3
+      .select(this.#host)
+      .append('svg')
       .attr('xmlns', SVG_NS)
       .attr('class', 'sg-root')
       .attr('tabindex', 0)
@@ -510,27 +587,60 @@ export class Graph {
     style.textContent = STYLESHEET
     svg.appendChild(style)
     svg.appendChild(this.#defs(doc, false))
-    this.#svg.append('rect').attr('class', 'sg-background').attr('width', '100%').attr('height', '100%')
-    this.#svg.append('rect').attr('class', 'sg-grid').attr('width', '100%').attr('height', '100%').attr('fill', `url(#${this.#uid}-grid)`).attr('pointer-events', 'none')
+    this.#svg
+      .append('rect')
+      .attr('class', 'sg-background')
+      .attr('width', '100%')
+      .attr('height', '100%')
+    this.#svg
+      .append('rect')
+      .attr('class', 'sg-grid')
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .attr('fill', `url(#${this.#uid}-grid)`)
+      .attr('pointer-events', 'none')
     this.#gridPattern = this.#svg.select(`#${this.#uid}-grid`)
     this.#root = this.#svg.append('g').attr('class', 'sg-viewport')
     this.#layers = this.#makeLayers(this.#root)
-    this.#marquee = this.#svg.append('rect').attr('class', 'sg-marquee').attr('visibility', 'hidden')
+    this.#marquee = this.#svg
+      .append('rect')
+      .attr('class', 'sg-marquee')
+      .attr('visibility', 'hidden')
     this.#svg.on('pointerdown.focus', () => svg.focus({ preventScroll: true }))
     this.#svg.on('contextmenu', event => {
       if (event.target !== svg && !event.target.classList?.contains('sg-background')) return
       event.preventDefault()
       const world = this.clientToWorld({ x: event.clientX, y: event.clientY })
-      this.#emitIntent({ type: 'context', id: null, kind: null, clientX: event.clientX, clientY: event.clientY, x: world.x, y: world.y })
+      this.#emitIntent({
+        type: 'context',
+        id: null,
+        kind: null,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        x: world.x,
+        y: world.y,
+      })
     })
     this.#updateGrid()
   }
 
   /** Marker and pattern definitions (ids are unique per graph). */
-  #defs (doc, forExport) {
+  #defs(doc, forExport) {
     const defs = svgEl('defs', {}, doc)
     const marker = (id, cls) => {
-      const m = svgEl('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, doc)
+      const m = svgEl(
+        'marker',
+        {
+          id,
+          viewBox: '0 0 10 10',
+          refX: 9,
+          refY: 5,
+          markerWidth: 7,
+          markerHeight: 7,
+          orient: 'auto-start-reverse',
+        },
+        doc
+      )
       m.appendChild(svgEl('path', { d: 'M0,0 L10,5 L0,10 z', class: cls }, doc))
       defs.appendChild(m)
     }
@@ -538,15 +648,25 @@ export class Graph {
     marker(`${this.#uid}-arrow-active`, 'sg-arrow sg-arrow-active')
     if (!forExport) {
       const g = this.#opts.grid || 10
-      const pattern = svgEl('pattern', { id: `${this.#uid}-grid`, patternUnits: 'userSpaceOnUse', width: g * 5, height: g * 5 }, doc)
+      const pattern = svgEl(
+        'pattern',
+        { id: `${this.#uid}-grid`, patternUnits: 'userSpaceOnUse', width: g * 5, height: g * 5 },
+        doc
+      )
       pattern.appendChild(svgEl('path', { class: 'sg-grid-minor', fill: 'none', d: '' }, doc))
-      pattern.appendChild(svgEl('path', { class: 'sg-grid-major', fill: 'none', d: `M${g * 5},0 L0,0 0,${g * 5}` }, doc))
+      pattern.appendChild(
+        svgEl(
+          'path',
+          { class: 'sg-grid-major', fill: 'none', d: `M${g * 5},0 L0,0 0,${g * 5}` },
+          doc
+        )
+      )
       defs.appendChild(pattern)
     }
     return defs
   }
 
-  #makeLayers (root) {
+  #makeLayers(root) {
     return {
       frames: root.append('g').attr('class', 'sg-layer-frames'),
       regions: root.append('g').attr('class', 'sg-layer-regions'),
@@ -554,33 +674,47 @@ export class Graph {
       nodes: root.append('g').attr('class', 'sg-layer-nodes'),
       annotations: root.append('g').attr('class', 'sg-layer-annotations'),
       handles: root.append('g').attr('class', 'sg-layer-handles'),
-      guides: root.append('g').attr('class', 'sg-layer-guides')
+      guides: root.append('g').attr('class', 'sg-layer-guides'),
     }
   }
 
-  #updateGrid () {
+  #updateGrid() {
     const { grid, showGrid } = this.#opts
     const g = grid || 10
     const { x, y, k } = this.#transform
     const pattern = this.#gridPattern
-    pattern.attr('width', g * 5).attr('height', g * 5).attr('patternTransform', `translate(${x},${y}) scale(${k})`)
+    pattern
+      .attr('width', g * 5)
+      .attr('height', g * 5)
+      .attr('patternTransform', `translate(${x},${y}) scale(${k})`)
     const minor = []
-    for (let i = 1; i < 5; i++) minor.push(`M${i * g},0 L${i * g},${g * 5} M0,${i * g} L${g * 5},${i * g}`)
-    pattern.select('.sg-grid-minor').attr('d', minor.join(' ')).attr('visibility', g * k < 6 ? 'hidden' : 'visible')
-    pattern.select('.sg-grid-major').attr('d', `M${g * 5},0 L0,0 0,${g * 5}`).attr('visibility', g * 5 * k < 8 ? 'hidden' : 'visible')
+    for (let i = 1; i < 5; i++)
+      minor.push(`M${i * g},0 L${i * g},${g * 5} M0,${i * g} L${g * 5},${i * g}`)
+    pattern
+      .select('.sg-grid-minor')
+      .attr('d', minor.join(' '))
+      .attr('visibility', g * k < 6 ? 'hidden' : 'visible')
+    pattern
+      .select('.sg-grid-major')
+      .attr('d', `M${g * 5},0 L0,0 0,${g * 5}`)
+      .attr('visibility', g * 5 * k < 8 ? 'hidden' : 'visible')
     pattern.selectAll('path').attr('vector-effect', 'non-scaling-stroke')
     this.#svg.select('.sg-grid').attr('visibility', showGrid ? 'visible' : 'hidden')
   }
 
-  #measureSize () {
+  #measureSize() {
     const box = this.#svg.node().getBoundingClientRect()
-    this.#size = { width: box.width || this.#host.clientWidth || 800, height: box.height || this.#host.clientHeight || 600 }
+    this.#size = {
+      width: box.width || this.#host.clientWidth || 800,
+      height: box.height || this.#host.clientHeight || 600,
+    }
   }
 
-  #setupZoom () {
+  #setupZoom() {
     const d3 = this.#d3
     const svg = this.#svg.node()
-    this.#zoom = d3.zoom()
+    this.#zoom = d3
+      .zoom()
       .scaleExtent([this.#opts.minZoom, this.#opts.maxZoom])
       .filter(event => {
         if (event.type === 'wheel') return event.ctrlKey || event.metaKey
@@ -588,7 +722,9 @@ export class Graph {
         if (event.type.startsWith('touch')) return true
         return event.button === 1 || (event.button === 0 && this.#spaceDown)
       })
-      .on('start', event => { if (event.sourceEvent?.type === 'mousedown') this.#svg.classed('sg-panning', true) })
+      .on('start', event => {
+        if (event.sourceEvent?.type === 'mousedown') this.#svg.classed('sg-panning', true)
+      })
       .on('zoom', event => {
         const { x, y, k } = event.transform
         this.#transform = { x, y, k }
@@ -605,25 +741,40 @@ export class Graph {
       event.preventDefault()
       let dx = event.deltaX
       let dy = event.deltaY
-      if (event.shiftKey && dx === 0) { dx = dy; dy = 0 }
+      if (event.shiftKey && dx === 0) {
+        dx = dy
+        dy = 0
+      }
       const factor = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.#size.height : 1
-      this.#zoom.translateBy(this.#svg, -dx * factor / this.#transform.k, -dy * factor / this.#transform.k)
+      this.#zoom.translateBy(
+        this.#svg,
+        (-dx * factor) / this.#transform.k,
+        (-dy * factor) / this.#transform.k
+      )
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
     this.#cleanup.push(() => svg.removeEventListener('wheel', onWheel))
   }
 
-  #setupBackgroundDrag () {
+  #setupBackgroundDrag() {
     const d3 = this.#d3
     const svg = this.#svg.node()
-    const isBackground = t => t === svg || t.classList?.contains('sg-background') || t.classList?.contains('sg-grid')
-    const drag = d3.drag()
+    const isBackground = t =>
+      t === svg || t.classList?.contains('sg-background') || t.classList?.contains('sg-grid')
+    const drag = d3
+      .drag()
       .filter(event => event.button === 0 && !this.#spaceDown && isBackground(event.target))
       .container(() => svg)
       .subject(event => ({ x: event.x, y: event.y }))
       .on('start', event => {
         const e = event.sourceEvent
-        this.#drag = { type: 'marquee', start: { x: event.x, y: event.y }, end: { x: event.x, y: event.y }, moved: false, additive: e.shiftKey || e.ctrlKey || e.metaKey }
+        this.#drag = {
+          type: 'marquee',
+          start: { x: event.x, y: event.y },
+          end: { x: event.x, y: event.y },
+          moved: false,
+          additive: e.shiftKey || e.ctrlKey || e.metaKey,
+        }
       })
       .on('drag', event => {
         const d = this.#drag
@@ -632,7 +783,12 @@ export class Graph {
         if (!d.moved && Math.hypot(d.end.x - d.start.x, d.end.y - d.start.y) < 3) return
         d.moved = true
         const r = rectFromPoints(d.start, d.end)
-        this.#marquee.attr('visibility', 'visible').attr('x', r.x).attr('y', r.y).attr('width', r.w).attr('height', r.h)
+        this.#marquee
+          .attr('visibility', 'visible')
+          .attr('x', r.x)
+          .attr('y', r.y)
+          .attr('width', r.w)
+          .attr('height', r.h)
       })
       .on('end', () => {
         const d = this.#drag
@@ -653,7 +809,7 @@ export class Graph {
   }
 
   /** Nodes and annotations touched by the rectangle, frames inside it, edges between selected nodes. */
-  #marqueeHits (rect) {
+  #marqueeHits(rect) {
     const m = this.#model
     const out = []
     for (const id of this.#index.query(rect)) {
@@ -662,17 +818,24 @@ export class Graph {
       if (!item || m.isHidden(item) || m.isLocked(item) || /** @type {any} */ (item).ghost) continue
       if (kind === 'frame') {
         const r = /** @type {Rect} */ (m.rectOf(id))
-        if (r.x >= rect.x && r.y >= rect.y && r.x + r.w <= rect.x + rect.w && r.y + r.h <= rect.y + rect.h) out.push(id)
+        if (
+          r.x >= rect.x &&
+          r.y >= rect.y &&
+          r.x + r.w <= rect.x + rect.w &&
+          r.y + r.h <= rect.y + rect.h
+        )
+          out.push(id)
       } else {
         out.push(id)
       }
     }
     const picked = new Set(out)
-    for (const e of m.edges.values()) if (!m.isHidden(e) && picked.has(e.source.node) && picked.has(e.target.node)) out.push(e.id)
+    for (const e of m.edges.values())
+      if (!m.isHidden(e) && picked.has(e.source.node) && picked.has(e.target.node)) out.push(e.id)
     return out
   }
 
-  #setupKeyboard () {
+  #setupKeyboard() {
     const svg = this.#svg.node()
     const onKeyDown = event => {
       const key = event.key
@@ -689,27 +852,47 @@ export class Graph {
         return
       }
       if (key === 'Escape') {
-        if (this.#drag) { this.#cancelDrag(); return }
+        if (this.#drag) {
+          this.#cancelDrag()
+          return
+        }
         if (this.#selection.size) this.#emitIntent({ type: 'select', ids: [] })
         return
       }
       if (key === 'Enter') {
-        const id = event.target?.closest?.('[data-id]')?.getAttribute('data-id') ?? (this.#selection.size === 1 ? [...this.#selection][0] : null)
-        if (id && this.#model.kindOf(id)) this.#emitIntent({ type: 'open', id, kind: this.#model.kindOf(id) })
+        const id =
+          event.target?.closest?.('[data-id]')?.getAttribute('data-id') ??
+          (this.#selection.size === 1 ? [...this.#selection][0] : null)
+        if (id && this.#model.kindOf(id))
+          this.#emitIntent({ type: 'open', id, kind: this.#model.kindOf(id) })
         return
       }
       if ((key === 'a' || key === 'A') && (event.ctrlKey || event.metaKey)) {
         event.preventDefault()
         const m = this.#model
-        const ids = [...m.nodes.values(), ...m.frames.values(), ...m.annotations.values(), ...m.edges.values()]
+        const ids = [
+          ...m.nodes.values(),
+          ...m.frames.values(),
+          ...m.annotations.values(),
+          ...m.edges.values(),
+        ]
           .filter(item => !m.isHidden(item) && !(/** @type {any} */ (item).ghost))
           .map(item => item.id)
         this.#emitIntent({ type: 'select', ids })
         return
       }
-      if (key === '+' || key === '=') { this.zoomBy(1.25); return }
-      if (key === '-' || key === '_') { this.zoomBy(0.8); return }
-      if (key === '0' && !event.ctrlKey && !event.metaKey) { this.fit({ animate: false }); return }
+      if (key === '+' || key === '=') {
+        this.zoomBy(1.25)
+        return
+      }
+      if (key === '-' || key === '_') {
+        this.zoomBy(0.8)
+        return
+      }
+      if (key === '0' && !event.ctrlKey && !event.metaKey) {
+        this.fit({ animate: false })
+        return
+      }
       if (this.#opts.readOnly) return
       if (this.#opts.deleteKeys.includes(key) && this.#selection.size) {
         event.preventDefault()
@@ -724,13 +907,23 @@ export class Graph {
         const items = this.#movableClosure([...this.#selection]).map(id => {
           const r = /** @type {Rect} */ (this.#model.rectOf(id))
           const item = /** @type {any} */ (this.#model.get(id))
-          return { id, kind: this.#model.kindOf(id), x: r.x + sx * step, y: r.y + sy * step, parent: item.parent ?? null }
+          return {
+            id,
+            kind: this.#model.kindOf(id),
+            x: r.x + sx * step,
+            y: r.y + sy * step,
+            parent: item.parent ?? null,
+          }
         })
         if (items.length) this.#emitIntent({ type: 'move', items })
       }
     }
-    const onKeyUp = event => { if (event.key === ' ') this.#spaceDown = false }
-    const onBlur = () => { this.#spaceDown = false }
+    const onKeyUp = event => {
+      if (event.key === ' ') this.#spaceDown = false
+    }
+    const onBlur = () => {
+      this.#spaceDown = false
+    }
     svg.addEventListener('keydown', onKeyDown)
     svg.addEventListener('keyup', onKeyUp)
     svg.addEventListener('blur', onBlur)
@@ -741,7 +934,7 @@ export class Graph {
     })
   }
 
-  #setupDrop () {
+  #setupDrop() {
     const svg = this.#svg.node()
     const accepts = event => {
       const types = [...(event.dataTransfer?.types ?? [])]
@@ -757,7 +950,11 @@ export class Graph {
       event.preventDefault()
       const raw = event.dataTransfer.getData(this.#opts.dropType)
       let data = raw
-      try { data = JSON.parse(raw) } catch { /* plain text payload */ }
+      try {
+        data = JSON.parse(raw)
+      } catch {
+        /* plain text payload */
+      }
       const world = this.clientToWorld({ x: event.clientX, y: event.clientY })
       this.#emitIntent({ type: 'drop', data, x: world.x, y: world.y })
     }
@@ -773,11 +970,14 @@ export class Graph {
   // Model helpers
   // ------------------------------------------------------------------------------------------
 
-  #shapeOf (node) {
-    return this.#shapes.get(node.shape ?? 'box') ?? /** @type {import('./shapes.js').ShapeDef} */ (this.#shapes.get('box'))
+  #shapeOf(node) {
+    return (
+      this.#shapes.get(node.shape ?? 'box') ??
+      /** @type {import('./shapes.js').ShapeDef} */ (this.#shapes.get('box'))
+    )
   }
 
-  #rebuildIndexes () {
+  #rebuildIndexes() {
     const m = this.#model
     this.#index.clear()
     this.#portIndex.clear()
@@ -789,21 +989,23 @@ export class Graph {
     }
     for (const node of m.nodes.values()) {
       if (m.isHidden(node) || node.ghost) continue
-      for (const [portId, a] of portAnchors(node, node.ports)) this.#portIndex.set(`${node.id}\u0000${portId}`, { x: a.x, y: a.y, w: 0, h: 0 })
+      for (const [portId, a] of portAnchors(node, node.ports))
+        this.#portIndex.set(`${node.id}\u0000${portId}`, { x: a.x, y: a.y, w: 0, h: 0 })
     }
   }
 
   /** An item's rectangle including any drag or resize in progress. @param {string} id @returns {Rect} */
-  #itemRect (id) {
+  #itemRect(id) {
     const r = /** @type {Rect} */ (this.#model.rectOf(id))
     const d = this.#drag
-    if (d?.type === 'move' && d.moved && d.idSet?.has(id)) return { ...r, x: r.x + d.delta.x, y: r.y + d.delta.y }
+    if (d?.type === 'move' && d.moved && d.idSet?.has(id))
+      return { ...r, x: r.x + d.delta.x, y: r.y + d.delta.y }
     if (d?.type === 'resize' && d.id === id && d.rect) return d.rect
     return r
   }
 
   /** @param {{ node: string, port: string|null }} end @param {{ x: number, y: number }} toward */
-  #anchor (end, toward) {
+  #anchor(end, toward) {
     const node = this.#model.nodes.get(end.node)
     const r = this.#itemRect(end.node)
     if (end.port && node) {
@@ -813,7 +1015,7 @@ export class Graph {
     return boundaryAnchor(r, toward)
   }
 
-  #routeOf (edge) {
+  #routeOf(edge) {
     const d = this.#drag
     const waypoints = d?.type === 'waypoints' && d.edge === edge.id ? d.waypoints : edge.waypoints
     const sRect = this.#itemRect(edge.source.node)
@@ -823,11 +1025,21 @@ export class Graph {
     const routing = edge.routing ?? this.#opts.routing
     let obstacles = []
     if (routing === 'orthogonal' && !waypoints.length) {
-      const area = expand(/** @type {Rect} */ (union([{ ...source, w: 0, h: 0 }, { ...target, w: 0, h: 0 }])), 240)
-      obstacles = this.#index.query(area, id => {
-        const n = this.#model.nodes.get(id)
-        return !!n && !n.ghost
-      }).map(id => this.#itemRect(id))
+      const area = expand(
+        /** @type {Rect} */ (
+          union([
+            { ...source, w: 0, h: 0 },
+            { ...target, w: 0, h: 0 },
+          ])
+        ),
+        240
+      )
+      obstacles = this.#index
+        .query(area, id => {
+          const n = this.#model.nodes.get(id)
+          return !!n && !n.ghost
+        })
+        .map(id => this.#itemRect(id))
     }
     const key = `${routing}|${source.x},${source.y},${source.side}|${target.x},${target.y},${target.side}|${JSON.stringify(waypoints)}|${obstacles.map(o => `${o.x},${o.y},${o.w},${o.h}`).join(';')}`
     const cached = this.#routes.get(edge.id)
@@ -838,7 +1050,7 @@ export class Graph {
   }
 
   /** Movable items plus everything inside moved frames, without duplicates. @param {string[]} ids */
-  #movableClosure (ids) {
+  #movableClosure(ids) {
     const m = this.#model
     const out = new Set()
     for (const id of ids) {
@@ -846,12 +1058,14 @@ export class Graph {
       const item = /** @type {any} */ (m.get(id))
       if (!kind || !MOVABLE.has(kind) || m.isLocked(item) || item.ghost) continue
       out.add(id)
-      if (kind === 'frame') for (const inner of m.descendants(id)) if (!m.isLocked(/** @type {any} */ (m.get(inner)))) out.add(inner)
+      if (kind === 'frame')
+        for (const inner of m.descendants(id))
+          if (!m.isLocked(/** @type {any} */ (m.get(inner)))) out.add(inner)
     }
     return [...out]
   }
 
-  #emitArrange (fn) {
+  #emitArrange(fn) {
     if (this.#opts.readOnly) return
     const m = this.#model
     const ids = [...this.#selection].filter(id => MOVABLE.has(/** @type {string} */ (m.kindOf(id))))
@@ -863,7 +1077,13 @@ export class Graph {
     if (!placed.length) return
     this.#emitIntent({
       type: 'move',
-      items: placed.map(p => ({ id: p.id, kind: m.kindOf(p.id), x: p.x, y: p.y, parent: /** @type {any} */ (m.get(p.id)).parent ?? null }))
+      items: placed.map(p => ({
+        id: p.id,
+        kind: m.kindOf(p.id),
+        x: p.x,
+        y: p.y,
+        parent: /** @type {any} */ (m.get(p.id)).parent ?? null,
+      })),
     })
   }
 
@@ -871,28 +1091,33 @@ export class Graph {
   // Events
   // ------------------------------------------------------------------------------------------
 
-  #emit (event, data) {
+  #emit(event, data) {
     for (const fn of [...(this.#listeners.get(event) ?? [])]) {
       try {
         fn(data)
       } catch (err) {
-        queueMicrotask(() => { throw err })
+        queueMicrotask(() => {
+          throw err
+        })
       }
     }
   }
 
-  #emitIntent (intent) {
+  #emitIntent(intent) {
     this.#emit('intent', intent)
   }
 
-  #clickSelect (id, additive) {
+  #clickSelect(id, additive) {
     let ids
-    if (additive) ids = this.#selection.has(id) ? [...this.#selection].filter(x => x !== id) : [...this.#selection, id]
+    if (additive)
+      ids = this.#selection.has(id)
+        ? [...this.#selection].filter(x => x !== id)
+        : [...this.#selection, id]
     else ids = [id]
     this.#emitIntent({ type: 'select', ids })
   }
 
-  #cancelDrag () {
+  #cancelDrag() {
     this.#drag = null
     this.#marquee.attr('visibility', 'hidden')
     this.#render()
@@ -902,23 +1127,32 @@ export class Graph {
   // Gestures on items
   // ------------------------------------------------------------------------------------------
 
-  #itemDragBehavior () {
+  #itemDragBehavior() {
     if (this.#behaviors.item) return this.#behaviors.item
     const d3 = this.#d3
-    return (this.#behaviors.item = d3.drag()
+    return (this.#behaviors.item = d3
+      .drag()
       .filter(event => event.button === 0 && !this.#spaceDown)
       .container(() => this.#root.node())
       .subject(event => ({ x: event.x, y: event.y }))
       .on('start', (event, d) => {
         const e = event.sourceEvent
         this.#svg.node().focus({ preventScroll: true })
-        this.#drag = { type: 'move', id: d.id, start: { x: event.x, y: event.y }, moved: false, additive: e.shiftKey || e.ctrlKey || e.metaKey, delta: { x: 0, y: 0 }, guides: [] }
+        this.#drag = {
+          type: 'move',
+          id: d.id,
+          start: { x: event.x, y: event.y },
+          moved: false,
+          additive: e.shiftKey || e.ctrlKey || e.metaKey,
+          delta: { x: 0, y: 0 },
+          guides: [],
+        }
       })
       .on('drag', event => this.#moveDrag(event))
       .on('end', () => this.#moveEnd()))
   }
 
-  #moveDrag (event) {
+  #moveDrag(event) {
     const d = this.#drag
     if (d?.type !== 'move') return
     const dx = event.x - d.start.x
@@ -942,9 +1176,14 @@ export class Graph {
     d.guides = []
     if (this.#opts.snap && !event.sourceEvent?.altKey) {
       const k = this.#transform.k
-      const near = this.#index.query(expand(proposed, 400 / k), id => !d.idSet.has(id) && m.kindOf(id) !== 'frame')
+      const near = this.#index
+        .query(expand(proposed, 400 / k), id => !d.idSet.has(id) && m.kindOf(id) !== 'frame')
         .map(id => /** @type {Rect} */ (m.rectOf(id)))
-      const snapped = snapMove(proposed, near, { grid: this.#opts.grid, threshold: 6 / k, guides: this.#opts.guides })
+      const snapped = snapMove(proposed, near, {
+        grid: this.#opts.grid,
+        threshold: 6 / k,
+        guides: this.#opts.guides,
+      })
       x = snapped.x
       y = snapped.y
       d.guides = snapped.guides
@@ -953,7 +1192,7 @@ export class Graph {
     this.#render()
   }
 
-  #moveEnd () {
+  #moveEnd() {
     const d = this.#drag
     if (d?.type !== 'move') return
     this.#drag = null
@@ -979,10 +1218,11 @@ export class Graph {
     this.#render()
   }
 
-  #portDragBehavior () {
+  #portDragBehavior() {
     if (this.#behaviors.port) return this.#behaviors.port
     const d3 = this.#d3
-    return (this.#behaviors.port = d3.drag()
+    return (this.#behaviors.port = d3
+      .drag()
       .filter(event => event.button === 0 && !this.#spaceDown && !this.#opts.readOnly)
       .container(() => this.#root.node())
       .subject(event => ({ x: event.x, y: event.y }))
@@ -996,7 +1236,7 @@ export class Graph {
           reverse: spec?.direction === 'in',
           pointer: { x: event.x, y: event.y },
           target: null,
-          moved: false
+          moved: false,
         }
       })
       .on('drag', event => {
@@ -1016,7 +1256,12 @@ export class Graph {
             const [source, target] = d.reverse ? [d.target, d.source] : [d.source, d.target]
             this.#emitIntent({ type: 'connect', source: strip(source), target: strip(target) })
           } else {
-            this.#emitIntent({ type: 'connect-to-point', source: strip(d.source), x: d.pointer.x, y: d.pointer.y })
+            this.#emitIntent({
+              type: 'connect-to-point',
+              source: strip(d.source),
+              x: d.pointer.x,
+              y: d.pointer.y,
+            })
           }
         }
         this.#renderHandles()
@@ -1027,7 +1272,7 @@ export class Graph {
    * The port a connection gesture would end on: a port near the pointer, else the first
    * suitable port of the node under it.
    */
-  #connectTarget (point, source, reverse) {
+  #connectTarget(point, source, reverse) {
     const m = this.#model
     const allowed = target => {
       if (target.node === source.node && target.port === source.port) return false
@@ -1056,7 +1301,12 @@ export class Graph {
       }
       const anchors = portAnchors(node, node.ports)
       const ranked = node.ports
-        .map(spec => ({ node: nodeId, port: spec.id, spec, dist: Math.hypot(anchors.get(spec.id).x - point.x, anchors.get(spec.id).y - point.y) }))
+        .map(spec => ({
+          node: nodeId,
+          port: spec.id,
+          spec,
+          dist: Math.hypot(anchors.get(spec.id).x - point.x, anchors.get(spec.id).y - point.y),
+        }))
         .filter(allowed)
         .sort((a, b) => a.dist - b.dist)
       if (ranked.length) return ranked[0]
@@ -1064,16 +1314,24 @@ export class Graph {
     return null
   }
 
-  #resizeDragBehavior () {
+  #resizeDragBehavior() {
     if (this.#behaviors.resize) return this.#behaviors.resize
     const d3 = this.#d3
-    return (this.#behaviors.resize = d3.drag()
+    return (this.#behaviors.resize = d3
+      .drag()
       .filter(event => event.button === 0 && !this.#opts.readOnly)
       .container(() => this.#root.node())
       .subject(event => ({ x: event.x, y: event.y }))
       .on('start', (event, h) => {
         event.sourceEvent?.stopPropagation()
-        this.#drag = { type: 'resize', id: h.id, dir: h.dir, start: { x: event.x, y: event.y }, rect0: /** @type {Rect} */ (this.#model.rectOf(h.id)), rect: null }
+        this.#drag = {
+          type: 'resize',
+          id: h.id,
+          dir: h.dir,
+          start: { x: event.x, y: event.y },
+          rect0: /** @type {Rect} */ (this.#model.rectOf(h.id)),
+          rect: null,
+        }
       })
       .on('drag', event => {
         const d = this.#drag
@@ -1101,17 +1359,26 @@ export class Graph {
           const { x, y, w, h } = d.rect
           const r0 = d.rect0
           if (x !== r0.x || y !== r0.y || w !== r0.w || h !== r0.h) {
-            this.#emitIntent({ type: 'resize', id: d.id, kind: this.#model.kindOf(d.id), x, y, w, h })
+            this.#emitIntent({
+              type: 'resize',
+              id: d.id,
+              kind: this.#model.kindOf(d.id),
+              x,
+              y,
+              w,
+              h,
+            })
           }
         }
         this.#render()
       }))
   }
 
-  #edgeHandleDragBehavior () {
+  #edgeHandleDragBehavior() {
     if (this.#behaviors.edgeHandle) return this.#behaviors.edgeHandle
     const d3 = this.#d3
-    return (this.#behaviors.edgeHandle = d3.drag()
+    return (this.#behaviors.edgeHandle = d3
+      .drag()
       .filter(event => event.button === 0 && !this.#opts.readOnly)
       .container(() => this.#root.node())
       .subject(event => ({ x: event.x, y: event.y }))
@@ -1126,14 +1393,18 @@ export class Graph {
             type: 'reconnect',
             edge: h.edge,
             end: h.end,
-            fixed: { node: fixed.node, port: fixed.port, spec: fixedNode?.ports.find(q => q.id === fixed.port) },
+            fixed: {
+              node: fixed.node,
+              port: fixed.port,
+              spec: fixedNode?.ports.find(q => q.id === fixed.port),
+            },
             pointer: { x: event.x, y: event.y },
             target: null,
-            moved: false
+            moved: false,
           }
         } else {
           const waypoints = edge.waypoints.map(p => ({ ...p }))
-          let index = h.index
+          const index = h.index
           if (h.role === 'insert') waypoints.splice(index, 0, { x: event.x, y: event.y })
           this.#drag = { type: 'waypoints', edge: h.edge, index, waypoints, moved: false }
         }
@@ -1157,7 +1428,12 @@ export class Graph {
         const d = this.#drag
         this.#drag = null
         if (d?.moved && d.type === 'reconnect' && d.target) {
-          this.#emitIntent({ type: 'reconnect', edge: d.edge, end: d.end, to: { node: d.target.node, port: d.target.port } })
+          this.#emitIntent({
+            type: 'reconnect',
+            edge: d.edge,
+            end: d.end,
+            to: { node: d.target.node, port: d.target.port },
+          })
         } else if (d?.moved && d.type === 'waypoints') {
           this.#emitIntent({ type: 'waypoints', edge: d.edge, waypoints: d.waypoints })
         }
@@ -1165,9 +1441,10 @@ export class Graph {
       }))
   }
 
-  #bindItem (sel, kind) {
+  #bindItem(sel, kind) {
     const self = this
-    sel.call(this.#itemDragBehavior())
+    sel
+      .call(this.#itemDragBehavior())
       .on('dblclick', (event, d) => {
         event.stopPropagation()
         self.#emitIntent({ type: 'open', id: d.id, kind })
@@ -1176,7 +1453,15 @@ export class Graph {
         event.preventDefault()
         event.stopPropagation()
         const world = self.clientToWorld({ x: event.clientX, y: event.clientY })
-        self.#emitIntent({ type: 'context', id: d.id, kind, clientX: event.clientX, clientY: event.clientY, x: world.x, y: world.y })
+        self.#emitIntent({
+          type: 'context',
+          id: d.id,
+          kind,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          x: world.x,
+          y: world.y,
+        })
       })
       .on('pointerenter', function (event, d) {
         self.#d3.select(this).classed('sg-hover', true)
@@ -1192,21 +1477,28 @@ export class Graph {
   // Rendering
   // ------------------------------------------------------------------------------------------
 
-  #scheduleCull () {
+  #scheduleCull() {
     if (!this.#stats.culled && this.#countItems() <= this.#opts.cullThreshold) return
     const view = visibleRect(this.#transform, this.#size)
     const area = this.#renderedArea
-    if (area && view.x >= area.x && view.y >= area.y && view.x + view.w <= area.x + area.w && view.y + view.h <= area.y + area.h) return
+    if (
+      area &&
+      view.x >= area.x &&
+      view.y >= area.y &&
+      view.x + view.w <= area.x + area.w &&
+      view.y + view.h <= area.y + area.h
+    )
+      return
     cancelAnimationFrame(this.#raf)
     this.#raf = requestAnimationFrame(() => this.#render())
   }
 
-  #countItems () {
+  #countItems() {
     const m = this.#model
     return m.nodes.size + m.frames.size + m.annotations.size + m.edges.size
   }
 
-  #render () {
+  #render() {
     const started = performance.now()
     this.#renderScene(this.#layers, { interactive: true, only: null })
     this.#renderHandles()
@@ -1219,7 +1511,7 @@ export class Graph {
    * @param {Record<string, any>} L
    * @param {{ interactive: boolean, only: Set<string>|null }} options
    */
-  #renderScene (L, { interactive, only }) {
+  #renderScene(L, { interactive, only }) {
     const m = this.#model
     let visible = null
     let area = null
@@ -1230,34 +1522,60 @@ export class Graph {
       for (const id of this.#selection) visible.add(id)
     }
     if (interactive) this.#renderedArea = area
-    const show = item => !m.isHidden(item) && (!only || only.has(item.id)) && (!visible || visible.has(item.id))
+    const show = item =>
+      !m.isHidden(item) && (!only || only.has(item.id)) && (!visible || visible.has(item.id))
     const frames = m.framesInOrder().filter(show)
     const nodes = [...m.nodes.values()].filter(show)
     const annotations = [...m.annotations.values()].filter(show)
     const shownNodes = new Set(nodes.map(n => n.id))
     const edges = [...m.edges.values()].filter(e => {
-      if (m.isHidden(e) || (only && !only.has(e.id) && !(only.has(e.source.node) && only.has(e.target.node)))) return false
+      if (
+        m.isHidden(e) ||
+        (only && !only.has(e.id) && !(only.has(e.source.node) && only.has(e.target.node)))
+      )
+        return false
       if (!visible) return true
       if (shownNodes.has(e.source.node) || shownNodes.has(e.target.node)) return true
       const box = union([this.#itemRect(e.source.node), this.#itemRect(e.target.node)])
       return !!box && !!area && intersects(box, area)
     })
-    if (interactive) this.#stats = { ...this.#stats, nodes: nodes.length, edges: edges.length, frames: frames.length, annotations: annotations.length, culled: !!visible }
+    if (interactive)
+      this.#stats = {
+        ...this.#stats,
+        nodes: nodes.length,
+        edges: edges.length,
+        frames: frames.length,
+        annotations: annotations.length,
+        culled: !!visible,
+      }
 
     const highlight = this.#overlays.get('highlight')
     const dim = highlight ? new Set(highlight.ids ?? []) : null
     this.#renderFrames(L.frames, frames, interactive, dim)
-    this.#renderAnnotations(L.regions, annotations.filter(a => a.kind === 'region'), interactive, dim)
+    this.#renderAnnotations(
+      L.regions,
+      annotations.filter(a => a.kind === 'region'),
+      interactive,
+      dim
+    )
     this.#renderEdges(L.edges, edges, interactive, dim)
     this.#renderNodes(L.nodes, nodes, interactive, dim)
-    this.#renderAnnotations(L.annotations, annotations.filter(a => a.kind !== 'region'), interactive, dim)
+    this.#renderAnnotations(
+      L.annotations,
+      annotations.filter(a => a.kind !== 'region'),
+      interactive,
+      dim
+    )
   }
 
-  #renderFrames (layer, frames, interactive, dim) {
+  #renderFrames(layer, frames, interactive, dim) {
     const m = this.#model
     const sel = layer.selectChildren('g.sg-frame').data(frames, d => d.id)
     sel.exit().remove()
-    const enter = sel.enter().append('g').attr('data-id', d => d.id)
+    const enter = sel
+      .enter()
+      .append('g')
+      .attr('data-id', d => d.id)
     enter.append('rect').attr('class', 'sg-frame-rect')
     enter.append('text').attr('class', 'sg-frame-label')
     if (interactive) {
@@ -1265,54 +1583,82 @@ export class Graph {
       this.#bindItem(enter, 'frame')
     }
     const all = enter.merge(sel)
-    all.attr('class', d => `sg-frame sg-kind-${d.kind}`)
+    all
+      .attr('class', d => `sg-frame sg-kind-${d.kind}`)
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed('sg-locked', d => m.isLocked(d))
       .classed('sg-dimmed', d => !!dim && !dim.has(d.id))
     all.each((d, i, nodes) => {
       const g = this.#d3.select(nodes[i])
       const r = this.#itemRect(d.id)
-      g.select('.sg-frame-rect').attr('x', r.x).attr('y', r.y).attr('width', r.w).attr('height', r.h).attr('rx', 8)
-        .style('stroke', d.style?.stroke ?? null).style('fill', d.style?.fill ?? null)
-      g.select('.sg-frame-label').attr('x', r.x + 10).attr('y', r.y + 7).text(d.label ?? '')
+      g.select('.sg-frame-rect')
+        .attr('x', r.x)
+        .attr('y', r.y)
+        .attr('width', r.w)
+        .attr('height', r.h)
+        .attr('rx', 8)
+        .style('stroke', d.style?.stroke ?? null)
+        .style('fill', d.style?.fill ?? null)
+      g.select('.sg-frame-label')
+        .attr('x', r.x + 10)
+        .attr('y', r.y + 7)
+        .text(d.label ?? '')
       g.select('.sg-frame-title').attr('x', r.x).attr('y', r.y).attr('width', r.w)
     })
   }
 
-  #renderNodes (layer, nodes, interactive, dim) {
+  #renderNodes(layer, nodes, interactive, dim) {
     const m = this.#model
     const sel = layer.selectChildren('g.sg-node').data(nodes, d => d.id)
     const leaving = sel.exit()
     // Keep keyboard focus in the canvas when the focused node goes away (e.g. after Delete).
-    if (interactive && leaving.filter(function () { return this.contains(/** @type {any} */ (this.getRootNode()).activeElement) }).size()) {
+    if (
+      interactive &&
+      leaving
+        .filter(function () {
+          return this.contains(/** @type {any} */ (this.getRootNode()).activeElement)
+        })
+        .size()
+    ) {
       this.#svg.node().focus({ preventScroll: true })
     }
     leaving.remove()
-    const enter = sel.enter().append('g').attr('class', 'sg-node').attr('data-id', d => d.id)
+    const enter = sel
+      .enter()
+      .append('g')
+      .attr('class', 'sg-node')
+      .attr('data-id', d => d.id)
     enter.append('g').attr('class', 'sg-body')
     enter.append('g').attr('class', 'sg-decor')
     enter.append('g').attr('class', 'sg-ports')
     if (interactive) this.#bindItem(enter, 'node')
     const all = enter.merge(sel)
-    all.attr('transform', d => {
-      const r = this.#itemRect(d.id)
-      return `translate(${r.x},${r.y})`
-    })
+    all
+      .attr('transform', d => {
+        const r = this.#itemRect(d.id)
+        return `translate(${r.x},${r.y})`
+      })
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed('sg-ghost', d => !!d.ghost)
       .classed('sg-composite', d => !!d.composite)
       .classed('sg-locked', d => m.isLocked(d))
       .classed('sg-dimmed', d => !!dim && !dim.has(d.id))
     if (interactive) {
-      all.attr('tabindex', d => (d.ghost ? null : 0))
+      all
+        .attr('tabindex', d => (d.ghost ? null : 0))
         .attr('role', 'button')
         .attr('aria-pressed', d => String(this.#selection.has(d.id)))
-        .attr('aria-label', d => [d.title ?? d.label, d.sublabel].filter(Boolean).join(', ') || d.id)
+        .attr(
+          'aria-label',
+          d => [d.title ?? d.label, d.sublabel].filter(Boolean).join(', ') || d.id
+        )
     }
     const heat = this.#overlays.get('heatmap')
     const badges = this.#overlays.get('badges')
     const heatDomain = heat ? domainOf(heat) : null
-    const heatColor = heat ? this.#d3.interpolateRgb?.(this.#tokens.heatLow, this.#tokens.heatHigh) : null
+    const heatColor = heat
+      ? this.#d3.interpolateRgb?.(this.#tokens.heatLow, this.#tokens.heatHigh)
+      : null
     const portDrag = interactive ? this.#portDragBehavior() : null
     all.each((d, i, groups) => {
       const g = this.#d3.select(groups[i])
@@ -1322,26 +1668,44 @@ export class Graph {
       // Ports
       const anchors = portAnchors({ x: 0, y: 0, w: r.w, h: r.h }, d.ports)
       const ports = d.ports.map(p => ({ ...p, node: d.id, a: anchors.get(p.id) }))
-      const psel = g.select('.sg-ports').selectChildren('circle.sg-port').data(ports, p => p.id)
+      const psel = g
+        .select('.sg-ports')
+        .selectChildren('circle.sg-port')
+        .data(ports, p => p.id)
       psel.exit().remove()
       const penter = psel.enter().append('circle').attr('class', 'sg-port')
       penter.append('title')
       if (portDrag && !d.ghost) penter.call(portDrag)
-      const target = this.#drag?.type === 'connect' || this.#drag?.type === 'reconnect' ? this.#drag.target : null
-      penter.merge(psel)
-        .attr('cx', p => p.a.x).attr('cy', p => p.a.y).attr('r', this.#opts.portRadius)
+      const target =
+        this.#drag?.type === 'connect' || this.#drag?.type === 'reconnect'
+          ? this.#drag.target
+          : null
+      penter
+        .merge(psel)
+        .attr('cx', p => p.a.x)
+        .attr('cy', p => p.a.y)
+        .attr('r', this.#opts.portRadius)
         .attr('data-port', p => p.id)
         .classed('sg-port-target', p => !!target && target.node === d.id && target.port === p.id)
-        .select('title').text(p => p.label ?? p.id)
+        .select('title')
+        .text(p => p.label ?? p.id)
 
       // Overlays: heat tint and badge
       const decor = g.select('.sg-decor')
       const hv = heat?.values?.[d.id]
       const heatSel = decor.selectChildren('rect.sg-heat').data(typeof hv === 'number' ? [hv] : [])
       heatSel.exit().remove()
-      heatSel.enter().append('rect').attr('class', 'sg-heat').merge(heatSel)
-        .attr('width', r.w).attr('height', r.h).attr('rx', Number(this.#tokens.radius) || 0)
-        .attr('fill', v => (heatColor ? heatColor(normalise(v, heatDomain)) : this.#tokens.heatHigh))
+      heatSel
+        .enter()
+        .append('rect')
+        .attr('class', 'sg-heat')
+        .merge(heatSel)
+        .attr('width', r.w)
+        .attr('height', r.h)
+        .attr('rx', Number(this.#tokens.radius) || 0)
+        .attr('fill', v =>
+          heatColor ? heatColor(normalise(v, heatDomain)) : this.#tokens.heatHigh
+        )
         .attr('fill-opacity', 0.4)
       const badge = badges?.values?.[d.id] ?? d.badge
       const show = badge !== undefined && badge !== null && badge !== '' && badge !== 0
@@ -1350,12 +1714,25 @@ export class Graph {
       const benter = bsel.enter().append('g').attr('class', 'sg-badge')
       benter.append('circle').attr('r', 9)
       benter.append('text')
-      benter.merge(bsel).attr('transform', `translate(${r.w - 2},2)`).select('text').text(v => v)
+      benter
+        .merge(bsel)
+        .attr('transform', `translate(${r.w - 2},2)`)
+        .select('text')
+        .text(v => v)
     })
   }
 
-  #renderNodeBody (g, d, r) {
-    const key = JSON.stringify([d.shape, r.w, r.h, d.label, d.sublabel, d.icon, d.style, this.#themeVersion])
+  #renderNodeBody(g, d, r) {
+    const key = JSON.stringify([
+      d.shape,
+      r.w,
+      r.h,
+      d.label,
+      d.sublabel,
+      d.icon,
+      d.style,
+      this.#themeVersion,
+    ])
     const node = g.node()
     if (node.__sgKey === key) return
     node.__sgKey = key
@@ -1365,7 +1742,8 @@ export class Graph {
     const dd = { ...d, w: r.w, h: r.h }
     shape.render(body, dd, { theme: this.#tokens, radius: Number(this.#tokens.radius) || 0 })
     const style = d.style ?? {}
-    body.selectAll('.sg-shape')
+    body
+      .selectAll('.sg-shape')
       .style('fill', style.fill ?? null)
       .style('stroke', style.stroke ?? null)
       .style('stroke-dasharray', style.dash ?? null)
@@ -1405,16 +1783,21 @@ export class Graph {
     }
   }
 
-  #icon (markup) {
-    if (!this.#iconCache.has(markup)) this.#iconCache.set(markup, sanitizeSvg(markup, `${this.#uid}-i${this.#iconCache.size}`))
+  #icon(markup) {
+    if (!this.#iconCache.has(markup))
+      this.#iconCache.set(markup, sanitizeSvg(markup, `${this.#uid}-i${this.#iconCache.size}`))
     return this.#iconCache.get(markup)
   }
 
-  #renderEdges (layer, edges, interactive, dim) {
+  #renderEdges(layer, edges, interactive, dim) {
     const m = this.#model
     const sel = layer.selectChildren('g.sg-edge').data(edges, d => d.id)
     sel.exit().remove()
-    const enter = sel.enter().append('g').attr('class', 'sg-edge').attr('data-id', d => d.id)
+    const enter = sel
+      .enter()
+      .append('g')
+      .attr('class', 'sg-edge')
+      .attr('data-id', d => d.id)
     if (interactive) enter.append('path').attr('class', 'sg-edge-hit')
     enter.append('path').attr('class', 'sg-edge-path')
     const label = enter.append('g').attr('class', 'sg-edge-label-group')
@@ -1437,7 +1820,15 @@ export class Graph {
           event.preventDefault()
           event.stopPropagation()
           const world = self.clientToWorld({ x: event.clientX, y: event.clientY })
-          self.#emitIntent({ type: 'context', id: d.id, kind: 'edge', clientX: event.clientX, clientY: event.clientY, x: world.x, y: world.y })
+          self.#emitIntent({
+            type: 'context',
+            id: d.id,
+            kind: 'edge',
+            clientX: event.clientX,
+            clientY: event.clientY,
+            x: world.x,
+            y: world.y,
+          })
         })
         .on('pointerenter', function (event, d) {
           self.#d3.select(this).classed('sg-hover', true)
@@ -1452,8 +1843,12 @@ export class Graph {
     const wDomain = widths ? domainOf(widths) : null
     const [wMin, wMax] = widths?.range ?? [1, 8]
     const all = enter.merge(sel)
-    all.classed('sg-selected', d => interactive && this.#selection.has(d.id))
-      .classed('sg-ghost', d => !!(m.nodes.get(d.source.node)?.ghost || m.nodes.get(d.target.node)?.ghost))
+    all
+      .classed('sg-selected', d => interactive && this.#selection.has(d.id))
+      .classed(
+        'sg-ghost',
+        d => !!(m.nodes.get(d.source.node)?.ghost || m.nodes.get(d.target.node)?.ghost)
+      )
       .classed('sg-dimmed', d => !!dim && !dim.has(d.id))
     all.each((d, i, groups) => {
       const g = this.#d3.select(groups[i])
@@ -1461,69 +1856,125 @@ export class Graph {
       const selected = interactive && this.#selection.has(d.id)
       g.select('.sg-edge-hit').attr('d', route.path)
       const wv = widths?.values?.[d.id]
-      g.select('.sg-edge-path').attr('d', route.path)
-        .attr('marker-end', d.arrow === false ? null : `url(#${this.#uid}-arrow${selected ? '-active' : ''})`)
+      g.select('.sg-edge-path')
+        .attr('d', route.path)
+        .attr(
+          'marker-end',
+          d.arrow === false ? null : `url(#${this.#uid}-arrow${selected ? '-active' : ''})`
+        )
         .style('stroke', d.style?.stroke ?? null)
         .style('stroke-dasharray', d.style?.dash ?? null)
-        .style('stroke-width', typeof wv === 'number' ? String(wMin + (wMax - wMin) * normalise(wv, wDomain)) : (d.style?.width ?? null))
+        .style(
+          'stroke-width',
+          typeof wv === 'number'
+            ? String(wMin + (wMax - wMin) * normalise(wv, wDomain))
+            : (d.style?.width ?? null)
+        )
       const lg = g.select('.sg-edge-label-group').attr('display', d.label ? null : 'none')
       if (d.label) {
         const w = this.#measure(d.label) + 8
         const h = this.#fontSize + 6
-        lg.select('.sg-edge-label-bg').attr('x', route.label.x - w / 2).attr('y', route.label.y - h / 2).attr('width', w).attr('height', h)
+        lg.select('.sg-edge-label-bg')
+          .attr('x', route.label.x - w / 2)
+          .attr('y', route.label.y - h / 2)
+          .attr('width', w)
+          .attr('height', h)
         lg.select('.sg-edge-label').attr('x', route.label.x).attr('y', route.label.y).text(d.label)
       }
     })
   }
 
-  #renderAnnotations (layer, annotations, interactive, dim) {
+  #renderAnnotations(layer, annotations, interactive, dim) {
     const m = this.#model
     const sel = layer.selectChildren('g.sg-annotation').data(annotations, d => d.id)
     sel.exit().remove()
-    const enter = sel.enter().append('g').attr('data-id', d => d.id)
+    const enter = sel
+      .enter()
+      .append('g')
+      .attr('data-id', d => d.id)
     if (interactive) this.#bindItem(enter, 'annotation')
     const all = enter.merge(sel)
-    all.attr('class', d => `sg-annotation sg-kind-${d.kind}`)
+    all
+      .attr('class', d => `sg-annotation sg-kind-${d.kind}`)
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed('sg-locked', d => m.isLocked(d))
       .classed('sg-dimmed', d => !!dim && !dim.has(d.id))
     all.each((d, i, groups) => {
       const g = this.#d3.select(groups[i])
       const r = this.#itemRect(d.id)
-      const key = JSON.stringify([d.kind, d.form, r, d.text, d.style, d.target, this.#themeVersion, d.kind === 'callout' && typeof d.target === 'string' ? this.#model.rectOf(d.target) : null])
+      const key = JSON.stringify([
+        d.kind,
+        d.form,
+        r,
+        d.text,
+        d.style,
+        d.target,
+        this.#themeVersion,
+        d.kind === 'callout' && typeof d.target === 'string' ? this.#model.rectOf(d.target) : null,
+      ])
       if (groups[i].__sgKey === key) return
       groups[i].__sgKey = key
       g.selectAll('*').remove()
       if (d.kind === 'callout' && d.target) {
-        const to = typeof d.target === 'string'
-          ? (() => { const tr = this.#model.rectOf(d.target); return tr ? boundaryAnchor(tr, center(r)) : null })()
-          : d.target
+        const to =
+          typeof d.target === 'string'
+            ? (() => {
+                const tr = this.#model.rectOf(d.target)
+                return tr ? boundaryAnchor(tr, center(r)) : null
+              })()
+            : d.target
         if (to) {
           const from = boundaryAnchor(r, to)
-          g.append('path').attr('class', 'sg-leader').attr('d', `M${from.x},${from.y} L${to.x},${to.y}`)
+          g.append('path')
+            .attr('class', 'sg-leader')
+            .attr('d', `M${from.x},${from.y} L${to.x},${to.y}`)
         }
       }
       if (d.kind === 'shape' && d.form === 'ellipse') {
-        g.append('ellipse').attr('class', 'sg-note').attr('cx', r.x + r.w / 2).attr('cy', r.y + r.h / 2).attr('rx', r.w / 2).attr('ry', r.h / 2)
+        g.append('ellipse')
+          .attr('class', 'sg-note')
+          .attr('cx', r.x + r.w / 2)
+          .attr('cy', r.y + r.h / 2)
+          .attr('rx', r.w / 2)
+          .attr('ry', r.h / 2)
       } else if (d.kind === 'shape' && d.form === 'diamond') {
-        g.append('path').attr('class', 'sg-note').attr('d', `M${r.x + r.w / 2},${r.y} L${r.x + r.w},${r.y + r.h / 2} L${r.x + r.w / 2},${r.y + r.h} L${r.x},${r.y + r.h / 2} Z`)
+        g.append('path')
+          .attr('class', 'sg-note')
+          .attr(
+            'd',
+            `M${r.x + r.w / 2},${r.y} L${r.x + r.w},${r.y + r.h / 2} L${r.x + r.w / 2},${r.y + r.h} L${r.x},${r.y + r.h / 2} Z`
+          )
       } else {
-        g.append('rect').attr('class', 'sg-note').attr('x', r.x).attr('y', r.y).attr('width', r.w).attr('height', r.h).attr('rx', d.kind === 'sticky' ? 2 : 6)
+        g.append('rect')
+          .attr('class', 'sg-note')
+          .attr('x', r.x)
+          .attr('y', r.y)
+          .attr('width', r.w)
+          .attr('height', r.h)
+          .attr('rx', d.kind === 'sticky' ? 2 : 6)
       }
-      g.select('.sg-note').style('fill', d.style?.fill ?? null).style('stroke', d.style?.stroke ?? null)
+      g.select('.sg-note')
+        .style('fill', d.style?.fill ?? null)
+        .style('stroke', d.style?.stroke ?? null)
       if (d.text) {
         const pad = 8
         const lineH = this.#fontSize * 1.3
         const maxLines = Math.max(1, Math.floor((r.h - 2 * pad) / lineH))
         const lines = wrapText(d.text, r.w - 2 * pad, this.#measure, { maxLines })
         const text = g.append('text').attr('class', 'sg-annotation-text')
-        lines.forEach((line, n) => text.append('tspan').attr('x', r.x + pad).attr('y', r.y + pad + n * lineH).text(line))
+        lines.forEach((line, n) =>
+          text
+            .append('tspan')
+            .attr('x', r.x + pad)
+            .attr('y', r.y + pad + n * lineH)
+            .text(line)
+        )
       }
     })
   }
 
   /** Selection handles, guides and the connection preview; cheap enough to redraw often. */
-  #renderHandles () {
+  #renderHandles() {
     const L = this.#layers
     if (!L.handles) return
     const k = this.#transform.k
@@ -1535,30 +1986,58 @@ export class Graph {
     const guides = d?.type === 'move' ? d.guides : []
     const gsel = L.guides.selectChildren('line.sg-guide').data(guides)
     gsel.exit().remove()
-    gsel.enter().append('line').attr('class', 'sg-guide').merge(gsel)
-      .attr('x1', g => (g.axis === 'x' ? g.value : g.from)).attr('x2', g => (g.axis === 'x' ? g.value : g.to))
-      .attr('y1', g => (g.axis === 'x' ? g.from : g.value)).attr('y2', g => (g.axis === 'x' ? g.to : g.value))
+    gsel
+      .enter()
+      .append('line')
+      .attr('class', 'sg-guide')
+      .merge(gsel)
+      .attr('x1', g => (g.axis === 'x' ? g.value : g.from))
+      .attr('x2', g => (g.axis === 'x' ? g.value : g.to))
+      .attr('y1', g => (g.axis === 'x' ? g.from : g.value))
+      .attr('y2', g => (g.axis === 'x' ? g.to : g.value))
       .attr('stroke-width', 1 / k)
 
     // Resize handles for a single selected box
     const single = this.#selection.size === 1 ? [...this.#selection][0] : null
     const kind = single ? m.kindOf(single) : null
     const item = single ? /** @type {any} */ (m.get(single)) : null
-    const resizable = !this.#opts.readOnly && item && kind && MOVABLE.has(kind) && !m.isLocked(item) && !item.ghost && !m.isHidden(item) && d?.type !== 'move'
+    const resizable =
+      !this.#opts.readOnly &&
+      item &&
+      kind &&
+      MOVABLE.has(kind) &&
+      !m.isLocked(item) &&
+      !item.ghost &&
+      !m.isHidden(item) &&
+      d?.type !== 'move'
     const handles = []
     if (resizable) {
       const r = this.#itemRect(/** @type {string} */ (single))
       const pos = {
-        nw: [r.x, r.y], n: [r.x + r.w / 2, r.y], ne: [r.x + r.w, r.y], e: [r.x + r.w, r.y + r.h / 2],
-        se: [r.x + r.w, r.y + r.h], s: [r.x + r.w / 2, r.y + r.h], sw: [r.x, r.y + r.h], w: [r.x, r.y + r.h / 2]
+        nw: [r.x, r.y],
+        n: [r.x + r.w / 2, r.y],
+        ne: [r.x + r.w, r.y],
+        e: [r.x + r.w, r.y + r.h / 2],
+        se: [r.x + r.w, r.y + r.h],
+        s: [r.x + r.w / 2, r.y + r.h],
+        sw: [r.x, r.y + r.h],
+        w: [r.x, r.y + r.h / 2],
       }
-      for (const dir of HANDLE_DIRS) handles.push({ id: single, dir, x: pos[dir][0], y: pos[dir][1] })
+      for (const dir of HANDLE_DIRS)
+        handles.push({ id: single, dir, x: pos[dir][0], y: pos[dir][1] })
     }
     const hsel = L.handles.selectChildren('rect.sg-handle').data(handles, h => h.dir)
     hsel.exit().remove()
-    hsel.enter().append('rect').call(this.#resizeDragBehavior()).merge(hsel)
+    hsel
+      .enter()
+      .append('rect')
+      .call(this.#resizeDragBehavior())
+      .merge(hsel)
       .attr('class', h => `sg-handle sg-handle-${h.dir}`)
-      .attr('x', h => h.x - size / 2).attr('y', h => h.y - size / 2).attr('width', size).attr('height', size)
+      .attr('x', h => h.x - size / 2)
+      .attr('y', h => h.y - size / 2)
+      .attr('width', size)
+      .attr('height', size)
       .attr('stroke-width', 1.5 / k)
 
     // Edge handles for a single selected edge
@@ -1568,30 +2047,72 @@ export class Graph {
       const route = this.#routeOf(edge)
       const pts = route.points
       const waypoints = d?.type === 'waypoints' && d.edge === edge.id ? d.waypoints : edge.waypoints
-      edgeHandles.push({ edge: edge.id, role: 'end', end: 'source', x: pts[0].x, y: pts[0].y, key: 'source' })
-      edgeHandles.push({ edge: edge.id, role: 'end', end: 'target', x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, key: 'target' })
-      waypoints.forEach((p, index) => edgeHandles.push({ edge: edge.id, role: 'waypoint', index, x: p.x, y: p.y, key: `w${index}` }))
+      edgeHandles.push({
+        edge: edge.id,
+        role: 'end',
+        end: 'source',
+        x: pts[0].x,
+        y: pts[0].y,
+        key: 'source',
+      })
+      edgeHandles.push({
+        edge: edge.id,
+        role: 'end',
+        end: 'target',
+        x: pts[pts.length - 1].x,
+        y: pts[pts.length - 1].y,
+        key: 'target',
+      })
+      waypoints.forEach((p, index) =>
+        edgeHandles.push({
+          edge: edge.id,
+          role: 'waypoint',
+          index,
+          x: p.x,
+          y: p.y,
+          key: `w${index}`,
+        })
+      )
       const control = [pts[0], ...waypoints, pts[pts.length - 1]]
       for (let index = 0; index < control.length - 1; index++) {
         const a = control[index]
         const b = control[index + 1]
-        edgeHandles.push({ edge: edge.id, role: 'insert', index, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, key: `i${index}` })
+        edgeHandles.push({
+          edge: edge.id,
+          role: 'insert',
+          index,
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+          key: `i${index}`,
+        })
       }
     }
     const esel = L.handles.selectChildren('circle.sg-edge-handle').data(edgeHandles, h => h.key)
     esel.exit().remove()
     const self = this
-    esel.enter().append('circle').call(this.#edgeHandleDragBehavior())
+    esel
+      .enter()
+      .append('circle')
+      .call(this.#edgeHandleDragBehavior())
       .on('dblclick', function (event, h) {
         event.stopPropagation()
         if (h.role !== 'waypoint' || self.#opts.readOnly) return
         const edge = m.edges.get(h.edge)
         if (!edge) return
-        self.#emitIntent({ type: 'waypoints', edge: h.edge, waypoints: edge.waypoints.filter((_, i) => i !== h.index) })
+        self.#emitIntent({
+          type: 'waypoints',
+          edge: h.edge,
+          waypoints: edge.waypoints.filter((_, i) => i !== h.index),
+        })
       })
       .merge(esel)
-      .attr('class', h => `sg-edge-handle ${h.role === 'insert' ? 'sg-waypoint sg-waypoint-new' : h.role === 'waypoint' ? 'sg-waypoint' : 'sg-handle'}`)
-      .attr('cx', h => h.x).attr('cy', h => h.y)
+      .attr(
+        'class',
+        h =>
+          `sg-edge-handle ${h.role === 'insert' ? 'sg-waypoint sg-waypoint-new' : h.role === 'waypoint' ? 'sg-waypoint' : 'sg-handle'}`
+      )
+      .attr('cx', h => h.x)
+      .attr('cy', h => h.y)
       .attr('r', h => (h.role === 'insert' ? 3.5 : 5) / k)
       .attr('stroke-width', 1.5 / k)
 
@@ -1602,12 +2123,26 @@ export class Graph {
       const toward = d.target ? this.#portPoint(d.target) : d.pointer
       const from = this.#anchor(fixed, toward)
       const to = d.target ? this.#anchor(d.target, from) : { ...d.pointer, side: null }
-      const [s, t] = (d.type === 'connect' ? d.reverse : d.end === 'source') ? [to, from] : [from, to]
-      ghost = [routeEdge({ source: s, target: t, routing: this.#opts.routing === 'curved' ? 'curved' : 'orthogonal' }).path]
+      const [s, t] = (d.type === 'connect' ? d.reverse : d.end === 'source')
+        ? [to, from]
+        : [from, to]
+      ghost = [
+        routeEdge({
+          source: s,
+          target: t,
+          routing: this.#opts.routing === 'curved' ? 'curved' : 'orthogonal',
+        }).path,
+      ]
     }
     const csel = L.handles.selectChildren('path.sg-ghost-edge').data(ghost)
     csel.exit().remove()
-    csel.enter().append('path').attr('class', 'sg-ghost-edge').merge(csel).attr('d', p => p).attr('stroke-width', 1.5 / k)
+    csel
+      .enter()
+      .append('path')
+      .attr('class', 'sg-ghost-edge')
+      .merge(csel)
+      .attr('d', p => p)
+      .attr('stroke-width', 1.5 / k)
     const connecting = d?.type === 'connect' || d?.type === 'reconnect'
     if (connecting || this.#portTargetShown) {
       L.nodes.selectAll('.sg-port').classed('sg-port-target', function () {
@@ -1619,7 +2154,7 @@ export class Graph {
     }
   }
 
-  #portPoint (end) {
+  #portPoint(end) {
     const node = this.#model.nodes.get(end.node)
     const r = this.#itemRect(end.node)
     if (end.port && node) return portAnchors(r, node.ports).get(end.port) ?? center(r)
@@ -1631,20 +2166,20 @@ export class Graph {
  * @param {{ values?: Record<string, number>, domain?: [number, number] }} spec
  * @returns {[number, number]}
  */
-function domainOf (spec) {
+function domainOf(spec) {
   if (spec.domain) return spec.domain
   const values = Object.values(spec.values ?? {}).filter(v => typeof v === 'number')
   return values.length ? [Math.min(...values), Math.max(...values)] : [0, 1]
 }
 
 /** @param {number} v @param {[number, number]|null} domain */
-function normalise (v, domain) {
+function normalise(v, domain) {
   const [lo, hi] = domain ?? [0, 1]
   if (hi === lo) return 1
   return Math.min(1, Math.max(0, (v - lo) / (hi - lo)))
 }
 
 /** @param {string} s */
-function cssEscape (s) {
+function cssEscape(s) {
   return typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&')
 }

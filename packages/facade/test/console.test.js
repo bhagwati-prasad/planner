@@ -4,7 +4,7 @@ import { Collection, NodeHandle, SystemHandle, StrataError } from '../src/index.
 import { createTestStrata } from './fixtures.js'
 
 /** The console session from spec §16, up to (not including) sim/test/docs, which arrive later. */
-async function specSession () {
+async function specSession() {
   const t = createTestStrata()
   const { strata } = t
   await strata.projects.create('checkout')
@@ -24,18 +24,32 @@ test('the console session from the spec works end to end', async () => {
   assert.equal(strata.project, p)
   assert.equal(gw.type, 'starter.api-gateway@1.0.0')
   assert.equal(gw.props.rateLimit, 1000)
-  assert.equal(svc.type, 'starter.service@1.0.0', "'service' finds the concrete component, not base:service")
+  assert.equal(
+    svc.type,
+    'starter.service@1.0.0',
+    "'service' finds the concrete component, not base:service"
+  )
 
   assert.ok(orders instanceof SystemHandle)
   assert.equal(orders.name, 'Orders System')
-  assert.deepEqual(root.nodes().map(n => n.name), ['Edge GW', 'Orders System'])
-  assert.deepEqual(orders.nodes().map(n => n.name), ['Orders', 'Orders DB'])
+  assert.deepEqual(
+    root.nodes().map(n => n.name),
+    ['Edge GW', 'Orders System']
+  )
+  assert.deepEqual(
+    orders.nodes().map(n => n.name),
+    ['Orders', 'Orders DB']
+  )
   assert.equal(svc.system.id, orders.id, 'handles stay live after the extract')
 
   const current = orders.enter()
   assert.equal(current.id, orders.id)
   assert.equal(strata.nav.breadcrumb, 'checkout › Orders System')
-  assert.equal(orders.rollup('latency.p99'), 95, 'service p99 80 ms + database p99 15 ms along the critical path')
+  assert.equal(
+    orders.rollup('latency.p99'),
+    95,
+    'service p99 80 ms + database p99 15 ms along the critical path'
+  )
   assert.deepEqual(orders.rollup('latency.p99', { detail: true }).path, [svc.id, db.id])
   assert.equal(root.rollup('latency.p99'), 100, 'the gateway adds its own 5 ms at the parent level')
 
@@ -49,15 +63,18 @@ test('the console session from the spec works end to end', async () => {
 test('strata.print(root) renders a text tree', async () => {
   const { strata, printed, root } = await specSession()
   strata.print(root)
-  assert.equal(printed.at(-1), [
-    'checkout  [context] · 2 nodes',
-    '├─ Edge GW  starter.api-gateway@1.0.0',
-    '│    out → Orders System.in  (http)',
-    '└─ ▣ Orders System  (by value · 2 nodes)',
-    '   ├─ Orders  starter.service@1.0.0',
-    '   │    db → Orders DB.in  (db-protocol)',
-    '   └─ Orders DB  starter.relational-db@1.0.0'
-  ].join('\n'))
+  assert.equal(
+    printed.at(-1),
+    [
+      'checkout  [context] · 2 nodes',
+      '├─ Edge GW  starter.api-gateway@1.0.0',
+      '│    out → Orders System.in  (http)',
+      '└─ ▣ Orders System  (by value · 2 nodes)',
+      '   ├─ Orders  starter.service@1.0.0',
+      '   │    db → Orders DB.in  (db-protocol)',
+      '   └─ Orders DB  starter.relational-db@1.0.0',
+    ].join('\n')
+  )
   assert.equal(strata.format(root, { depth: 1 }).split('\n').length, 4)
   assert.equal(strata.format(), strata.format(root), 'with no target, prints the current system')
   const project = strata.format(strata.project)
@@ -79,20 +96,46 @@ test('help lists topics, shows signatures with examples, and explains what arriv
 
 test('namespaces from later releases explain themselves instead of failing obscurely', async () => {
   const { strata } = createTestStrata()
-  assert.throws(() => strata.sim.run({ scenario: 'checkout' }), err => err instanceof StrataError && err.code === 'UNSUPPORTED' && /arrives in R1/.test(err.message))
+  assert.throws(
+    () => strata.sim.run({ scenario: 'checkout' }),
+    err =>
+      err instanceof StrataError && err.code === 'UNSUPPORTED' && /arrives in R1/.test(err.message)
+  )
   assert.throws(() => strata.comments.add(), /M6/)
-  assert.equal(await Promise.resolve(strata.docs).then(() => 'resolved'), 'resolved', 'awaiting a planned namespace does not hang')
+  assert.equal(
+    await Promise.resolve(strata.docs).then(() => 'resolved'),
+    'resolved',
+    'awaiting a planned namespace does not hang'
+  )
 })
 
 test('collections have toTable() for console.table', async () => {
   const { root } = await specSession()
   const rows = root.nodes().toTable()
-  assert.deepEqual(rows.map(r => [r.name, r.type]), [['Edge GW', 'starter.api-gateway@1.0.0'], ['Orders System', '▣ Orders System (value)']])
+  assert.deepEqual(
+    rows.map(r => [r.name, r.type]),
+    [
+      ['Edge GW', 'starter.api-gateway@1.0.0'],
+      ['Orders System', '▣ Orders System (value)'],
+    ]
+  )
   assert.ok(!(rows instanceof Collection), 'rows are a plain array')
   const edgeRows = root.edges().toTable()
-  assert.deepEqual(edgeRows.map(r => `${r.from} → ${r.to} ${r.type}`), ['Edge GW.out → Orders System.in http'])
-  assert.deepEqual(root.children().toTable().map(r => r.name), ['Orders System'])
-  assert.ok(!(root.nodes().map(n => n.name) instanceof Collection), 'derived arrays are plain arrays')
+  assert.deepEqual(
+    edgeRows.map(r => `${r.from} → ${r.to} ${r.type}`),
+    ['Edge GW.out → Orders System.in http']
+  )
+  assert.deepEqual(
+    root
+      .children()
+      .toTable()
+      .map(r => r.name),
+    ['Orders System']
+  )
+  assert.ok(
+    !(root.nodes().map(n => n.name) instanceof Collection),
+    'derived arrays are plain arrays'
+  )
   assert.equal(root.nodes().get('Edge GW').name, 'Edge GW')
 })
 
@@ -106,7 +149,11 @@ test('node handles: effective props, explain, set and unset, ports, edges', asyn
   assert.equal(svc.explain().concurrency.source, 'default')
   assert.throws(() => svc.set({ concurency: 1 }), /Did you mean 'concurrency'/)
   assert.throws(() => svc.port('nope'), /has no port 'nope' \(has: in, out, db\)/)
-  assert.deepEqual(svc.edges().map(e => String(e)), ['Edge<Orders.db → Orders DB.in>'], 'Orders.in is reached through the boundary port, not an edge')
+  assert.deepEqual(
+    svc.edges().map(e => String(e)),
+    ['Edge<Orders.db → Orders DB.in>'],
+    'Orders.in is reached through the boundary port, not an edge'
+  )
   assert.equal(svc.port('in').connected, false)
   assert.equal(db.port('in').connected, true)
   assert.equal(gw.port('in').connected, false)
@@ -122,7 +169,11 @@ test('connect picks compatible ports from nodes, names and "Node.port" strings',
   const db = p.root.add('relational-db', { name: 'DB' })
   const gw = p.root.add('api-gateway', { name: 'GW' })
   const e1 = p.root.connect(svc, db)
-  assert.equal(String(e1), 'Edge<Svc.db → DB.in>', 'the only type both sides share decides the ports')
+  assert.equal(
+    String(e1),
+    'Edge<Svc.db → DB.in>',
+    'the only type both sides share decides the ports'
+  )
   assert.equal(e1.type, 'db-protocol')
   const e2 = p.root.connect('GW', 'Svc', { type: 'grpc' })
   assert.equal(String(e2), 'Edge<GW.out → Svc.in>')
@@ -136,7 +187,10 @@ test('connect picks compatible ports from nodes, names and "Node.port" strings',
   e4.update({ label: 'internal' }).set({ timeout: '2s' })
   assert.deepEqual([e4.label, e4.props.timeout], ['internal', '2s'])
   e4.remove()
-  assert.throws(() => e4.label, err => err.code === 'NOT_FOUND')
+  assert.throws(
+    () => e4.label,
+    err => err.code === 'NOT_FOUND'
+  )
 })
 
 test('navigation: enter, up, home, breadcrumbs and events; the path heals after structural edits', async () => {
@@ -159,10 +213,14 @@ test('navigation: enter, up, home, breadcrumbs and events; the path heals after 
     'checkout › Orders System › Storage',
     'checkout',
     'checkout › Orders System',
-    'checkout › Orders System › Storage'
+    'checkout › Orders System › Storage',
   ])
   orders.inline(storage.via)
-  assert.equal(strata.nav.breadcrumb, 'checkout › Orders System', 'the path drops the dissolved level')
+  assert.equal(
+    strata.nav.breadcrumb,
+    'checkout › Orders System',
+    'the path drops the dissolved level'
+  )
   assert.throws(() => strata.nav.enter(orders.node('Orders')), /not a composite/)
 })
 
@@ -174,14 +232,27 @@ test('systems placed by reference are read-only where they are placed', async ()
   auth.expose(svc.port('in'))
   const placed = p.root.place(auth)
   assert.equal(placed.placement, 'reference')
-  assert.deepEqual(placed.ports().map(port => port.name), ['in'])
+  assert.deepEqual(
+    placed.ports().map(port => port.name),
+    ['in']
+  )
   const inside = placed.enter()
   assert.equal(inside.readOnly, true)
   assert.equal(strata.nav.current.readOnly, true)
-  assert.throws(() => inside.add('service'), err => err.code === 'READ_ONLY' && /project.system\('Standard Auth Service'\)/.test(err.message))
-  assert.throws(() => inside.node('Auth').set({ concurrency: 2 }), err => err.code === 'READ_ONLY')
+  assert.throws(
+    () => inside.add('service'),
+    err => err.code === 'READ_ONLY' && /project.system\('Standard Auth Service'\)/.test(err.message)
+  )
+  assert.throws(
+    () => inside.node('Auth').set({ concurrency: 2 }),
+    err => err.code === 'READ_ONLY'
+  )
   p.system('Standard Auth Service').add('relational-db', { name: 'Users DB' })
-  assert.deepEqual(inside.nodes().map(n => n.name), ['Auth', 'Users DB'], 'changes in the source show through the reference')
+  assert.deepEqual(
+    inside.nodes().map(n => n.name),
+    ['Auth', 'Users DB'],
+    'changes in the source show through the reference'
+  )
   const copy = placed.detach()
   assert.equal(copy.readOnly, false)
   copy.add('service', { name: 'Extra' })
@@ -194,21 +265,42 @@ test('projects persist through storage and reopen in a fresh session', async () 
   p.root.add('service', { name: 'Orders' })
   await p.save()
   await first.strata.projects.create('Billing')
-  assert.deepEqual((await first.strata.projects.list()).map(r => [r.name, r.open]), [['Billing', true], ['Checkout', true]])
+  assert.deepEqual(
+    (await first.strata.projects.list()).map(r => [r.name, r.open]),
+    [
+      ['Billing', true],
+      ['Checkout', true],
+    ]
+  )
 
   const second = createTestStrata({ storage: first.storage, seed: 2 })
   const reopened = await second.strata.projects.open('checkout')
   assert.equal(reopened.id, p.id)
-  assert.deepEqual(reopened.root.nodes().map(n => n.name), ['Orders'])
+  assert.deepEqual(
+    reopened.root.nodes().map(n => n.name),
+    ['Orders']
+  )
   assert.equal(reopened.canUndo, false, 'history does not travel with the file')
-  await assert.rejects(second.strata.projects.open('nope'), err => err.code === 'NOT_FOUND' && /Saved projects: 'Billing', 'Checkout'/.test(err.message))
+  await assert.rejects(
+    second.strata.projects.open('nope'),
+    err => err.code === 'NOT_FOUND' && /Saved projects: 'Billing', 'Checkout'/.test(err.message)
+  )
 
   second.strata.projects.close(reopened)
   assert.equal(second.strata.project, null)
-  assert.throws(() => reopened.dispatch({ type: 'project.update', payload: { changes: { name: 'x' } } }), /closed/)
+  assert.throws(
+    () => reopened.dispatch({ type: 'project.update', payload: { changes: { name: 'x' } } }),
+    /closed/
+  )
   await second.strata.projects.delete('Billing')
-  assert.deepEqual((await second.strata.projects.list()).map(r => r.name), ['Checkout'])
-  await assert.rejects(first.strata.projects.create('Dup', { id: p.id }), err => err.code === 'CONFLICT')
+  assert.deepEqual(
+    (await second.strata.projects.list()).map(r => r.name),
+    ['Checkout']
+  )
+  await assert.rejects(
+    first.strata.projects.create('Dup', { id: p.id }),
+    err => err.code === 'CONFLICT'
+  )
 })
 
 test('switching projects switches the target of dispatch, undo and selection', async () => {
@@ -224,7 +316,10 @@ test('switching projects switches the target of dispatch, undo and selection', a
   assert.equal(strata.undo(), true)
   assert.equal(a.root.nodes().length, 0)
   assert.equal(strata.redo(), true)
-  assert.deepEqual(strata.projects.opened().map(p => p.name), ['A', 'B'])
+  assert.deepEqual(
+    strata.projects.opened().map(p => p.name),
+    ['A', 'B']
+  )
 })
 
 test('transactions group console work into one undo step, and events carry the project', async () => {
@@ -232,11 +327,14 @@ test('transactions group console work into one undo step, and events carry the p
   const p = await strata.projects.create('tx')
   const changes = []
   strata.on('change', ({ project, op }) => changes.push([project.name, op.command]))
-  strata.transaction(() => {
-    const a = p.root.add('api-gateway', { name: 'GW', at: { x: 0, y: 0 } })
-    const b = p.root.add('service', { name: 'Svc', at: { x: 200, y: 0 } })
-    p.root.connect(a, b)
-  }, { label: 'Scaffold' })
+  strata.transaction(
+    () => {
+      const a = p.root.add('api-gateway', { name: 'GW', at: { x: 0, y: 0 } })
+      const b = p.root.add('service', { name: 'Svc', at: { x: 200, y: 0 } })
+      p.root.connect(a, b)
+    },
+    { label: 'Scaffold' }
+  )
   assert.deepEqual(changes, [['tx', 'batch']])
   assert.deepEqual(p.root.node('Svc').position, { x: 200, y: 0 })
   strata.undo()
@@ -249,7 +347,10 @@ test('selection drops deleted items and rejects unknown ids', async () => {
   strata.select([svc, db.id])
   db.remove()
   assert.ok(strata.$ instanceof NodeHandle)
-  assert.throws(() => strata.select('ghost'), err => err.code === 'NOT_FOUND')
+  assert.throws(
+    () => strata.select('ghost'),
+    err => err.code === 'NOT_FOUND'
+  )
   strata.select()
   assert.equal(strata.$, null)
 })
@@ -258,7 +359,10 @@ test('the facade does not expose the core', async () => {
   const { strata, root, svc } = await specSession()
   for (const obj of [strata, root, svc, strata.project, svc.port('in')]) {
     assert.equal('core' in obj, false)
-    assert.equal(Object.keys(obj).some(k => k.toLowerCase().includes('core')), false)
+    assert.equal(
+      Object.keys(obj).some(k => k.toLowerCase().includes('core')),
+      false
+    )
   }
   assert.equal(String(strata), 'Strata<checkout>')
 })
@@ -267,8 +371,17 @@ test('components: list, get and register', () => {
   const { strata } = createTestStrata()
   const ids = strata.components.list().map(c => c.id)
   assert.ok(ids.includes('base:service') && ids.includes('starter.service'))
-  assert.deepEqual(strata.components.get('service').lineage, ['starter.service', 'base:service', 'base:component'])
-  strata.components.register({ id: 'acme.cache', name: 'Cache', version: '0.1.0', extends: 'base:cache' })
+  assert.deepEqual(strata.components.get('service').lineage, [
+    'starter.service',
+    'base:service',
+    'base:component',
+  ])
+  strata.components.register({
+    id: 'acme.cache',
+    name: 'Cache',
+    version: '0.1.0',
+    extends: 'base:cache',
+  })
   assert.equal(strata.components.get('acme.cache').ports.length, 2)
 })
 

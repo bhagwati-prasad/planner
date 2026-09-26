@@ -10,11 +10,18 @@ strata.components.register({
   name: 'API gateway',
   version: '1.0.0',
   extends: 'base:proxy',
-  ports: [{ name: 'in', direction: 'in', accepts: ['http'] }, { name: 'out', direction: 'out', accepts: ['http', 'grpc'] }],
+  ports: [
+    { name: 'in', direction: 'in', accepts: ['http'] },
+    { name: 'out', direction: 'out', accepts: ['http', 'grpc'] },
+  ],
   properties: {
     rateLimit: { type: 'number', unit: 'req/s', default: 500 },
-    latency: { type: 'distribution', unit: 'ms', default: { kind: 'lognormal', median: 1, p99: 5 } }
-  }
+    latency: {
+      type: 'distribution',
+      unit: 'ms',
+      default: { kind: 'lognormal', median: 1, p99: 5 },
+    },
+  },
 })
 strata.components.register({
   id: 'starter.service',
@@ -24,9 +31,15 @@ strata.components.register({
   ports: [
     { name: 'in', direction: 'in', accepts: ['http', 'grpc'] },
     { name: 'out', direction: 'out', accepts: ['http', 'grpc'] },
-    { name: 'db', direction: 'out', accepts: ['db-protocol'] }
+    { name: 'db', direction: 'out', accepts: ['db-protocol'] },
   ],
-  properties: { latency: { type: 'distribution', unit: 'ms', default: { kind: 'lognormal', median: 20, p99: 80 } } }
+  properties: {
+    latency: {
+      type: 'distribution',
+      unit: 'ms',
+      default: { kind: 'lognormal', median: 20, p99: 80 },
+    },
+  },
 })
 strata.components.register({
   id: 'starter.relational-db',
@@ -35,9 +48,13 @@ strata.components.register({
   extends: 'base:store',
   ports: [{ name: 'in', direction: 'in', accepts: ['db-protocol'] }],
   properties: {
-    latency: { type: 'distribution', unit: 'ms', default: { kind: 'lognormal', median: 2, p99: 15 } },
-    maxConnections: { type: 'integer', default: 100 }
-  }
+    latency: {
+      type: 'distribution',
+      unit: 'ms',
+      default: { kind: 'lognormal', median: 2, p99: 15 },
+    },
+    maxConnections: { type: 'integer', default: 100 },
+  },
 })
 
 const heading = text => console.log(`\n\x1b[1m${text}\x1b[0m`)

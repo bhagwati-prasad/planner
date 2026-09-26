@@ -4,7 +4,13 @@
  * the active project, navigation and selection, and forwards every change to the core as a
  * command. Replacing the UI means writing new components against this object.
  */
-import { Emitter, createCore, createRegistry, createUlidFactory, fail } from '../../core/src/index.js'
+import {
+  Emitter,
+  createCore,
+  createRegistry,
+  createUlidFactory,
+  fail,
+} from '../../core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE, INSPECT } from './internal.js'
 import { createMemoryStorage } from './storage.js'
@@ -47,7 +53,14 @@ export class Strata {
   #clipboard = null
 
   /** @param {StrataOptions} [options] */
-  constructor ({ storage = createMemoryStorage(), registry = createRegistry(), identity = {}, clock = Date.now, random, output } = {}) {
+  constructor({
+    storage = createMemoryStorage(),
+    registry = createRegistry(),
+    identity = {},
+    clock = Date.now,
+    random,
+    output,
+  } = {}) {
     this.#registry = registry
     this.#clock = clock
     this.#random = random
@@ -55,7 +68,7 @@ export class Strata {
     this.#identity = Object.freeze({
       id: identity.id ?? createUlidFactory({ now: clock, random })(),
       name: identity.name ?? 'Local user',
-      color: identity.color ?? '#4f7cff'
+      color: identity.color ?? '#4f7cff',
     })
 
     const emit = (event, data) => this.#emitter.emit(event, data)
@@ -64,38 +77,57 @@ export class Strata {
       emit,
       open: this.#open,
       now: () => new Date(this.#clock()).toISOString(),
-      makeCore: snapshot => createCore({ registry: this.#registry, actorId: this.#identity.id, clock: this.#clock, random: this.#random, snapshot }),
+      makeCore: snapshot =>
+        createCore({
+          registry: this.#registry,
+          actorId: this.#identity.id,
+          clock: this.#clock,
+          random: this.#random,
+          snapshot,
+        }),
       activate: project => {
         this.#active = project
-        if (this.#selection.projectId !== project?.id) this.#selection = { projectId: project?.id ?? null, ids: [] }
+        if (this.#selection.projectId !== project?.id)
+          this.#selection = { projectId: project?.id ?? null, ids: [] }
       },
-      active: () => this.#active
+      active: () => this.#active,
     })
 
     /** Component types (built-in types, manifests and packed plugins share one registry). */
     this.components = new ComponentsApi(this.#registry, emit)
 
-    for (const [name, info] of Object.entries(PLANNED)) this[name] = planned(name, info.release, info.what)
+    for (const [name, info] of Object.entries(PLANNED))
+      this[name] = planned(name, info.release, info.what)
   }
 
   /** The local identity recorded as the author of every change. */
-  get identity () { return this.#identity }
+  get identity() {
+    return this.#identity
+  }
 
   /** The active project, or null. */
-  get project () { return this.#active }
+  get project() {
+    return this.#active
+  }
 
-  #requireProject () {
-    if (!this.#active) fail('INVALID', "No project is open. Create one with await strata.projects.create('name') or open one with await strata.projects.open('name').")
+  #requireProject() {
+    if (!this.#active)
+      fail(
+        'INVALID',
+        "No project is open. Create one with await strata.projects.create('name') or open one with await strata.projects.open('name')."
+      )
     return this.#active
   }
 
   /** Breadcrumb navigation of the active project. */
-  get nav () { return this.#requireProject().nav }
+  get nav() {
+    return this.#requireProject().nav
+  }
 
   /**
    * The current selection: a handle, a Collection when several items are selected, or null.
    */
-  get $ () {
+  get $() {
     const project = this.#active
     if (!project || this.#selection.projectId !== project.id) return null
     const core = project[CORE]
@@ -114,14 +146,20 @@ export class Strata {
    * Replaces the selection. Accepts handles, ids and arrays of them; no arguments clears it.
    * @param {...unknown} items
    */
-  select (...items) {
+  select(...items) {
     const project = this.#requireProject()
     const core = project[CORE]
     const ids = []
     for (const item of items.flat(Infinity)) {
       const id = typeof item === 'string' ? item : /** @type {any} */ (item)?.id
-      if (typeof id !== 'string' || !(core.get('node', id) || core.get('edge', id) || core.get('system', id))) {
-        fail('NOT_FOUND', `Cannot select ${String(item)}: not a node, edge or system of '${project.name}'`)
+      if (
+        typeof id !== 'string' ||
+        !(core.get('node', id) || core.get('edge', id) || core.get('system', id))
+      ) {
+        fail(
+          'NOT_FOUND',
+          `Cannot select ${String(item)}: not a node, edge or system of '${project.name}'`
+        )
       }
       if (!ids.includes(id)) ids.push(id)
     }
@@ -131,16 +169,20 @@ export class Strata {
   }
 
   /** The last clip copied in this session (plain JSON), or null. */
-  get clipboard () { return this.#clipboard }
+  get clipboard() {
+    return this.#clipboard
+  }
 
   /**
    * Copies nodes (default: the selected ones) with the edges between them.
    * @param {Iterable<string|{ id: string }>} [items]
    * @returns {import('./clipboard.js').Clip}
    */
-  copy (items) {
+  copy(items) {
     const project = this.#requireProject()
-    const ids = items ? [...items].map(i => (typeof i === 'string' ? i : i.id)) : this.#selection.ids
+    const ids = items
+      ? [...items].map(i => (typeof i === 'string' ? i : i.id))
+      : this.#selection.ids
     this.#clipboard = copyNodes(project, ids)
     this.#emitter.emit('clipboard', { clip: this.#clipboard })
     return this.#clipboard
@@ -151,7 +193,7 @@ export class Strata {
    * selects what was pasted.
    * @param {{ clip?: import('./clipboard.js').Clip, into?: SystemHandle, at?: { x: number, y: number } }} [options]
    */
-  paste ({ clip = this.#clipboard ?? undefined, into, at } = {}) {
+  paste({ clip = this.#clipboard ?? undefined, into, at } = {}) {
     const project = this.#requireProject()
     if (!clip) fail('INVALID', 'The clipboard is empty; copy something first with strata.copy()')
     const target = into ?? project.nav.current
@@ -165,14 +207,19 @@ export class Strata {
    * first one. Returns the copies, which become the selection.
    * @param {Iterable<string|{ id: string }>} [items] default: the selection
    */
-  duplicate (items) {
+  duplicate(items) {
     const project = this.#requireProject()
-    const ids = items ? [...items].map(i => (typeof i === 'string' ? i : i.id)) : this.#selection.ids
+    const ids = items
+      ? [...items].map(i => (typeof i === 'string' ? i : i.id))
+      : this.#selection.ids
     const clip = copyNodes(project, ids)
     const nodes = ids.map(id => project[CORE].get('node', id)).filter(Boolean)
     const positions = nodes.map(n => new NodeHandle(project, n.id).position).filter(Boolean)
     const at = positions.length
-      ? { x: Math.min(...positions.map(p => p.x)) + 40, y: Math.min(...positions.map(p => p.y)) + 40 }
+      ? {
+          x: Math.min(...positions.map(p => p.x)) + 40,
+          y: Math.min(...positions.map(p => p.y)) + 40,
+        }
       : undefined
     const pasted = new SystemHandle(project, nodes[0].systemId).paste(clip, { at })
     if (pasted.length) this.select(pasted)
@@ -183,7 +230,9 @@ export class Strata {
    * Applies a command to the active project.
    * @param {{ type: string, payload?: any }} command
    */
-  dispatch (command) { return this.#requireProject().dispatch(command) }
+  dispatch(command) {
+    return this.#requireProject().dispatch(command)
+  }
 
   /**
    * @template T
@@ -191,33 +240,48 @@ export class Strata {
    * @param {{ label?: string }} [options]
    * @returns {T}
    */
-  transaction (fn, options) { return this.#requireProject().transaction(fn, options) }
+  transaction(fn, options) {
+    return this.#requireProject().transaction(fn, options)
+  }
 
-  undo () { return this.#requireProject().undo() }
-  redo () { return this.#requireProject().redo() }
+  undo() {
+    return this.#requireProject().undo()
+  }
+  redo() {
+    return this.#requireProject().redo()
+  }
 
   /** Commands available in the active project, with signatures. */
-  commands () { return this.#requireProject().commands() }
+  commands() {
+    return this.#requireProject().commands()
+  }
 
   /**
    * Subscribes to 'change', 'history', 'navigate', 'select', 'project' or '*'.
    * @param {string} event
    * @param {Function} fn
    */
-  on (event, fn) { return this.#emitter.on(event, fn) }
+  on(event, fn) {
+    return this.#emitter.on(event, fn)
+  }
   /** @param {string} event @param {Function} fn */
-  once (event, fn) { return this.#emitter.once(event, fn) }
+  once(event, fn) {
+    return this.#emitter.once(event, fn)
+  }
   /** @param {string} event @param {Function} fn */
-  off (event, fn) { this.#emitter.off(event, fn) }
+  off(event, fn) {
+    this.#emitter.off(event, fn)
+  }
 
   /**
    * Text rendering of a project, system, node or collection (default: the current system).
    * @param {unknown} [target]
    * @param {{ depth?: number, edges?: boolean }} [options]
    */
-  format (target, options) {
+  format(target, options) {
     if (target === undefined) {
-      if (!this.#active) return "No project is open. Try: await strata.projects.create('my-project')"
+      if (!this.#active)
+        return "No project is open. Try: await strata.projects.create('my-project')"
       target = this.#active.nav.current
     }
     return formatTarget(target, options)
@@ -228,7 +292,7 @@ export class Strata {
    * @param {unknown} [target]
    * @param {{ depth?: number, edges?: boolean }} [options]
    */
-  print (target, options) {
+  print(target, options) {
     this.#output(this.format(target, options))
   }
 
@@ -236,18 +300,22 @@ export class Strata {
    * Prints help: the topic list, or commands with signatures and examples for one topic.
    * @param {string} [topic]
    */
-  help (topic) {
+  help(topic) {
     this.#output(helpText(topic))
   }
 
   /** @param {string} [topic] */
-  helpText (topic) { return helpText(topic) }
+  helpText(topic) {
+    return helpText(topic)
+  }
 
-  toString () {
+  toString() {
     return `Strata<${this.#active ? this.#active.name : 'no project'}>`
   }
 
-  [INSPECT] () { return this.toString() }
+  [INSPECT]() {
+    return this.toString()
+  }
 }
 
 /**
@@ -256,18 +324,18 @@ export class Strata {
  * @param {string} release
  * @param {string} what
  */
-function planned (name, release, what) {
+function planned(name, release, what) {
   const message = `strata.${name} arrives in ${release} (${what}). See strata.help('${name}').`
   return new Proxy(Object.freeze({}), {
-    get (_target, prop) {
+    get(_target, prop) {
       if (prop === Symbol.toStringTag) return `strata.${name} (${release})`
       if (typeof prop === 'symbol' || prop === 'then' || prop === 'toJSON') return undefined
       return () => fail('UNSUPPORTED', message)
-    }
+    },
   })
 }
 
 /** @param {StrataOptions} [options] */
-export function createStrata (options) {
+export function createStrata(options) {
   return new Strata(options)
 }

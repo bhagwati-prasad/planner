@@ -4,7 +4,14 @@
  */
 import { Collection } from './collection.js'
 import { CORE } from './internal.js'
-import { BoundaryPortHandle, EdgeHandle, NodeHandle, PortHandle, SystemHandle, portLabel } from './handles.js'
+import {
+  BoundaryPortHandle,
+  EdgeHandle,
+  NodeHandle,
+  PortHandle,
+  SystemHandle,
+  portLabel,
+} from './handles.js'
 import { ProjectHandle } from './projects.js'
 
 /** @typedef {import('../../core/src/index.js').Core} Core */
@@ -13,11 +20,16 @@ import { ProjectHandle } from './projects.js'
  * @param {unknown} target
  * @param {{ depth?: number, edges?: boolean }} [options]
  */
-export function formatTarget (target, options = {}) {
+export function formatTarget(target, options = {}) {
   if (target instanceof ProjectHandle) return formatProject(target, options)
   if (target instanceof SystemHandle) return formatSystem(target[CORE], target.id, options)
   if (target instanceof NodeHandle) return formatNode(target)
-  if (target instanceof PortHandle || target instanceof EdgeHandle || target instanceof BoundaryPortHandle) return String(target)
+  if (
+    target instanceof PortHandle ||
+    target instanceof EdgeHandle ||
+    target instanceof BoundaryPortHandle
+  )
+    return String(target)
   if (target instanceof Collection || Array.isArray(target)) {
     const rows = target instanceof Collection ? target.toTable() : target
     return formatTable(rows)
@@ -27,9 +39,11 @@ export function formatTarget (target, options = {}) {
 }
 
 /** @param {ProjectHandle} project @param {{ depth?: number, edges?: boolean }} options */
-function formatProject (project, options) {
+function formatProject(project, options) {
   const core = project[CORE]
-  const lines = [`Project ${project.name} · rev ${project.rev} · ${plural(core.all('system').length, 'system')} · ${plural(core.all('node').length, 'node')}`]
+  const lines = [
+    `Project ${project.name} · rev ${project.rev} · ${plural(core.all('system').length, 'system')} · ${plural(core.all('node').length, 'node')}`,
+  ]
   lines.push(formatSystem(core, core.rootSystemId, options))
   const library = core.all('system').filter(s => s.id !== core.rootSystemId && !s.ownerNodeId)
   if (library.length) {
@@ -45,13 +59,13 @@ function formatProject (project, options) {
  * @param {string} systemId
  * @param {{ depth?: number, edges?: boolean }} [options] depth: levels of nodes to show (default all)
  */
-export function formatSystem (core, systemId, { depth = Infinity, edges = true } = {}) {
+export function formatSystem(core, systemId, { depth = Infinity, edges = true } = {}) {
   const system = core.require('system', systemId)
   const bps = core.boundaryPortsOf(systemId)
   const header = [
     `${system.name}  [${system.levelTag ?? 'system'}]`,
     plural(core.nodesOf(systemId).length, 'node'),
-    ...(bps.length ? [`ports: ${bps.map(bp => boundaryLabel(core, bp)).join(', ')}`] : [])
+    ...(bps.length ? [`ports: ${bps.map(bp => boundaryLabel(core, bp)).join(', ')}`] : []),
   ].join(' · ')
   const out = [header]
 
@@ -63,10 +77,18 @@ export function formatSystem (core, systemId, { depth = Infinity, edges = true }
       const inner = prefix + (last ? '   ' : '│  ')
       if (edges) {
         for (const port of core.portsOf(node.id)) {
-          for (const edge of core.find('edge', 'fromPort', port.id)) out.push(`${inner}  ${port.name} → ${portLabel(core, edge.toPort)}${edge.connectionType ? `  (${edge.connectionType})` : ''}${edge.label ? `  “${edge.label}”` : ''}`)
+          for (const edge of core.find('edge', 'fromPort', port.id))
+            out.push(
+              `${inner}  ${port.name} → ${portLabel(core, edge.toPort)}${edge.connectionType ? `  (${edge.connectionType})` : ''}${edge.label ? `  “${edge.label}”` : ''}`
+            )
         }
       }
-      if (node.kind === 'composite' && levelsLeft > 1 && core.get('system', node.systemRef) && !stack.has(node.systemRef)) {
+      if (
+        node.kind === 'composite' &&
+        levelsLeft > 1 &&
+        core.get('system', node.systemRef) &&
+        !stack.has(node.systemRef)
+      ) {
         walk(node.systemRef, inner, levelsLeft - 1, new Set([...stack, node.systemRef]))
       }
     })
@@ -76,33 +98,47 @@ export function formatSystem (core, systemId, { depth = Infinity, edges = true }
 }
 
 /** @param {Core} core @param {any} node */
-function nodeLabel (core, node) {
+function nodeLabel(core, node) {
   const status = node.status !== 'planned' ? ` · ${node.status}` : ''
   if (node.kind !== 'composite') return `${node.name}  ${node.typeRef}${status}`
   const child = core.get('system', node.systemRef)
-  const how = node.placement === 'reference' ? `by reference${child && child.name !== node.name ? ` → ${child.name}` : ''}` : 'by value'
+  const how =
+    node.placement === 'reference'
+      ? `by reference${child && child.name !== node.name ? ` → ${child.name}` : ''}`
+      : 'by value'
   return `▣ ${node.name}  (${how} · ${plural(child ? core.nodesOf(child.id).length : 0, 'node')})${status}`
 }
 
 /** @param {Core} core @param {any} bp */
-function boundaryLabel (core, bp) {
+function boundaryLabel(core, bp) {
   const arrow = bp.direction === 'out' ? '←' : bp.direction === 'in' ? '→' : '↔'
   return `${bp.name} ${arrow} ${bp.internalPortId ? portLabel(core, bp.internalPortId) : '(unmapped)'}`
 }
 
 /** @param {NodeHandle} node */
-function formatNode (node) {
+function formatNode(node) {
   const core = node[CORE]
   const e = node.entity
-  const lines = [`${e.name}  ${e.kind === 'composite' ? nodeLabel(core, e).slice(e.name.length + 2) : e.typeRef} · ${e.status}${e.owner ? ` · owner ${e.owner}` : ''}`]
+  const lines = [
+    `${e.name}  ${e.kind === 'composite' ? nodeLabel(core, e).slice(e.name.length + 2) : e.typeRef} · ${e.status}${e.owner ? ` · owner ${e.owner}` : ''}`,
+  ]
   const ports = core.portsOf(e.id)
   if (ports.length) {
     lines.push('  ports')
     for (const port of ports) {
-      const links = core.edgesAtPort(port.id).map(edge => edge.fromPort === port.id ? `→ ${portLabel(core, edge.toPort)}` : `← ${portLabel(core, edge.fromPort)}`)
-      for (const bp of core.find('boundaryPort', 'internalPortId', port.id)) links.push(`⇠ boundary port '${bp.name}' of ${core.get('system', bp.systemId)?.name}`)
+      const links = core
+        .edgesAtPort(port.id)
+        .map(edge =>
+          edge.fromPort === port.id
+            ? `→ ${portLabel(core, edge.toPort)}`
+            : `← ${portLabel(core, edge.fromPort)}`
+        )
+      for (const bp of core.find('boundaryPort', 'internalPortId', port.id))
+        links.push(`⇠ boundary port '${bp.name}' of ${core.get('system', bp.systemId)?.name}`)
       const accepts = core.acceptsOf(port.id)
-      lines.push(`    ${port.name} (${port.direction}${accepts.length ? `, ${accepts.join('|')}` : ''})${links.length ? `  ${links.join(', ')}` : ''}`)
+      lines.push(
+        `    ${port.name} (${port.direction}${accepts.length ? `, ${accepts.join('|')}` : ''})${links.length ? `  ${links.join(', ')}` : ''}`
+      )
     }
   }
   if (e.kind === 'atomic') {
@@ -110,7 +146,9 @@ function formatNode (node) {
     if (props.length) {
       lines.push('  props')
       for (const [key, { value, source, unit }] of props) {
-        lines.push(`    ${key} = ${typeof value === 'string' ? value : JSON.stringify(value)}${unit && typeof value === 'number' ? ` ${unit}` : ''}${source === 'default' ? '  (default)' : ''}`)
+        lines.push(
+          `    ${key} = ${typeof value === 'string' ? value : JSON.stringify(value)}${unit && typeof value === 'number' ? ` ${unit}` : ''}${source === 'default' ? '  (default)' : ''}`
+        )
       }
     }
   }
@@ -121,17 +159,26 @@ function formatNode (node) {
  * Plain-text table of row objects.
  * @param {Record<string, unknown>[]} rows
  */
-export function formatTable (rows) {
+export function formatTable(rows) {
   if (!rows.length) return '(empty)'
   if (rows.some(r => r === null || typeof r !== 'object')) return rows.map(String).join('\n')
   const columns = [...new Set(rows.flatMap(r => Object.keys(r)))]
-  const cell = v => (v === undefined || v === null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v))
+  const cell = v =>
+    v === undefined || v === null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v)
   const widths = columns.map(c => Math.max(c.length, ...rows.map(r => cell(r[c]).length)))
-  const line = values => values.map((v, i) => v.padEnd(widths[i])).join('  ').trimEnd()
-  return [line(columns), line(widths.map(w => '─'.repeat(w))), ...rows.map(r => line(columns.map(c => cell(r[c]))))].join('\n')
+  const line = values =>
+    values
+      .map((v, i) => v.padEnd(widths[i]))
+      .join('  ')
+      .trimEnd()
+  return [
+    line(columns),
+    line(widths.map(w => '─'.repeat(w))),
+    ...rows.map(r => line(columns.map(c => cell(r[c])))),
+  ].join('\n')
 }
 
 /** @param {number} n @param {string} word */
-function plural (n, word) {
+function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`
 }

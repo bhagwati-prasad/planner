@@ -167,7 +167,7 @@ Tests: the packer, bundler and validation in Node (including bundling and runnin
 - `strata serve` serves the repository (the development app at `/app/`) and redirects `/` there; its component directories default to `./components` and `./connection-types`, and `npm run serve` points them at the starter library.
 - Uploads last for the session; M5 stores them in IndexedDB (and, when served, may write them to `components/`).
 - `strata new project`, `script` and the R1/R2 commands answer with the milestone or release that brings them.
-- The typecheck covers the browser and headless packages; the Node-only packages (`strata-server`, `strata-cli`) would need `@types/node`, which the zero-dependency rule keeps out, so tests cover them.
+- The typecheck (`npm run typecheck`, TypeScript pinned as a dev dependency since task 0002) covers the browser and headless packages; the Node-only packages (`server`, `cli`) would need `@types/node`, which is not on the approved dev-dependency list of eng §16, so tests cover them.
 
 Known gaps, kept for later: behaviour hooks run only in tests until the simulation worker (R1); migrations are loaded and checked by `strata test-component` but nothing runs them yet, because upgrading a node to a newer component version (with the property diff of §7) is still to come; binary assets are not bundled; the offline page does not persist anything yet (M5).
 

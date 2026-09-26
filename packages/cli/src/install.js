@@ -14,12 +14,14 @@ export const END_MARKER = '<!-- STRATA:COMPONENTS:END -->'
  * @param {string} scriptPath
  * @returns {Promise<boolean>} false when the tag was already there
  */
-export async function installScriptTag (htmlPath, scriptPath) {
+export async function installScriptTag(htmlPath, scriptPath) {
   const html = await readFile(htmlPath, 'utf8')
   const begin = html.indexOf(BEGIN_MARKER)
   const end = html.indexOf(END_MARKER)
   if (begin < 0 || end < begin) {
-    throw new Error(`${htmlPath} has no component block. Add these two lines where component scripts belong:\n${BEGIN_MARKER} - one line per packed component -->\n${END_MARKER}`)
+    throw new Error(
+      `${htmlPath} has no component block. Add these two lines where component scripts belong:\n${BEGIN_MARKER} - one line per packed component -->\n${END_MARKER}`
+    )
   }
   const src = relative(dirname(htmlPath), scriptPath).split(sep).join('/')
   const block = html.slice(begin, end)

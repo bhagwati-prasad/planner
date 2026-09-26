@@ -20,9 +20,15 @@ const LIMITS = { entries: 2000, bytes: 64 * 1024 * 1024 }
  */
 
 /** @param {Uint8Array} data @returns {Promise<Uint8Array>} */
-async function streamInflate (data) {
-  if (typeof DecompressionStream !== 'function') throw new StrataError('UNSUPPORTED', 'This environment cannot decompress zip files; unzip the folder and upload its files instead')
-  const stream = new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (data)]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
+async function streamInflate(data) {
+  if (typeof DecompressionStream !== 'function')
+    throw new StrataError(
+      'UNSUPPORTED',
+      'This environment cannot decompress zip files; unzip the folder and upload its files instead'
+    )
+  const stream = new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (data)])
+    .stream()
+    .pipeThrough(new DecompressionStream('deflate-raw'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
@@ -31,19 +37,23 @@ async function streamInflate (data) {
  * @param {{ inflateRaw?: InflateRaw }} [options]
  * @returns {Promise<Record<string, Uint8Array>>} path → content (directories omitted)
  */
-export async function readZip (bytes, { inflateRaw = streamInflate } = {}) {
+export async function readZip(bytes, { inflateRaw = streamInflate } = {}) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const bad = message => new StrataError('INVALID', `Not a readable zip file: ${message}`)
 
   let eocd = -1
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 0xffff); i--) {
-    if (view.getUint32(i, true) === EOCD) { eocd = i; break }
+    if (view.getUint32(i, true) === EOCD) {
+      eocd = i
+      break
+    }
   }
   if (eocd < 0) throw bad('no end of central directory record')
   const count = view.getUint16(eocd + 10, true)
   const size = view.getUint32(eocd + 12, true)
   const offset = view.getUint32(eocd + 16, true)
-  if (count === 0xffff || size === 0xffffffff || offset === 0xffffffff) throw bad('ZIP64 archives are not supported')
+  if (count === 0xffff || size === 0xffffffff || offset === 0xffffffff)
+    throw bad('ZIP64 archives are not supported')
   if (count > LIMITS.entries) throw bad(`it has ${count} entries (at most ${LIMITS.entries})`)
   if (offset + size > bytes.length) throw bad('the central directory lies outside the file')
 
@@ -69,23 +79,31 @@ export async function readZip (bytes, { inflateRaw = streamInflate } = {}) {
 
     if (name.endsWith('/')) continue
     if (flags & 1) throw bad(`'${name}' is encrypted`)
-    if (compressed === 0xffffffff || uncompressed === 0xffffffff) throw bad('ZIP64 archives are not supported')
+    if (compressed === 0xffffffff || uncompressed === 0xffffffff)
+      throw bad('ZIP64 archives are not supported')
     total += uncompressed
     if (total > LIMITS.bytes) throw bad(`it expands to more than ${LIMITS.bytes / 1048576} MB`)
     if (view.getUint32(localOffset, true) !== LOCAL) throw bad(`corrupt entry '${name}'`)
-    const start = localOffset + 30 + view.getUint16(localOffset + 26, true) + view.getUint16(localOffset + 28, true)
+    const start =
+      localOffset +
+      30 +
+      view.getUint16(localOffset + 26, true) +
+      view.getUint16(localOffset + 28, true)
     const data = bytes.subarray(start, start + compressed)
     let content
     if (method === 0) content = data.slice()
     else if (method === 8) content = await inflateRaw(data)
     else throw bad(`'${name}' uses compression method ${method}; use the standard deflate`)
-    if (content.length !== uncompressed) throw bad(`'${name}' has the wrong size after decompression`)
+    if (content.length !== uncompressed)
+      throw bad(`'${name}' has the wrong size after decompression`)
     out[name] = content
   }
   return out
 }
 
 /** True when the bytes start like a zip file. @param {Uint8Array} bytes */
-export function isZip (bytes) {
-  return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4
+export function isZip(bytes) {
+  return (
+    bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4
+  )
 }

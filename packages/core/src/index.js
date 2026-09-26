@@ -11,17 +11,50 @@ export { createPrng, hashString, secureRandomBytes } from './random.js'
 export { toPlain, deepFreeze, deepEqual, thaw, isPlainObject } from './plain.js'
 export { compareSemver, isSemver, parseSemver, satisfies } from './semver.js'
 export {
-  PROPERTY_TYPES, ROLLUP_RULES, DISTRIBUTION_KINDS, parseDuration, parseBytes, parseRate,
-  normalizeDistribution, normalizeValue, validateValue, checkSchema, defaultProps, quantile, mean, statistic, probit
+  PROPERTY_TYPES,
+  ROLLUP_RULES,
+  DISTRIBUTION_KINDS,
+  parseDuration,
+  parseBytes,
+  parseRate,
+  normalizeDistribution,
+  normalizeValue,
+  validateValue,
+  checkSchema,
+  defaultProps,
+  quantile,
+  mean,
+  statistic,
+  probit,
 } from './props.js'
 export {
-  Registry, createRegistry, normalizeManifest, parseTypeRef, typeRefOf, CORE_API_VERSION, PORT_DIRECTIONS, PLUGIN_KINDS
+  Registry,
+  createRegistry,
+  normalizeManifest,
+  parseTypeRef,
+  typeRefOf,
+  CORE_API_VERSION,
+  PORT_DIRECTIONS,
+  PLUGIN_KINDS,
 } from './registry.js'
 export { BUILTIN_MANIFESTS } from './builtins.js'
 export { CORE_COMMANDS, registerCoreCommands } from './commands/index.js'
 export { rollup, resolveRule, nodeValue, contractValue, checkContracts } from './rollup.js'
 export { findProblems } from './validate.js'
 export {
-  NODE_STATUSES, LEVEL_TAGS, VIEW_KINDS, PLACEMENTS, childLevel, containsSystem, wouldCycle, pathsTo,
-  subtreeSystemIds, resolvePort, acceptsOf, effectiveProps, explainProps, manifestOf, connectionTypeOf
+  NODE_STATUSES,
+  LEVEL_TAGS,
+  VIEW_KINDS,
+  PLACEMENTS,
+  childLevel,
+  containsSystem,
+  wouldCycle,
+  pathsTo,
+  subtreeSystemIds,
+  resolvePort,
+  acceptsOf,
+  effectiveProps,
+  explainProps,
+  manifestOf,
+  connectionTypeOf,
 } from './model.js'

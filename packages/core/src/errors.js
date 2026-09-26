@@ -10,7 +10,7 @@ export class StrataError extends Error {
    * @param {string} message
    * @param {unknown} [details]
    */
-  constructor (code, message, details) {
+  constructor(code, message, details) {
     super(message)
     this.name = 'StrataError'
     this.code = code
@@ -25,7 +25,7 @@ export class StrataError extends Error {
  * @param {unknown} [details]
  * @returns {never}
  */
-export function fail (code, message, details) {
+export function fail(code, message, details) {
   throw new StrataError(code, message, details)
 }
 
@@ -35,7 +35,7 @@ export function fail (code, message, details) {
  * @param {Iterable<string>} candidates
  * @param {number} [max]
  */
-export function suggest (input, candidates, max = 3) {
+export function suggest(input, candidates, max = 3) {
   const lower = String(input).toLowerCase()
   return [...candidates]
     .map(c => ({ c, d: distance(lower, c.toLowerCase()) }))
@@ -46,11 +46,11 @@ export function suggest (input, candidates, max = 3) {
 }
 
 /** @param {string[]} list */
-export function didYouMean (list) {
+export function didYouMean(list) {
   return list.length ? ` Did you mean ${list.map(s => `'${s}'`).join(' or ')}?` : ''
 }
 
-function distance (a, b) {
+function distance(a, b) {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i)
   for (let i = 1; i <= a.length; i++) {
     let prev = row[0]

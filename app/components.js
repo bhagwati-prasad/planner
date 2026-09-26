@@ -8,7 +8,7 @@
  * @param {import('../packages/facade/src/index.js').Strata} strata
  * @param {{ replace?: boolean }} [options]
  */
-export async function installServedComponents (strata, { replace = false } = {}) {
+export async function installServedComponents(strata, { replace = false } = {}) {
   if (!/^https?:$/.test(location.protocol)) return null
   let listing
   try {
@@ -21,7 +21,9 @@ export async function installServedComponents (strata, { replace = false } = {})
   let installed = 0
   for (const c of listing.components) {
     if (!c.bundle) {
-      console.warn(`Strata: ${c.folder} was not packed:\n${c.problems.map(p => `  ${p.file}${p.line ? `:${p.line}` : ''}: ${p.message}`).join('\n')}`)
+      console.warn(
+        `Strata: ${c.folder} was not packed:\n${c.problems.map(p => `  ${p.file}${p.line ? `:${p.line}` : ''}: ${p.message}`).join('\n')}`
+      )
       continue
     }
     try {
@@ -39,14 +41,18 @@ export async function installServedComponents (strata, { replace = false } = {})
  * @param {import('../packages/facade/src/index.js').Strata} strata
  * @param {(message: string) => void} notify
  */
-export function watchServedComponents (strata, notify) {
+export function watchServedComponents(strata, notify) {
   if (!/^https?:$/.test(location.protocol) || typeof EventSource !== 'function') return () => {}
   const events = new EventSource('/api/events')
   events.addEventListener('components', async e => {
     const { changes } = JSON.parse(e.data)
     await installServedComponents(strata, { replace: true })
     for (const c of changes) {
-      notify(c.action === 'failed' ? `${c.folder} has errors; see the console` : `${c.typeRef ?? c.folder} ${c.action}`)
+      notify(
+        c.action === 'failed'
+          ? `${c.folder} has errors; see the console`
+          : `${c.typeRef ?? c.folder} ${c.action}`
+      )
     }
   })
   return () => events.close()

@@ -17,11 +17,11 @@ const ULID_RE = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/
  * @param {{ now?: () => number, random?: (n: number) => Uint8Array }} [options]
  * @returns {() => string}
  */
-export function createUlidFactory ({ now = Date.now, random = secureRandomBytes } = {}) {
+export function createUlidFactory({ now = Date.now, random = secureRandomBytes } = {}) {
   let lastTime = -1
   /** @type {number[]} */
   let lastRandom = []
-  return function ulid () {
+  return function ulid() {
     let time = Math.floor(now())
     if (time <= lastTime) {
       time = lastTime
@@ -35,17 +35,21 @@ export function createUlidFactory ({ now = Date.now, random = secureRandomBytes 
 }
 
 /** @param {number[]} digits */
-function incrementDigits (digits) {
+function incrementDigits(digits) {
   for (let i = digits.length - 1; i >= 0; i--) {
-    if (digits[i] < 31) { digits[i]++; return }
+    if (digits[i] < 31) {
+      digits[i]++
+      return
+    }
     digits[i] = 0
   }
   fail('CONFLICT', 'ULID random component overflowed within one millisecond')
 }
 
 /** @param {number} time */
-function encodeTime (time) {
-  if (!Number.isInteger(time) || time < 0 || time > TIME_MAX) fail('INVALID', `Cannot encode time ${time} in a ULID`)
+function encodeTime(time) {
+  if (!Number.isInteger(time) || time < 0 || time > TIME_MAX)
+    fail('INVALID', `Cannot encode time ${time} in a ULID`)
   let out = ''
   for (let i = 0; i < TIME_LEN; i++) {
     out = ENCODING[time % 32] + out
@@ -55,7 +59,7 @@ function encodeTime (time) {
 }
 
 /** @param {unknown} value */
-export function isUlid (value) {
+export function isUlid(value) {
   return typeof value === 'string' && ULID_RE.test(value)
 }
 
@@ -63,7 +67,7 @@ export function isUlid (value) {
  * Millisecond timestamp encoded in a ULID.
  * @param {string} id
  */
-export function ulidTime (id) {
+export function ulidTime(id) {
   if (!isUlid(id)) fail('INVALID', `Not a ULID: ${id}`)
   let time = 0
   for (let i = 0; i < TIME_LEN; i++) time = time * 32 + ENCODING.indexOf(id[i])

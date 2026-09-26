@@ -48,18 +48,25 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
   #zoom
   #hint
 
-  constructor () {
+  constructor() {
     super()
     this.#crumbs = h('nav', { 'aria-label': 'System path' }, h('ol'))
     this.#pages = h('div', { class: 'pages', role: 'tablist', 'aria-label': 'Pages' })
     this.#graphHost = h('div', { class: 'graph' })
     this.#zoom = h('div', { class: 'zoom', 'aria-live': 'polite' })
     this.#hint = h('div', { class: 'hint', hidden: true })
-    this.#stage = h('div', { class: 'stage' }, this.#graphHost, h('div', { class: 'minimap' }), this.#zoom, this.#hint)
+    this.#stage = h(
+      'div',
+      { class: 'stage' },
+      this.#graphHost,
+      h('div', { class: 'minimap' }),
+      this.#zoom,
+      this.#hint
+    )
     this.content.append(h('header', null, this.#crumbs, this.#pages), this.#stage)
   }
 
-  subscribe (strata, shell) {
+  subscribe(strata, shell) {
     shell.canvas = this
     if (!this.graph) {
       this.graph = create(this.#graphHost, {
@@ -67,27 +74,37 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
         theme: shell.theme ?? 'light',
         deleteKeys: ['Delete'],
         ariaLabel: 'Architecture diagram',
-        canConnect: (s, t) => this.#canConnect(s, t)
+        canConnect: (s, t) => this.#canConnect(s, t),
       })
-      this.#minimap = createMinimap(this.graph, /** @type {HTMLElement} */ (this.#stage.querySelector('.minimap')), { width: 200, height: 130 })
+      this.#minimap = createMinimap(
+        this.graph,
+        /** @type {HTMLElement} */ (this.#stage.querySelector('.minimap')),
+        { width: 200, height: 130 }
+      )
       this.graph.on('intent', intent => this.intent(intent))
       this.graph.on('transform', () => this.#showZoom())
     }
     return [
       strata.on('change', () => this.invalidate()),
       strata.on('navigate', () => this.#navigated()),
-      strata.on('project', () => { this.#key = null; this.update() }),
+      strata.on('project', () => {
+        this.#key = null
+        this.update()
+      }),
       shell.on('selection', ({ ids }) => this.graph?.select(ids)),
-      shell.on('theme', theme => { this.graph?.setTheme(theme); this.#minimap?.refresh() }),
+      shell.on('theme', theme => {
+        this.graph?.setTheme(theme)
+        this.#minimap?.refresh()
+      }),
       shell.on('highlight', ({ ids }) => {
         if (ids?.length) this.graph?.setOverlay('highlight', { ids })
         else this.graph?.clearOverlay('highlight')
-      })
+      }),
     ]
   }
 
   /** Applies a graph intent through the adapter; errors become notifications. @param {any} intent */
-  intent (intent) {
+  intent(intent) {
     const strata = /** @type {any} */ (this.strata)
     const shell = /** @type {import('./shell.js').Shell} */ (this.shell)
     const system = strata.project?.nav.current
@@ -103,46 +120,61 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
     if (result.select) shell.select(result.select)
     if (result.enter) this.enter(result.enter)
     if (result.inspect) shell.inspect(result.inspect)
-    if (result.quickAdd) shell.openPalette('add', { source: result.quickAdd.source, at: { x: result.quickAdd.x, y: result.quickAdd.y } })
+    if (result.quickAdd)
+      shell.openPalette('add', {
+        source: result.quickAdd.source,
+        at: { x: result.quickAdd.x, y: result.quickAdd.y },
+      })
     if (result.contextMenu) shell.openContextMenu(result.contextMenu)
   }
 
   /** Drills into a composite node. @param {string} nodeId */
-  enter (nodeId) {
+  enter(nodeId) {
     const strata = /** @type {any} */ (this.strata)
     strata.nav.enter(strata.project.node(nodeId))
   }
 
   /** Where pasted or added things go: the middle of the view. */
-  freeSpot () {
+  freeSpot() {
     if (!this.graph) return undefined
     const { width, height } = this.graph.size
     const t = this.graph.transform
-    return { x: Math.round(((width / 2 - t.x) / t.k - 80) / 10) * 10, y: Math.round(((height / 2 - t.y) / t.k - 32) / 10) * 10 }
+    return {
+      x: Math.round(((width / 2 - t.x) / t.k - 80) / 10) * 10,
+      y: Math.round(((height / 2 - t.y) / t.k - 32) / 10) * 10,
+    }
   }
 
   /** Adds a page (view) to the current system and shows it. */
-  newPage () {
+  newPage() {
     const strata = /** @type {any} */ (this.strata)
     const system = strata.project.nav.current
     const count = system.views().length
-    this.#viewId = strata.dispatch({ type: 'view.create', payload: { systemId: system.id, name: `Page ${count + 1}` } })
+    this.#viewId = strata.dispatch({
+      type: 'view.create',
+      payload: { systemId: system.id, name: `Page ${count + 1}` },
+    })
     this.update()
   }
 
   /** @param {'svg'|'png'} format */
-  async download (format) {
+  async download(format) {
     if (!this.graph) return
-    const name = `${(/** @type {any} */ (this.strata)).project?.nav.current.name ?? 'diagram'}.${format}`.replace(/[^\w.-]+/g, '-')
-    const blob = format === 'svg'
-      ? new Blob([this.graph.exportSVG()], { type: 'image/svg+xml' })
-      : await this.graph.exportPNG({ scale: 2 })
+    const name =
+      `${/** @type {any} */ (this.strata).project?.nav.current.name ?? 'diagram'}.${format}`.replace(
+        /[^\w.-]+/g,
+        '-'
+      )
+    const blob =
+      format === 'svg'
+        ? new Blob([this.graph.exportSVG()], { type: 'image/svg+xml' })
+        : await this.graph.exportPNG({ scale: 2 })
     const a = h('a', { href: URL.createObjectURL(blob), download: name })
     a.click()
     setTimeout(() => URL.revokeObjectURL(/** @type {HTMLAnchorElement} */ (a).href), 2000)
   }
 
-  update () {
+  update() {
     const strata = /** @type {any} */ (this.strata)
     const shell = /** @type {import('./shell.js').Shell} */ (this.shell)
     if (!this.graph || this.#transitioning) return
@@ -173,11 +205,13 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
 
     this.#renderCrumbs(project)
     this.#renderPages(system)
-    this.#showHint((data.nodes ?? []).some(n => parseId(n.id).kind === 'model')
-      ? null
-      : system.readOnly
-        ? 'This system is empty.'
-        : 'Drag a component here from the library, or press Ctrl+K and search for “Add a component”.')
+    this.#showHint(
+      (data.nodes ?? []).some(n => parseId(n.id).kind === 'model')
+        ? null
+        : system.readOnly
+          ? 'This system is empty.'
+          : 'Drag a component here from the library, or press Ctrl+K and search for “Add a component”.'
+    )
     if (key !== this.#key) {
       this.#key = key
       const saved = this.#transforms.get(key)
@@ -187,7 +221,7 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
     this.#showZoom()
   }
 
-  async #navigated () {
+  async #navigated() {
     const strata = /** @type {any} */ (this.strata)
     const shell = /** @type {import('./shell.js').Shell} */ (this.shell)
     const graph = this.graph
@@ -201,7 +235,12 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
     const animate = !shell.reducedMotion
     shell.select([])
     // Entering: the composite is still on screen; zoom into it before showing its system.
-    if (animate && current?.viaNodeId && previousKey?.startsWith(`${parent?.systemId}|`) && graph.bounds([current.viaNodeId])) {
+    if (
+      animate &&
+      current?.viaNodeId &&
+      previousKey?.startsWith(`${parent?.systemId}|`) &&
+      graph.bounds([current.viaNodeId])
+    ) {
       this.#transitioning = true
       graph.zoomTo([current.viaNodeId], { animate: true, padding: 0, maxScale: 8 })
       await delay(TRANSITION_MS)
@@ -220,40 +259,86 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
     }
   }
 
-  #renderCrumbs (project) {
+  #renderCrumbs(project) {
     const ol = /** @type {HTMLElement} */ (this.#crumbs.firstElementChild)
-    if (!project) { fill(ol); return }
+    if (!project) {
+      fill(ol)
+      return
+    }
     const strata = /** @type {any} */ (this.strata)
     const path = project.nav.path
     const depth = path.length - 1
-    fill(ol, ...path.map((system, i) => h('li', null,
-      h('button', {
-        'aria-current': i === depth ? 'page' : null,
-        title: i === depth ? system.name : `Go up to ${system.name}`,
-        onclick: () => { for (let n = depth; n > i; n--) strata.nav.up() }
-      }, system.name),
-      i === depth && system.readOnly ? h('span', { class: 'badge', title: 'Placed by reference: edit the source system to change it' }, 'read-only') : null
-    )))
-  }
-
-  #renderPages (system) {
-    const views = system.views()
-    fill(this.#pages,
-      ...views.map(v => h('button', {
-        role: 'tab',
-        'aria-selected': String(v.id === this.#viewId),
-        onclick: () => { this.#viewId = v.id; this.update() }
-      }, v.name)),
-      system.readOnly ? null : h('button', { class: 'ghost', title: 'New page', 'aria-label': 'New page', onclick: () => this.newPage() }, '+')
+    fill(
+      ol,
+      ...path.map((system, i) =>
+        h(
+          'li',
+          null,
+          h(
+            'button',
+            {
+              'aria-current': i === depth ? 'page' : null,
+              title: i === depth ? system.name : `Go up to ${system.name}`,
+              onclick: () => {
+                for (let n = depth; n > i; n--) strata.nav.up()
+              },
+            },
+            system.name
+          ),
+          i === depth && system.readOnly
+            ? h(
+                'span',
+                {
+                  class: 'badge',
+                  title: 'Placed by reference: edit the source system to change it',
+                },
+                'read-only'
+              )
+            : null
+        )
+      )
     )
   }
 
-  #showZoom () {
+  #renderPages(system) {
+    const views = system.views()
+    fill(
+      this.#pages,
+      ...views.map(v =>
+        h(
+          'button',
+          {
+            role: 'tab',
+            'aria-selected': String(v.id === this.#viewId),
+            onclick: () => {
+              this.#viewId = v.id
+              this.update()
+            },
+          },
+          v.name
+        )
+      ),
+      system.readOnly
+        ? null
+        : h(
+            'button',
+            {
+              class: 'ghost',
+              title: 'New page',
+              'aria-label': 'New page',
+              onclick: () => this.newPage(),
+            },
+            '+'
+          )
+    )
+  }
+
+  #showZoom() {
     if (this.graph) this.#zoom.textContent = `${Math.round(this.graph.transform.k * 100)}%`
   }
 
   /** @param {string|null} text */
-  #showHint (text) {
+  #showHint(text) {
     this.#hint.hidden = !text
     fill(this.#hint, text ? h('p', null, text) : '')
   }
@@ -262,13 +347,17 @@ nav button[aria-current="page"] { font-weight: 700; cursor: default; }
    * Whether a connection gesture may end here: outputs to inputs, with a shared connection
    * type, and boundary ports by direction.
    */
-  #canConnect (s, t) {
+  #canConnect(s, t) {
     if (s.node === t.node) return false
     if (s.spec?.direction === 'in' || t.spec?.direction === 'out') return false
     const strata = /** @type {any} */ (this.strata)
     const accepts = end => {
       if (parseId(end.node).kind !== 'model' || !end.port) return []
-      try { return strata.project.node(end.node).port(end.port).accepts } catch { return [] }
+      try {
+        return strata.project.node(end.node).port(end.port).accepts
+      } catch {
+        return []
+      }
     }
     const a = accepts(s)
     const b = accepts(t)

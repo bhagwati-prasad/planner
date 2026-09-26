@@ -17,7 +17,13 @@ import { fail } from './errors.js'
 import { isPlainObject } from './plain.js'
 import { normalizeValue, ROLLUP_RULES, statistic } from './props.js'
 import {
-  boundaryPortsOf, edgesOf, effectiveProps, manifestOf, nodesOf, portsOf, subtreeSystemIds
+  boundaryPortsOf,
+  edgesOf,
+  effectiveProps,
+  manifestOf,
+  nodesOf,
+  portsOf,
+  subtreeSystemIds,
 } from './model.js'
 
 const PATH_RULES = new Set(['critical-path', 'min-path', 'product'])
@@ -53,10 +59,21 @@ const DEFAULT_WORST_ORDER = ['up', 'degraded', 'down']
  * @param {{ type?: string, unit?: string }} [schema]
  * @returns {RuleSpec}
  */
-function normalizeRule (spec, schema) {
-  const obj = typeof spec === 'string' ? { rule: spec } : isPlainObject(spec) ? { .../** @type {object} */ (spec) } : null
-  if (!obj || !ROLLUP_RULES.includes(obj.rule)) fail('INVALID', `Unknown roll-up rule ${JSON.stringify(spec)}; use one of ${ROLLUP_RULES.join(', ')}`)
-  if (obj.rule === 'product' && obj.scale === undefined) obj.scale = schema?.type === 'percent' || schema?.unit === '%' ? 100 : 1
+function normalizeRule(spec, schema) {
+  /** @type {RuleSpec|null} */
+  const obj =
+    typeof spec === 'string'
+      ? { rule: spec }
+      : isPlainObject(spec)
+        ? { .../** @type {RuleSpec} */ (spec) }
+        : null
+  if (!obj || !ROLLUP_RULES.includes(obj.rule))
+    fail(
+      'INVALID',
+      `Unknown roll-up rule ${JSON.stringify(spec)}; use one of ${ROLLUP_RULES.join(', ')}`
+    )
+  if (obj.rule === 'product' && obj.scale === undefined)
+    obj.scale = schema?.type === 'percent' || schema?.unit === '%' ? 100 : 1
   if (obj.unit === undefined && schema?.unit) obj.unit = schema.unit
   return obj
 }
@@ -71,35 +88,43 @@ function normalizeRule (spec, schema) {
  * @param {string} key
  * @param {string|RuleSpec} [explicit]
  */
-export function resolveRule (src, registry, systemId, key, explicit) {
+export function resolveRule(src, registry, systemId, key, explicit) {
   const head = key.split('.')[0]
   const subtree = subtreeSystemIds(src, systemId)
   /** @type {{ type?: string, unit?: string }|undefined} */
   let schema
   let declared
-  search:
-  for (const id of subtree) {
+  search: for (const id of subtree) {
     for (const node of nodesOf(src, id)) {
       const manifest = manifestOf(registry, node)
       if (!manifest) continue
       const metric = manifest.metrics[key]
       const prop = manifest.properties[head]
-      if (!schema && (metric || prop)) schema = metric ? { unit: metric.unit } : { type: prop.type, unit: prop.unit }
+      if (!schema && (metric || prop))
+        schema = metric ? { unit: metric.unit } : { type: prop.type, unit: prop.unit }
       const rule = metric?.rollup ?? prop?.rollup
       if (rule !== undefined) {
         declared = rule
-        schema = metric?.rollup !== undefined ? { unit: metric.unit } : { type: prop.type, unit: prop.unit }
+        schema =
+          metric?.rollup !== undefined
+            ? { unit: metric.unit }
+            : { type: prop.type, unit: prop.unit }
         break search
       }
     }
   }
-  const spec = explicit ??
+  const spec =
+    explicit ??
     src.require('system', systemId).rollups?.[key] ??
     declared ??
     subtree.map(id => src.require('system', id).rollups?.[key]).find(Boolean)
   if (spec === undefined) {
     const system = src.require('system', systemId)
-    fail('NO_ROLLUP_RULE', `No roll-up rule for '${key}' in '${system.name}'. Declare 'rollup' on the property or metric in a component manifest, set rollups['${key}'] on the system, or pass { rule }.`, { key })
+    fail(
+      'NO_ROLLUP_RULE',
+      `No roll-up rule for '${key}' in '${system.name}'. Declare 'rollup' on the property or metric in a component manifest, set rollups['${key}'] on the system, or pass { rule }.`,
+      { key }
+    )
   }
   return normalizeRule(spec, schema)
 }
@@ -112,7 +137,7 @@ export function resolveRule (src, registry, systemId, key, explicit) {
  * @param {string} key
  * @param {RollupOptions['values']} [values]
  */
-export function nodeValue (registry, node, key, values, depth = 0) {
+export function nodeValue(registry, node, key, values, depth = 0) {
   if (values) {
     const v = values(node, key)
     if (v !== undefined) return v
@@ -123,7 +148,9 @@ export function nodeValue (registry, node, key, values, depth = 0) {
     // A metric may name the property that estimates it until the simulation measures it,
     // e.g. "latency.p99": { "estimate": "serviceTime.p99" }.
     const estimate = manifestOf(registry, node)?.metrics?.[key]?.estimate
-    return typeof estimate === 'string' && estimate !== key && depth < 4 ? nodeValue(registry, node, estimate, undefined, depth + 1) : undefined
+    return typeof estimate === 'string' && estimate !== key && depth < 4
+      ? nodeValue(registry, node, estimate, undefined, depth + 1)
+      : undefined
   }
   const schema = manifestOf(registry, node)?.properties?.[head]
   let value = props[head]
@@ -141,7 +168,7 @@ export function nodeValue (registry, node, key, values, depth = 0) {
  * @param {any} system
  * @param {string} key
  */
-export function contractValue (system, key) {
+export function contractValue(system, key) {
   const target = system.contract?.[key]
   if (!target) return undefined
   return target.equals ?? target.max ?? target.min
@@ -152,13 +179,21 @@ export function contractValue (system, key) {
  * @param {Record<string, unknown>} where
  * @param {import('./registry.js').Registry|undefined} registry
  */
-function matches (node, where, registry) {
+function matches(node, where, registry) {
   if (where.kind !== undefined && node.kind !== where.kind) return false
   if (where.status !== undefined && node.status !== where.status) return false
   if (where.owner !== undefined && node.owner !== where.owner) return false
   if (where.tag !== undefined && !node.tags.includes(where.tag)) return false
-  if (where.type !== undefined && !(node.typeRef === where.type || node.typeRef?.startsWith(`${where.type}@`))) return false
-  if (where.extends !== undefined && !(node.typeRef && registry?.isA(node.typeRef, String(where.extends)))) return false
+  if (
+    where.type !== undefined &&
+    !(node.typeRef === where.type || node.typeRef?.startsWith(`${where.type}@`))
+  )
+    return false
+  if (
+    where.extends !== undefined &&
+    !(node.typeRef && registry?.isA(node.typeRef, String(where.extends)))
+  )
+    return false
   return true
 }
 
@@ -171,14 +206,23 @@ function matches (node, where, registry) {
  * @param {RollupOptions} [options]
  * @returns {RollupResult}
  */
-export function rollup (src, registry, systemId, key, options = {}) {
-  if (typeof key !== 'string' || !key) fail('INVALID', 'A roll-up needs a key such as "latency.p99"')
+export function rollup(src, registry, systemId, key, options = {}) {
+  if (typeof key !== 'string' || !key)
+    fail('INVALID', 'A roll-up needs a key such as "latency.p99"')
   const spec = resolveRule(src, registry, systemId, key, options.rule)
   const abstract = new Set(options.abstract ?? [])
-  return aggregate(src, registry, src.require('system', systemId), key, spec, { ...options, abstract }, new Set())
+  return aggregate(
+    src,
+    registry,
+    src.require('system', systemId),
+    key,
+    spec,
+    { ...options, abstract },
+    new Set()
+  )
 }
 
-function aggregate (src, registry, system, key, spec, options, stack) {
+function aggregate(src, registry, system, key, spec, options, stack) {
   if (stack.has(system.id)) fail('CYCLE', `System '${system.name}' contains itself`)
   stack.add(system.id)
   const override = system.rollups?.[key]
@@ -193,7 +237,9 @@ function aggregate (src, registry, system, key, spec, options, stack) {
     if (node.kind === 'composite') {
       const child = src.get('system', node.systemRef)
       if (child) {
-        value = options.abstract.has(child.id) ? undefined : aggregate(src, registry, child, key, spec, options, stack).value
+        value = options.abstract.has(child.id)
+          ? undefined
+          : aggregate(src, registry, child, key, spec, options, stack).value
         if (value === undefined) value = contractValue(child, key)
       }
     } else if (rule.rule === 'count' && rule.where) {
@@ -210,14 +256,27 @@ function aggregate (src, registry, system, key, spec, options, stack) {
   }
   stack.delete(system.id)
 
-  const result = { systemId: system.id, key, rule: rule.rule, value: undefined, unit: rule.unit, contributors, missing }
-  if (PATH_RULES.has(rule.rule)) return Object.assign(result, pathAggregate(src, registry, system, values, rule))
+  const result = {
+    systemId: system.id,
+    key,
+    rule: rule.rule,
+    value: undefined,
+    unit: rule.unit,
+    contributors,
+    missing,
+  }
+  if (PATH_RULES.has(rule.rule))
+    return Object.assign(result, pathAggregate(src, registry, system, values, rule))
 
   const numbers = contributors.map(c => c.value).filter(v => typeof v === 'number')
   switch (rule.rule) {
     case 'sum':
     case 'count':
-      result.value = numbers.length ? numbers.reduce((a, b) => a + b, 0) : (rule.rule === 'count' ? 0 : undefined)
+      result.value = numbers.length
+        ? numbers.reduce((a, b) => a + b, 0)
+        : rule.rule === 'count'
+          ? 0
+          : undefined
       break
     case 'min':
       result.value = numbers.length ? Math.min(...numbers) : undefined
@@ -227,7 +286,8 @@ function aggregate (src, registry, system, key, spec, options, stack) {
       break
     case 'union': {
       const set = new Set()
-      for (const { value } of contributors) for (const v of Array.isArray(value) ? value : [value]) set.add(v)
+      for (const { value } of contributors)
+        for (const v of Array.isArray(value) ? value : [value]) set.add(v)
       result.value = [...set].sort((a, b) => String(a).localeCompare(String(b)))
       break
     }
@@ -237,7 +297,10 @@ function aggregate (src, registry, system, key, spec, options, stack) {
       let rank = -1
       for (const { value } of contributors) {
         const r = order.indexOf(value)
-        if (r > rank) { rank = r; worst = value }
+        if (r > rank) {
+          rank = r
+          worst = value
+        }
       }
       result.value = worst
       break
@@ -256,10 +319,11 @@ function aggregate (src, registry, system, key, spec, options, stack) {
  * @param {Map<string, unknown>} values
  * @param {RuleSpec} rule
  */
-function pathAggregate (src, registry, system, values, rule) {
+function pathAggregate(src, registry, system, values, rule) {
   const nodes = nodesOf(src, system.id)
   const portOwner = new Map()
-  for (const node of nodes) for (const port of portsOf(src, node.id)) portOwner.set(port.id, node.id)
+  for (const node of nodes)
+    for (const port of portsOf(src, node.id)) portOwner.set(port.id, node.id)
   /** @type {Map<string, Set<string>>} */
   const succ = new Map(nodes.map(n => [n.id, new Set()]))
   // Entry points are nodes nothing calls, synchronously or not; a consumer fed by a queue is
@@ -273,7 +337,14 @@ function pathAggregate (src, registry, system, values, rule) {
     if (effectiveProps(registry, edge).mode !== 'async') succ.get(a)?.add(b)
   }
   const bps = boundaryPortsOf(src, system.id)
-  const endpoints = dirs => [...new Set(bps.filter(bp => dirs.includes(bp.direction) && bp.internalPortId).map(bp => portOwner.get(bp.internalPortId)).filter(Boolean))]
+  const endpoints = dirs => [
+    ...new Set(
+      bps
+        .filter(bp => dirs.includes(bp.direction) && bp.internalPortId)
+        .map(bp => portOwner.get(bp.internalPortId))
+        .filter(Boolean)
+    ),
+  ]
   let sources = endpoints(['in', 'both'])
   if (!sources.length) sources = nodes.filter(n => !hasPred.has(n.id)).map(n => n.id)
   if (!sources.length) sources = nodes.map(n => n.id)
@@ -298,7 +369,7 @@ function pathAggregate (src, registry, system, values, rule) {
         continue
       }
       if (state.get(next) === 1) continue // back edge closes a cycle: ignore it
-      /** @type {string[]} */ (dag.get(top.id)).push(next)
+      ;/** @type {string[]} */ (dag.get(top.id)).push(next)
       if (!state.has(next)) {
         state.set(next, 1)
         dag.set(next, [])
@@ -321,14 +392,18 @@ function pathAggregate (src, registry, system, values, rule) {
     queue.push(...(pred.get(id) ?? []))
   }
   const topo = [...postorder].reverse().filter(id => relevant.has(id))
-  const num = id => (typeof values.get(id) === 'number' ? /** @type {number} */ (values.get(id)) : undefined)
+  const num = id =>
+    typeof values.get(id) === 'number' ? /** @type {number} */ (values.get(id)) : undefined
 
   if (rule.rule === 'min-path') {
     let value
     let bottleneck
     for (const id of topo) {
       const v = num(id)
-      if (v !== undefined && (value === undefined || v < value)) { value = v; bottleneck = id }
+      if (v !== undefined && (value === undefined || v < value)) {
+        value = v
+        bottleneck = id
+      }
     }
     return { value, bottleneck, sources, targets }
   }
@@ -347,7 +422,10 @@ function pathAggregate (src, registry, system, values, rule) {
     for (const p of pred.get(id) ?? []) {
       if (!best.has(p)) continue
       const b = best.get(p)
-      if (from === undefined || (isProduct ? b < base : b > base)) { base = b; from = p }
+      if (from === undefined || (isProduct ? b < base : b > base)) {
+        base = b
+        from = p
+      }
     }
     best.set(id, isProduct ? base * weight : base + weight)
     via.set(id, from)
@@ -356,12 +434,21 @@ function pathAggregate (src, registry, system, values, rule) {
   let end
   for (const t of targets) {
     if (!best.has(t)) continue
-    if (end === undefined || (isProduct ? best.get(t) < best.get(end) : best.get(t) > best.get(end))) end = t
+    if (
+      end === undefined ||
+      (isProduct ? best.get(t) < best.get(end) : best.get(t) > best.get(end))
+    )
+      end = t
   }
   const path = []
   for (let id = end; id !== undefined; id = via.get(id)) path.unshift(id)
   const raw = end === undefined ? undefined : best.get(end)
-  return { value: raw === undefined ? undefined : isProduct ? raw * scale : raw, path, sources, targets }
+  return {
+    value: raw === undefined ? undefined : isProduct ? raw * scale : raw,
+    path,
+    sources,
+    targets,
+  }
 }
 
 /**
@@ -372,7 +459,7 @@ function pathAggregate (src, registry, system, values, rule) {
  * @param {RollupOptions} [options]
  * @returns {{ key: string, target: any, value: unknown, status: 'ok'|'violated'|'unknown', message: string }[]}
  */
-export function checkContracts (src, registry, systemId, options = {}) {
+export function checkContracts(src, registry, systemId, options = {}) {
   const system = src.require('system', systemId)
   return Object.entries(system.contract ?? {}).map(([key, target]) => {
     let result
@@ -380,25 +467,62 @@ export function checkContracts (src, registry, systemId, options = {}) {
       result = rollup(src, registry, systemId, key, options)
     } catch (err) {
       if (/** @type {any} */ (err).code === 'NO_ROLLUP_RULE') {
-        return { key, target, value: undefined, status: /** @type {const} */ ('unknown'), message: `'${system.name}': no roll-up rule for contract key '${key}'` }
+        return {
+          key,
+          target,
+          value: undefined,
+          status: /** @type {const} */ ('unknown'),
+          message: `'${system.name}': no roll-up rule for contract key '${key}'`,
+        }
       }
       throw err
     }
     const value = result.value
     const unit = target.unit ?? result.unit ?? ''
-    const fmt = v => `${typeof v === 'number' ? +v.toFixed(3) : JSON.stringify(v)}${unit && unit !== '%' ? ` ${unit}` : unit}`
+    const fmt = v =>
+      `${typeof v === 'number' ? +v.toFixed(3) : JSON.stringify(v)}${unit && unit !== '%' ? ` ${unit}` : unit}`
     if (target.equals !== undefined && value !== undefined && value !== target.equals) {
-      return { key, target, value, status: /** @type {const} */ ('violated'), message: `'${system.name}': ${key} is ${fmt(value)}, contract requires ${fmt(target.equals)}` }
+      return {
+        key,
+        target,
+        value,
+        status: /** @type {const} */ ('violated'),
+        message: `'${system.name}': ${key} is ${fmt(value)}, contract requires ${fmt(target.equals)}`,
+      }
     }
     if (typeof value !== 'number') {
-      return { key, target, value, status: /** @type {'unknown'|'ok'} */ (value === undefined ? 'unknown' : 'ok'), message: `'${system.name}': ${key} ${value === undefined ? 'has no derived value yet' : 'is not numeric'}` }
+      return {
+        key,
+        target,
+        value,
+        status: /** @type {'unknown'|'ok'} */ (value === undefined ? 'unknown' : 'ok'),
+        message: `'${system.name}': ${key} ${value === undefined ? 'has no derived value yet' : 'is not numeric'}`,
+      }
     }
     if (target.max !== undefined && value > target.max) {
-      return { key, target, value, status: /** @type {const} */ ('violated'), message: `'${system.name}': ${key} is ${fmt(value)}, above the contract maximum of ${fmt(target.max)}` }
+      return {
+        key,
+        target,
+        value,
+        status: /** @type {const} */ ('violated'),
+        message: `'${system.name}': ${key} is ${fmt(value)}, above the contract maximum of ${fmt(target.max)}`,
+      }
     }
     if (target.min !== undefined && value < target.min) {
-      return { key, target, value, status: /** @type {const} */ ('violated'), message: `'${system.name}': ${key} is ${fmt(value)}, below the contract minimum of ${fmt(target.min)}` }
+      return {
+        key,
+        target,
+        value,
+        status: /** @type {const} */ ('violated'),
+        message: `'${system.name}': ${key} is ${fmt(value)}, below the contract minimum of ${fmt(target.min)}`,
+      }
     }
-    return { key, target, value, status: /** @type {const} */ ('ok'), message: `'${system.name}': ${key} is ${fmt(value)}, within contract` }
+    return {
+      key,
+      target,
+      value,
+      status: /** @type {const} */ ('ok'),
+      message: `'${system.name}': ${key} is ${fmt(value)}, within contract`,
+    }
   })
 }

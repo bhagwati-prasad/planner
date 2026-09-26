@@ -21,26 +21,26 @@
  * scripts and the console before persistence is configured.
  * @returns {StorageAdapter}
  */
-export function createMemoryStorage () {
+export function createMemoryStorage() {
   /** @type {Map<string, string>} */
   const records = new Map()
   return {
     kind: 'memory',
-    async list () {
+    async list() {
       return [...records.values()]
         .map(text => JSON.parse(text))
         .map(({ id, name, updatedAt }) => ({ id, name, updatedAt }))
         .sort((a, b) => a.name.localeCompare(b.name))
     },
-    async load (id) {
+    async load(id) {
       const text = records.get(id)
       return text ? JSON.parse(text) : null
     },
-    async save (record) {
+    async save(record) {
       records.set(record.id, JSON.stringify(record))
     },
-    async remove (id) {
+    async remove(id) {
       records.delete(id)
-    }
+    },
   }
 }

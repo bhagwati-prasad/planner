@@ -7,10 +7,33 @@ import { parseId } from '../adapter.js'
 
 /** Actions offered for each kind of target, in order; '-' is a separator. */
 const MENU = {
-  node: ['nav.enter', 'edit.rename', '-', 'edit.copy', 'edit.duplicate', 'edit.delete', '-', 'structure.extract', 'structure.inline', 'structure.detach', '-', 'arrange.left', 'arrange.top', 'view.zoomSelection'],
+  node: [
+    'nav.enter',
+    'edit.rename',
+    '-',
+    'edit.copy',
+    'edit.duplicate',
+    'edit.delete',
+    '-',
+    'structure.extract',
+    'structure.inline',
+    'structure.detach',
+    '-',
+    'arrange.left',
+    'arrange.top',
+    'view.zoomSelection',
+  ],
   edge: ['edit.rename', 'edit.delete'],
   frame: ['nav.up', 'view.fit'],
-  background: ['edit.paste', 'palette.add', 'structure.newSystem', '-', 'edit.selectAll', 'view.fit', 'nav.up']
+  background: [
+    'edit.paste',
+    'palette.add',
+    'structure.newSystem',
+    '-',
+    'edit.selectAll',
+    'view.fit',
+    'nav.up',
+  ],
 }
 
 export class StrataContextMenu extends StrataElement {
@@ -29,37 +52,66 @@ kbd { font: var(--st-mono); font-size: 11px; color: var(--st-muted); }
   #menu
   #returnFocus = null
 
-  constructor () {
+  constructor() {
     super()
     this.#menu = h('div', { role: 'menu', onkeydown: e => this.#key(e) })
-    this.content.append(h('div', { class: 'catcher', onpointerdown: () => this.close(), oncontextmenu: e => { e.preventDefault(); this.close() } }), this.#menu)
+    this.content.append(
+      h('div', {
+        class: 'catcher',
+        onpointerdown: () => this.close(),
+        oncontextmenu: e => {
+          e.preventDefault()
+          this.close()
+        },
+      }),
+      this.#menu
+    )
   }
 
-  subscribe (strata, shell) {
+  subscribe(strata, shell) {
     return [shell.on('context-menu', target => this.open(target))]
   }
 
-  open (target) {
+  open(target) {
     const shell = /** @type {any} */ (this.shell)
     const parsed = target.id ? parseId(target.id) : null
     // Right-clicking something outside the selection selects it first.
     if (target.id && !shell.selection.includes(target.id)) shell.select([target.id])
-    const kind = !target.id ? 'background' : parsed?.kind === 'frame' ? 'frame' : target.kind === 'edge' || parsed?.kind === 'map' ? 'edge' : 'node'
+    const kind = !target.id
+      ? 'background'
+      : parsed?.kind === 'frame'
+        ? 'frame'
+        : target.kind === 'edge' || parsed?.kind === 'map'
+          ? 'edge'
+          : 'node'
     const context = { at: target.id ? undefined : { x: target.x, y: target.y } }
     const actions = new Map(shell.actions(context).map(a => [a.id, a]))
-    const items = MENU[kind].map(id => {
-      if (id === '-') return h('hr')
-      const a = actions.get(id)
-      if (!a) return null
-      return h('button', {
-        role: 'menuitem',
-        tabindex: '-1',
-        disabled: !a.available,
-        onclick: () => { this.close(); shell.run(a.id, context) }
-      }, h('span', null, a.title), a.shortcut ? h('kbd', null, displayShortcut(a.shortcut)) : null)
-    }).filter(Boolean)
+    const items = MENU[kind]
+      .map(id => {
+        if (id === '-') return h('hr')
+        const a = actions.get(id)
+        if (!a) return null
+        return h(
+          'button',
+          {
+            role: 'menuitem',
+            tabindex: '-1',
+            disabled: !a.available,
+            onclick: () => {
+              this.close()
+              shell.run(a.id, context)
+            },
+          },
+          h('span', null, a.title),
+          a.shortcut ? h('kbd', null, displayShortcut(a.shortcut)) : null
+        )
+      })
+      .filter(Boolean)
     // Drop separators at the edges or next to each other.
-    const cleaned = items.filter((el, i, all) => el.tagName !== 'HR' || (i > 0 && i < all.length - 1 && all[i - 1].tagName !== 'HR'))
+    const cleaned = items.filter(
+      (el, i, all) =>
+        el.tagName !== 'HR' || (i > 0 && i < all.length - 1 && all[i - 1].tagName !== 'HR')
+    )
     fill(this.#menu, ...cleaned)
     this.#returnFocus = /** @type {any} */ (document.activeElement)
     this.setAttribute('open', '')
@@ -67,21 +119,36 @@ kbd { font: var(--st-mono); font-size: 11px; color: var(--st-muted); }
     const height = cleaned.length * 30
     this.#menu.style.left = `${Math.min(target.clientX, window.innerWidth - width - 8)}px`
     this.#menu.style.top = `${Math.min(target.clientY, window.innerHeight - height - 8)}px`
-    requestAnimationFrame(() => /** @type {HTMLElement|null} */ (this.#menu.querySelector('[role="menuitem"]:not(:disabled)'))?.focus())
+    requestAnimationFrame(() =>
+      /** @type {HTMLElement|null} */ (
+        this.#menu.querySelector('[role="menuitem"]:not(:disabled)')
+      )?.focus()
+    )
   }
 
-  close () {
+  close() {
     if (!this.hasAttribute('open')) return
     this.removeAttribute('open')
     this.#returnFocus?.focus?.()
   }
 
-  #key (e) {
-    const items = /** @type {HTMLElement[]} */ ([...this.#menu.querySelectorAll('[role="menuitem"]:not(:disabled)')])
+  #key(e) {
+    const items = /** @type {HTMLElement[]} */ ([
+      ...this.#menu.querySelectorAll('[role="menuitem"]:not(:disabled)'),
+    ])
     const i = items.indexOf(/** @type {HTMLElement} */ (this.shadowRoot?.activeElement))
-    if (e.key === 'Escape') { e.preventDefault(); this.close() }
-    if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus() }
-    if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus() }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      this.close()
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      items[(i + 1) % items.length]?.focus()
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      items[(i - 1 + items.length) % items.length]?.focus()
+    }
   }
 }
 
@@ -92,7 +159,7 @@ const MODES = [
   { id: 'debug', title: 'Debug', release: 'R1' },
   { id: 'test', title: 'Test', release: 'R1' },
   { id: 'docs', title: 'Docs', release: 'R2' },
-  { id: 'plan', title: 'Plan', release: 'R2' }
+  { id: 'plan', title: 'Plan', release: 'R2' },
 ]
 
 export class StrataToolbar extends StrataElement {
@@ -108,38 +175,72 @@ export class StrataToolbar extends StrataElement {
 .group { display: flex; gap: 4px; }
 `
 
-  subscribe (strata, shell) {
+  subscribe(strata, shell) {
     return [
-      ...['change', 'history', 'project', 'navigate'].map(e => strata.on(e, () => this.invalidate())),
+      ...['change', 'history', 'project', 'navigate'].map(e =>
+        strata.on(e, () => this.invalidate())
+      ),
       shell.on('selection', () => this.invalidate()),
-      shell.on('theme', () => this.invalidate())
+      shell.on('theme', () => this.invalidate()),
     ]
   }
 
-  update () {
+  update() {
     const strata = /** @type {any} */ (this.strata)
     const shell = /** @type {any} */ (this.shell)
     const project = strata.project
     const button = (id, label, attrs = {}) => {
       const a = shell.action(id)
       const available = a && (!a.enabled || a.enabled(shell))
-      return h('button', { title: a ? `${a.title}${a.shortcut ? ` (${displayShortcut(a.shortcut)})` : ''}` : label, disabled: !available, onclick: () => shell.run(id), ...attrs }, label)
+      return h(
+        'button',
+        {
+          title: a ? `${a.title}${a.shortcut ? ` (${displayShortcut(a.shortcut)})` : ''}` : label,
+          disabled: !available,
+          onclick: () => shell.run(id),
+          ...attrs,
+        },
+        label
+      )
     }
-    fill(this.content,
+    fill(
+      this.content,
       h('span', { class: 'brand' }, 'Strata'),
       h('span', { class: 'project', title: 'Project' }, project ? project.name : 'No project'),
-      h('div', { role: 'tablist', 'aria-label': 'Mode' }, MODES.map(m => h('button', {
-        role: 'tab',
-        'aria-selected': String(m.id === 'design'),
-        title: m.release ? `${m.title} arrives in ${m.release}` : m.title,
-        onclick: () => { if (m.release) shell.notify(`${m.title} mode arrives in ${m.release}.`) }
-      }, m.title))),
+      h(
+        'div',
+        { role: 'tablist', 'aria-label': 'Mode' },
+        MODES.map(m =>
+          h(
+            'button',
+            {
+              role: 'tab',
+              'aria-selected': String(m.id === 'design'),
+              title: m.release ? `${m.title} arrives in ${m.release}` : m.title,
+              onclick: () => {
+                if (m.release) shell.notify(`${m.title} mode arrives in ${m.release}.`)
+              },
+            },
+            m.title
+          )
+        )
+      ),
       h('span', { class: 'spacer' }),
       h('div', { class: 'group' }, button('edit.undo', 'Undo'), button('edit.redo', 'Redo')),
       h('div', { class: 'group' }, button('structure.extract', 'Extract'), button('nav.up', 'Up')),
-      h('div', { class: 'group' },
+      h(
+        'div',
+        { class: 'group' },
         button('palette.commands', `Commands ${displayShortcut('Ctrl+K')}`),
-        h('button', { onclick: () => shell.emit('toggle-theme'), 'aria-pressed': String(shell.theme === 'dark'), title: 'Toggle dark theme' }, shell.theme === 'dark' ? 'Light' : 'Dark'),
+        h(
+          'button',
+          {
+            onclick: () => shell.emit('toggle-theme'),
+            'aria-pressed': String(shell.theme === 'dark'),
+            title: 'Toggle dark theme',
+          },
+          shell.theme === 'dark' ? 'Light' : 'Dark'
+        ),
         button('help.shortcuts', '?', { 'aria-label': 'Keyboard shortcuts' })
       )
     )

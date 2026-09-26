@@ -12,10 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http",
-        "grpc"
-      ]
+      "accepts": ["http", "grpc"]
     },
     {
       "name": "out",
@@ -40,10 +37,7 @@
     },
     "validationMode": {
       "type": "enum",
-      "values": [
-        "local-jwt",
-        "introspection"
-      ],
+      "values": ["local-jwt", "introspection"],
       "default": "local-jwt",
       "group": "Validation"
     },

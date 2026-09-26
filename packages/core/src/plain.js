@@ -12,11 +12,11 @@ import { fail } from './errors.js'
  * @param {string} [path]
  * @returns {T}
  */
-export function toPlain (value, path = 'value') {
+export function toPlain(value, path = 'value') {
   return /** @type {T} */ (clone(value, path, new Set()))
 }
 
-function clone (value, path, seen) {
+function clone(value, path, seen) {
   if (value === null) return null
   switch (typeof value) {
     case 'string':
@@ -37,7 +37,10 @@ function clone (value, path, seen) {
       } else {
         const proto = Object.getPrototypeOf(value)
         if (proto !== Object.prototype && proto !== null) {
-          fail('INVALID', `${path} is a ${value?.constructor?.name ?? 'non-plain object'}; only plain objects, arrays, strings, finite numbers, booleans and null are allowed`)
+          fail(
+            'INVALID',
+            `${path} is a ${value?.constructor?.name ?? 'non-plain object'}; only plain objects, arrays, strings, finite numbers, booleans and null are allowed`
+          )
         }
         out = {}
         for (const key of Object.keys(value)) {
@@ -59,7 +62,7 @@ function clone (value, path, seen) {
  * @param {T} value
  * @returns {T}
  */
-export function deepFreeze (value) {
+export function deepFreeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     Object.freeze(value)
     for (const key of Object.keys(value)) deepFreeze(value[key])
@@ -73,7 +76,7 @@ export function deepFreeze (value) {
  * @param {unknown} b
  * @returns {boolean}
  */
-export function deepEqual (a, b) {
+export function deepEqual(a, b) {
   if (a === b) return true
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
   if (Array.isArray(a) !== Array.isArray(b)) return false
@@ -93,12 +96,12 @@ export function deepEqual (a, b) {
  * @param {T} value
  * @returns {T}
  */
-export function thaw (value) {
+export function thaw(value) {
   return value === undefined ? value : JSON.parse(JSON.stringify(value))
 }
 
 /** @param {unknown} value */
-export function isPlainObject (value) {
+export function isPlainObject(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
   const proto = Object.getPrototypeOf(value)
   return proto === Object.prototype || proto === null

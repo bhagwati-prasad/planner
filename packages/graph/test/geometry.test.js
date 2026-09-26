@@ -1,7 +1,17 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  union, intersects, containsPoint, containsRect, rectFromPoints, portAnchors, boundaryAnchor, segmentCrossesRect, snap, expand, center
+  union,
+  intersects,
+  containsPoint,
+  containsRect,
+  rectFromPoints,
+  portAnchors,
+  boundaryAnchor,
+  segmentCrossesRect,
+  snap,
+  expand,
+  center,
 } from '../src/geometry.js'
 import { SpatialIndex } from '../src/spatial.js'
 import { smartGuides, snapMove, snapRect } from '../src/snap.js'
@@ -32,10 +42,18 @@ test('ports spread evenly along their sides unless pinned', () => {
     { id: 'out', side: 'right' },
     { id: 'dlq', side: 'right' },
     { id: 'pinned', side: 'top', offset: 0.25 },
-    { id: 'auto-in', direction: 'in' }
+    { id: 'auto-in', direction: 'in' },
   ])
-  assert.deepEqual(anchors.get('in'), { x: 0, y: 20, side: 'left' }, 'two ports on the left: at 1/3 and 2/3')
-  assert.deepEqual(anchors.get('auto-in'), { x: 0, y: 40, side: 'left' }, 'inputs default to the left')
+  assert.deepEqual(
+    anchors.get('in'),
+    { x: 0, y: 20, side: 'left' },
+    'two ports on the left: at 1/3 and 2/3'
+  )
+  assert.deepEqual(
+    anchors.get('auto-in'),
+    { x: 0, y: 40, side: 'left' },
+    'inputs default to the left'
+  )
   assert.deepEqual(anchors.get('out'), { x: 100, y: 20, side: 'right' })
   assert.deepEqual(anchors.get('dlq'), { x: 100, y: 40, side: 'right' })
   assert.deepEqual(anchors.get('pinned'), { x: 25, y: 0, side: 'top' })
@@ -64,8 +82,14 @@ test('spatial index: query, within, nearest, move and delete', () => {
   index.set('big', box(-500, -500, 2000, 2000))
   assert.deepEqual(index.query(box(50, 25, 10, 10)).sort(), ['a', 'big'])
   assert.deepEqual(index.within(box(-10, -10, 200, 200)), ['a'])
-  assert.equal(index.nearest({ x: 110, y: 25 }, 20, id => id !== 'big'), 'a')
-  assert.equal(index.nearest({ x: 150, y: 25 }, 20, id => id !== 'big'), null)
+  assert.equal(
+    index.nearest({ x: 110, y: 25 }, 20, id => id !== 'big'),
+    'a'
+  )
+  assert.equal(
+    index.nearest({ x: 150, y: 25 }, 20, id => id !== 'big'),
+    null
+  )
   index.set('a', box(1000, 1000))
   assert.deepEqual(index.query(box(0, 0, 50, 50)), ['big'])
   assert.ok(index.delete('big'))
@@ -86,43 +110,109 @@ test('smart guides align edges and centres within the threshold', () => {
 
 test('snapMove prefers guides, falls back to the grid', () => {
   const others = [box(0, 0, 100, 50)]
-  assert.deepEqual(snapMove(box(3, 133), others, { grid: 10 }), { x: 0, y: 130, guides: [{ axis: 'x', value: 0, from: 0, to: 183 }] })
+  assert.deepEqual(snapMove(box(3, 133), others, { grid: 10 }), {
+    x: 0,
+    y: 130,
+    guides: [{ axis: 'x', value: 0, from: 0, to: 183 }],
+  })
   assert.deepEqual(snapMove(box(333, 133), others, { grid: 10 }), { x: 330, y: 130, guides: [] })
-  assert.deepEqual(snapMove(box(3, 133), others, { grid: 10, guides: false }), { x: 0, y: 130, guides: [] })
+  assert.deepEqual(snapMove(box(3, 133), others, { grid: 10, guides: false }), {
+    x: 0,
+    y: 130,
+    guides: [],
+  })
   assert.deepEqual(snapRect(box(14, 16), 10), box(10, 20))
 })
 
 test('align and distribute', () => {
-  const items = [{ id: 'a', ...box(0, 0, 100, 40) }, { id: 'b', ...box(150, 30, 50, 20) }, { id: 'c', ...box(40, 90, 80, 10) }]
-  assert.deepEqual(align(items, 'left').map(p => p.x), [0, 0, 0])
-  assert.deepEqual(align(items, 'right').map(p => p.x), [100, 150, 120])
-  assert.deepEqual(align(items, 'middle').map(p => p.y), [30, 40, 45])
-  assert.deepEqual(align(items, 'center').map(p => p.x), [50, 75, 60])
-  const row = [{ id: 'a', ...box(0, 0, 10, 10) }, { id: 'b', ...box(15, 0, 30, 10) }, { id: 'c', ...box(100, 0, 20, 10) }]
+  const items = [
+    { id: 'a', ...box(0, 0, 100, 40) },
+    { id: 'b', ...box(150, 30, 50, 20) },
+    { id: 'c', ...box(40, 90, 80, 10) },
+  ]
+  assert.deepEqual(
+    align(items, 'left').map(p => p.x),
+    [0, 0, 0]
+  )
+  assert.deepEqual(
+    align(items, 'right').map(p => p.x),
+    [100, 150, 120]
+  )
+  assert.deepEqual(
+    align(items, 'middle').map(p => p.y),
+    [30, 40, 45]
+  )
+  assert.deepEqual(
+    align(items, 'center').map(p => p.x),
+    [50, 75, 60]
+  )
+  const row = [
+    { id: 'a', ...box(0, 0, 10, 10) },
+    { id: 'b', ...box(15, 0, 30, 10) },
+    { id: 'c', ...box(100, 0, 20, 10) },
+  ]
   const spread = distribute(row, 'horizontal')
-  assert.deepEqual(spread.map(p => p.x), [0, 40, 100], 'equal 30-unit gaps')
-  assert.deepEqual(distribute(row.slice(0, 2), 'horizontal').map(p => p.x), [0, 15], 'fewer than three: unchanged')
+  assert.deepEqual(
+    spread.map(p => p.x),
+    [0, 40, 100],
+    'equal 30-unit gaps'
+  )
+  assert.deepEqual(
+    distribute(row.slice(0, 2), 'horizontal').map(p => p.x),
+    [0, 15],
+    'fewer than three: unchanged'
+  )
   assert.throws(() => align(items, /** @type {any} */ ('diagonal')), /Unknown alignment/)
 })
 
 test('viewport transforms', () => {
-  const t = fitTransform(box(0, 0, 400, 200), { width: 800, height: 600 }, { padding: 0, maxScale: 4 })
+  const t = fitTransform(
+    box(0, 0, 400, 200),
+    { width: 800, height: 600 },
+    { padding: 0, maxScale: 4 }
+  )
   assert.equal(t.k, 2)
   assert.deepEqual(worldToScreen(t, { x: 0, y: 0 }), { x: 0, y: 100 })
   assert.deepEqual(screenToWorld(t, { x: 400, y: 300 }), { x: 200, y: 100 }, 'centred')
-  assert.equal(fitTransform(box(0, 0, 400, 200), { width: 800, height: 600 }).k, 1, 'default fit never zooms past 100%')
+  assert.equal(
+    fitTransform(box(0, 0, 400, 200), { width: 800, height: 600 }).k,
+    1,
+    'default fit never zooms past 100%'
+  )
   const z = zoomAt({ x: 0, y: 0, k: 1 }, 2, { x: 100, y: 100 })
-  assert.deepEqual(screenToWorld(z, { x: 100, y: 100 }), { x: 100, y: 100 }, 'the point under the cursor stays put')
+  assert.deepEqual(
+    screenToWorld(z, { x: 100, y: 100 }),
+    { x: 100, y: 100 },
+    'the point under the cursor stays put'
+  )
   assert.equal(zoomAt({ x: 0, y: 0, k: 3 }, 10, { x: 0, y: 0 }).k, 4, 'clamped')
-  assert.deepEqual(visibleRect({ x: -100, y: -50, k: 2 }, { width: 400, height: 300 }), { x: 50, y: 25, w: 200, h: 150 })
+  assert.deepEqual(visibleRect({ x: -100, y: -50, k: 2 }, { width: 400, height: 300 }), {
+    x: 50,
+    y: 25,
+    w: 200,
+    h: 150,
+  })
 })
 
 test('text wraps on words, breaks long words and ellipsises', () => {
   const measure = s => s.length * 10
-  assert.deepEqual(wrapText('Payment service handles cards', 100, measure), ['Payment', 'service', 'handles', 'cards'])
+  assert.deepEqual(wrapText('Payment service handles cards', 100, measure), [
+    'Payment',
+    'service',
+    'handles',
+    'cards',
+  ])
   assert.deepEqual(wrapText('a bb ccc', 60, measure), ['a bb', 'ccc'])
-  assert.deepEqual(wrapText('Supercalifragilistic', 50, measure), ['Super', 'calif', 'ragil', 'istic'])
-  assert.deepEqual(wrapText('one two three four', 90, measure, { maxLines: 2 }), ['one two', 'three…'])
+  assert.deepEqual(wrapText('Supercalifragilistic', 50, measure), [
+    'Super',
+    'calif',
+    'ragil',
+    'istic',
+  ])
+  assert.deepEqual(wrapText('one two three four', 90, measure, { maxLines: 2 }), [
+    'one two',
+    'three…',
+  ])
   assert.deepEqual(wrapText('line one\nline two', 200, measure), ['line one', 'line two'])
   assert.ok(estimateMeasure(12)('abc') > 0)
 })

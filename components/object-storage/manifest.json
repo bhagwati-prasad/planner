@@ -12,10 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http",
-        "file-batch"
-      ]
+      "accepts": ["http", "file-batch"]
     }
   ],
   "properties": {
@@ -49,11 +46,7 @@
     },
     "storageClass": {
       "type": "enum",
-      "values": [
-        "standard",
-        "infrequent-access",
-        "archive"
-      ],
+      "values": ["standard", "infrequent-access", "archive"],
       "default": "standard",
       "group": "Data"
     },

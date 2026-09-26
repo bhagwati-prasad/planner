@@ -21,7 +21,7 @@ export { fuzzyScore } from './palette.js'
  * @param {HTMLElement} host
  * @param {{ strata: any, config?: object }} options
  */
-export function mountStrata (host, { strata, config = DEFAULT_CONFIG }) {
+export function mountStrata(host, { strata, config = DEFAULT_CONFIG }) {
   const app = /** @type {any} */ (document.createElement('strata-app'))
   app.config = config
   app.strata = strata

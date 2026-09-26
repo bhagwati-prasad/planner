@@ -19,36 +19,71 @@ button { width: 100%; text-align: left; border: 0; display: grid; grid-template-
 small { color: var(--st-muted); }
 `
 
-  subscribe (strata) {
+  subscribe(strata) {
     return ['change', 'project'].map(e => strata.on(e, () => this.invalidate()))
   }
 
-  update () {
+  update() {
     const strata = /** @type {any} */ (this.strata)
     const project = strata.project
     const problems = project ? project.problems() : []
-    this.dispatchEvent(new CustomEvent('count', { detail: { count: problems.length, errors: problems.filter(p => p.severity === 'error').length } }))
+    this.dispatchEvent(
+      new CustomEvent('count', {
+        detail: {
+          count: problems.length,
+          errors: problems.filter(p => p.severity === 'error').length,
+        },
+      })
+    )
     if (!problems.length) {
       fill(this.content, h('p', { class: 'empty' }, project ? 'No problems found.' : 'No project'))
       return
     }
     const systemName = id => {
-      try { return project.system(id).name } catch { return '' }
+      try {
+        return project.system(id).name
+      } catch {
+        return ''
+      }
     }
-    fill(this.content, h('ul', null, problems.map(p => h('li', { class: p.severity }, h('button', {
-      title: 'Show where this is',
-      onclick: () => this.#reveal(p)
-    }, h('span', { class: 'icon', 'aria-label': p.severity }, SEVERITY[p.severity] ?? '•'), p.message, h('small', null, p.systemId ? systemName(p.systemId) : ''))))))
+    fill(
+      this.content,
+      h(
+        'ul',
+        null,
+        problems.map(p =>
+          h(
+            'li',
+            { class: p.severity },
+            h(
+              'button',
+              {
+                title: 'Show where this is',
+                onclick: () => this.#reveal(p),
+              },
+              h('span', { class: 'icon', 'aria-label': p.severity }, SEVERITY[p.severity] ?? '•'),
+              p.message,
+              h('small', null, p.systemId ? systemName(p.systemId) : '')
+            )
+          )
+        )
+      )
+    )
   }
 
   /** Navigates to the problem's system and selects what it is about. */
-  #reveal (problem) {
+  #reveal(problem) {
     const strata = /** @type {any} */ (this.strata)
     const shell = /** @type {any} */ (this.shell)
     const project = strata.project
     if (!problem.systemId) return
     if (project.nav.current.id !== problem.systemId) {
-      try { strata.nav.enter(project.system(problem.systemId)) } catch (err) { shell.notify(err.message, 'error'); return }
+      try {
+        strata.nav.enter(project.system(problem.systemId))
+      } catch (err) {
+        shell.notify(err.message, 'error')
+        return
+      }
     }
     const id = problem.kind === 'boundaryPort' ? `bp:${problem.id}` : problem.id
     requestAnimationFrame(() => {
@@ -73,37 +108,54 @@ form input { flex: 1; font: var(--st-mono); font-size: 12px; }
   /** @type {HTMLInputElement} */
   #input
 
-  constructor () {
+  constructor() {
     super()
     this.#list = h('ol', { 'aria-label': 'Command log', 'aria-live': 'polite' })
-    this.#input = /** @type {HTMLInputElement} */ (h('input', {
-      'aria-label': 'Command as JSON',
-      placeholder: '{"type": "project.update", "payload": {"changes": {"name": "Checkout"}}}   ·   full API: strata in DevTools'
-    }))
-    const form = h('form', {
-      onsubmit: e => {
-        e.preventDefault()
-        this.#run()
-      }
-    }, this.#input, h('button', { type: 'submit' }, 'Run'))
+    this.#input = /** @type {HTMLInputElement} */ (
+      h('input', {
+        'aria-label': 'Command as JSON',
+        placeholder:
+          '{"type": "project.update", "payload": {"changes": {"name": "Checkout"}}}   ·   full API: strata in DevTools',
+      })
+    )
+    const form = h(
+      'form',
+      {
+        onsubmit: e => {
+          e.preventDefault()
+          this.#run()
+        },
+      },
+      this.#input,
+      h('button', { type: 'submit' }, 'Run')
+    )
     this.content.append(this.#list, form)
   }
 
-  subscribe (strata) {
+  subscribe(strata) {
     return ['change', 'project'].map(e => strata.on(e, () => this.invalidate()))
   }
 
-  update () {
+  update() {
     const strata = /** @type {any} */ (this.strata)
     const ops = strata.project ? strata.project.oplog.slice(-200) : []
-    fill(this.#list, ...ops.reverse().map(op => h('li', null,
-      h('span', { class: 'when' }, op.timestamp.slice(11, 19)),
-      h('span', null, op.meta?.undoOf ? 'undo' : op.meta?.redoOf ? 'redo' : op.command),
-      h('span', { class: 'who' }, summarise(op))
-    )))
+    fill(
+      this.#list,
+      ...ops
+        .reverse()
+        .map(op =>
+          h(
+            'li',
+            null,
+            h('span', { class: 'when' }, op.timestamp.slice(11, 19)),
+            h('span', null, op.meta?.undoOf ? 'undo' : op.meta?.redoOf ? 'redo' : op.command),
+            h('span', { class: 'who' }, summarise(op))
+          )
+        )
+    )
   }
 
-  #run () {
+  #run() {
     const strata = /** @type {any} */ (this.strata)
     const shell = /** @type {any} */ (this.shell)
     const text = this.#input.value.trim()
@@ -115,15 +167,21 @@ form input { flex: 1; font: var(--st-mono); font-size: 12px; }
       shell.notify('Commands are JSON: {"type": "...", "payload": {...}}', 'error')
       return
     }
-    if (this.attempt(() => {
-      const result = strata.dispatch(command)
-      shell.notify(`${command.type}${result !== undefined ? ` → ${JSON.stringify(result)}` : ''}`, 'success')
-    })) this.#input.value = ''
+    if (
+      this.attempt(() => {
+        const result = strata.dispatch(command)
+        shell.notify(
+          `${command.type}${result !== undefined ? ` → ${JSON.stringify(result)}` : ''}`,
+          'success'
+        )
+      })
+    )
+      this.#input.value = ''
   }
 }
 
 /** A short description of an operation for the log. */
-function summarise (op) {
+function summarise(op) {
   const p = op.payload ?? {}
   if (op.command === 'batch') return p.label ?? `${p.commands?.length ?? 0} commands`
   if (op.command === 'model.restore') return `${p.entities?.length ?? 0} entities`

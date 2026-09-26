@@ -4,21 +4,37 @@
  */
 import { fail } from '../errors.js'
 import {
-  boundaryPortsOf, childLevel, edgesAtPort, edgesOf, nodesOf, portsOf, viewsOf
+  boundaryPortsOf,
+  childLevel,
+  edgesAtPort,
+  edgesOf,
+  nodesOf,
+  portsOf,
+  viewsOf,
 } from '../model.js'
 import {
-  centroid, copyContents, createMirrorPort, createSystem, offsetEntry, optionalString, removeBoundaryPort,
-  removeEdge, requireString, stringList, uniqueName
+  centroid,
+  copyContents,
+  createMirrorPort,
+  createSystem,
+  offsetEntry,
+  optionalString,
+  removeBoundaryPort,
+  removeEdge,
+  requireString,
+  stringList,
+  uniqueName,
 } from './ops.js'
 
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
 
 export const recursionCommands = {
   'system.extract': {
-    description: 'Moves the selected nodes into a new child system, creating a boundary port for every crossing edge and rewiring those edges to the new composite',
+    description:
+      'Moves the selected nodes into a new child system, creating a boundary port for every crossing edge and rewiring those edges to the new composite',
     signature: '{ systemId, nodeIds: [id], name?, id?, nodeId? }',
     /** @param {any} p @param {Ctx} ctx */
-    handler (p, ctx) {
+    handler(p, ctx) {
       const parent = ctx.tx.require('system', requireString(p.systemId, 'systemId'))
       const nodeIds = stringList(p.nodeIds, 'nodeIds') ?? []
       if (nodeIds.length === 0) fail('INVALID', 'Select at least one node to extract')
@@ -26,15 +42,26 @@ export const recursionCommands = {
       if (selected.size !== nodeIds.length) fail('INVALID', 'nodeIds contains duplicates')
       const nodes = [...selected].sort().map(id => ctx.tx.require('node', id))
       for (const node of nodes) {
-        if (node.systemId !== parent.id) fail('INVALID', `'${node.name}' is not in system '${parent.name}'`)
+        if (node.systemId !== parent.id)
+          fail('INVALID', `'${node.name}' is not in system '${parent.name}'`)
       }
 
-      const remaining = nodesOf(ctx.tx, parent.id).filter(n => !selected.has(n.id)).map(n => n.name)
-      const name = p.name !== undefined ? requireString(p.name, 'name').trim() : uniqueName(remaining, 'New system')
+      const remaining = nodesOf(ctx.tx, parent.id)
+        .filter(n => !selected.has(n.id))
+        .map(n => n.name)
+      const name =
+        p.name !== undefined
+          ? requireString(p.name, 'name').trim()
+          : uniqueName(remaining, 'New system')
       p.name = name
       const systemId = optionalString(p.id, 'id') ?? ctx.newId()
       const compositeId = optionalString(p.nodeId, 'nodeId') ?? ctx.newId()
-      createSystem(ctx, { id: systemId, name, levelTag: childLevel(parent.levelTag), ownerNodeId: compositeId })
+      createSystem(ctx, {
+        id: systemId,
+        name,
+        levelTag: childLevel(parent.levelTag),
+        ownerNodeId: compositeId,
+      })
 
       const movedPorts = new Set(nodes.flatMap(n => portsOf(ctx.tx, n.id).map(port => port.id)))
       for (const node of nodes) ctx.tx.update('node', node.id, { systemId })
@@ -53,7 +80,9 @@ export const recursionCommands = {
 
       // One boundary port per (internal port, direction) that traffic crosses, plus one for
       // every boundary port of the parent that pointed into the selection.
-      const parentBps = boundaryPortsOf(ctx.tx, parent.id).filter(bp => bp.internalPortId && movedPorts.has(bp.internalPortId))
+      const parentBps = boundaryPortsOf(ctx.tx, parent.id).filter(
+        bp => bp.internalPortId && movedPorts.has(bp.internalPortId)
+      )
       /** @type {Map<string, {portId: string, direction: string}>} */
       const needed = new Map()
       const need = (portId, direction) => {
@@ -78,7 +107,7 @@ export const recursionCommands = {
         props: {},
         tags: [],
         owner: null,
-        status: statuses.size === 1 ? nodes[0].status : 'planned'
+        status: statuses.size === 1 ? nodes[0].status : 'planned',
       })
 
       const bpNames = new Set()
@@ -87,7 +116,9 @@ export const recursionCommands = {
       for (const [key, { portId, direction }] of needed) {
         const port = ctx.tx.require('port', portId)
         const owner = ctx.tx.require('node', port.nodeId)
-        const bpName = bpNames.has(port.name) ? uniqueName(bpNames, `${owner.name}.${port.name}`) : port.name
+        const bpName = bpNames.has(port.name)
+          ? uniqueName(bpNames, `${owner.name}.${port.name}`)
+          : port.name
         bpNames.add(bpName)
         const bp = ctx.tx.create('boundaryPort', {
           id: ctx.newId(),
@@ -95,13 +126,19 @@ export const recursionCommands = {
           name: bpName,
           direction,
           internalPortId: portId,
-          description: ''
+          description: '',
         })
         mirrorOf.set(key, createMirrorPort(ctx, compositeId, bp))
       }
-      incoming.forEach((edge, i) => ctx.tx.update('edge', edge.id, { toPort: mirrorOf.get(incomingKeys[i]) }))
-      outgoing.forEach((edge, i) => ctx.tx.update('edge', edge.id, { fromPort: mirrorOf.get(outgoingKeys[i]) }))
-      parentBps.forEach((bp, i) => ctx.tx.update('boundaryPort', bp.id, { internalPortId: mirrorOf.get(parentBpKeys[i]) }))
+      incoming.forEach((edge, i) =>
+        ctx.tx.update('edge', edge.id, { toPort: mirrorOf.get(incomingKeys[i]) })
+      )
+      outgoing.forEach((edge, i) =>
+        ctx.tx.update('edge', edge.id, { fromPort: mirrorOf.get(outgoingKeys[i]) })
+      )
+      parentBps.forEach((bp, i) =>
+        ctx.tx.update('boundaryPort', bp.id, { internalPortId: mirrorOf.get(parentBpKeys[i]) })
+      )
 
       // Views: the child's view inherits the positions from the parent's primary view; each
       // parent view shows the new composite where the selection was.
@@ -111,11 +148,15 @@ export const recursionCommands = {
       const [childView] = viewsOf(ctx.tx, systemId)
       if (parentViews.length && childView) {
         const inherited = {}
-        for (const id of moved) if (parentViews[0].layout[id]) inherited[id] = parentViews[0].layout[id]
+        for (const id of moved)
+          if (parentViews[0].layout[id]) inherited[id] = parentViews[0].layout[id]
         ctx.tx.update('view', childView.id, { layout: inherited })
       }
       for (const view of parentViews) {
-        const center = centroid(view.layout, nodes.map(n => n.id))
+        const center = centroid(
+          view.layout,
+          nodes.map(n => n.id)
+        )
         const layout = {}
         for (const [id, entry] of Object.entries(view.layout)) {
           if (moved.has(id)) continue
@@ -131,14 +172,15 @@ export const recursionCommands = {
       }
 
       return { systemId, nodeId: compositeId }
-    }
+    },
   },
 
   'system.inline': {
-    description: 'Dissolves a composite back into its parent and reconnects edges through its boundary ports (a by-reference composite is copied, leaving the library system untouched)',
+    description:
+      'Dissolves a composite back into its parent and reconnects edges through its boundary ports (a by-reference composite is copied, leaving the library system untouched)',
     signature: '{ nodeId }',
     /** @param {any} p @param {Ctx} ctx */
-    handler (p, ctx) {
+    handler(p, ctx) {
       const composite = ctx.tx.require('node', requireString(p.nodeId, 'nodeId'))
       if (composite.kind !== 'composite') fail('INVALID', `'${composite.name}' is not a composite`)
       const parentId = composite.systemId
@@ -167,7 +209,11 @@ export const recursionCommands = {
             removeEdge(ctx, edge.id)
             continue
           }
-          ctx.tx.update('edge', edge.id, edge.fromPort === mirror.id ? { fromPort: target } : { toPort: target })
+          ctx.tx.update(
+            'edge',
+            edge.id,
+            edge.fromPort === mirror.id ? { fromPort: target } : { toPort: target }
+          )
         }
         for (const outer of ctx.tx.find('boundaryPort', 'internalPortId', mirror.id)) {
           ctx.tx.update('boundaryPort', outer.id, { internalPortId: target })
@@ -177,7 +223,10 @@ export const recursionCommands = {
 
       const newNodeIds = childNodes.map(n => mapId(n.id))
       const source = childViews[0]?.layout ?? {}
-      const origin = centroid(source, childNodes.map(n => n.id)) ?? { x: 0, y: 0 }
+      const origin = centroid(
+        source,
+        childNodes.map(n => n.id)
+      ) ?? { x: 0, y: 0 }
       for (const view of viewsOf(ctx.tx, parentId)) {
         const at = view.layout[composite.id]
         const layout = { ...view.layout }
@@ -191,7 +240,10 @@ export const recursionCommands = {
         }
         const wasHidden = view.hidden.includes(composite.id)
         const hidden = view.hidden.filter(id => id !== composite.id)
-        ctx.tx.update('view', view.id, { layout, hidden: wasHidden ? [...hidden, ...newNodeIds] : hidden })
+        ctx.tx.update('view', view.id, {
+          layout,
+          hidden: wasHidden ? [...hidden, ...newNodeIds] : hidden,
+        })
       }
 
       ctx.tx.remove('node', composite.id)
@@ -201,6 +253,6 @@ export const recursionCommands = {
         ctx.tx.remove('system', child.id)
       }
       return newNodeIds
-    }
-  }
+    },
+  },
 }

@@ -4,7 +4,15 @@
 
 /** The built-in base behaviours a component can extend (spec §7 "Behaviour API"). */
 export const BASE_TYPES = Object.freeze([
-  'base:client', 'base:service', 'base:queue', 'base:topic', 'base:store', 'base:cache', 'base:proxy', 'base:timer', 'base:external'
+  'base:client',
+  'base:service',
+  'base:queue',
+  'base:topic',
+  'base:store',
+  'base:cache',
+  'base:proxy',
+  'base:timer',
+  'base:external',
 ])
 
 const CATEGORY = {
@@ -16,18 +24,25 @@ const CATEGORY = {
   'base:cache': 'Data',
   'base:proxy': 'Edge',
   'base:timer': 'Compute',
-  'base:external': 'External'
+  'base:external': 'External',
 }
 
 /** @param {string} name e.g. 'order-router' */
-const titleOf = name => name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+const titleOf = name =>
+  name
+    .split('-')
+    .map(w => w[0].toUpperCase() + w.slice(1))
+    .join(' ')
 
 /**
  * @param {string} name folder name (lowercase, hyphenated)
  * @param {{ extends?: string, id?: string }} [options]
  * @returns {Record<string, string>} path → content
  */
-export function scaffoldComponent (name, { extends: base = 'base:service', id = `local.${name}` } = {}) {
+export function scaffoldComponent(
+  name,
+  { extends: base = 'base:service', id = `local.${name}` } = {}
+) {
   const title = titleOf(name)
   const manifest = {
     strataApi: '^1.0',
@@ -45,12 +60,12 @@ export function scaffoldComponent (name, { extends: base = 'base:service', id = 
         unit: 'ms',
         default: { kind: 'lognormal', median: 20, p99: 120 },
         group: 'Performance',
-        description: 'Time to handle one message'
-      }
+        description: 'Time to handle one message',
+      },
     },
     metrics: {
-      handled: { unit: 'messages', rollup: 'sum', description: 'Messages handled so far' }
-    }
+      handled: { unit: 'messages', rollup: 'sum', description: 'Messages handled so far' },
+    },
   }
   return {
     'manifest.json': `${JSON.stringify(manifest, null, 2)}\n`,
@@ -121,6 +136,6 @@ test('a message is forwarded after the service time', () => {
   behaviour.onTimer('done', ctx, { msg: 'm1' })
   assert.deepEqual(ctx.calls.slice(1), [['metric', 'handled', 1], ['forward', 'm1']])
 })
-`
+`,
   }
 }

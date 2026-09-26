@@ -9,7 +9,7 @@ export class Emitter {
   #onError
 
   /** @param {{ onError?: (err: unknown, event: string) => void }} [options] */
-  constructor ({ onError = rethrowLater } = {}) {
+  constructor({ onError = rethrowLater } = {}) {
     this.#onError = onError
   }
 
@@ -19,7 +19,7 @@ export class Emitter {
    * @param {Function} fn
    * @returns {() => void} unsubscribe
    */
-  on (event, fn) {
+  on(event, fn) {
     if (typeof fn !== 'function') throw new TypeError('Listener must be a function')
     let set = this.#handlers.get(event)
     if (!set) this.#handlers.set(event, (set = new Set()))
@@ -28,23 +28,27 @@ export class Emitter {
   }
 
   /** @param {string} event @param {Function} fn */
-  once (event, fn) {
-    const off = this.on(event, (...args) => { off(); fn(...args) })
+  once(event, fn) {
+    const off = this.on(event, (...args) => {
+      off()
+      fn(...args)
+    })
     return off
   }
 
   /** @param {string} event @param {Function} fn */
-  off (event, fn) {
+  off(event, fn) {
     this.#handlers.get(event)?.delete(fn)
   }
 
   /** @param {string} event @param {unknown} [data] */
-  emit (event, data) {
+  emit(event, data) {
     for (const fn of [...(this.#handlers.get(event) ?? [])]) this.#call(event, fn, data)
-    if (event !== '*') for (const fn of [...(this.#handlers.get('*') ?? [])]) this.#call(event, fn, event, data)
+    if (event !== '*')
+      for (const fn of [...(this.#handlers.get('*') ?? [])]) this.#call(event, fn, event, data)
   }
 
-  #call (event, fn, ...args) {
+  #call(event, fn, ...args) {
     try {
       fn(...args)
     } catch (err) {
@@ -53,7 +57,7 @@ export class Emitter {
   }
 
   /** @param {string} [event] */
-  listenerCount (event) {
+  listenerCount(event) {
     if (event) return this.#handlers.get(event)?.size ?? 0
     let n = 0
     for (const set of this.#handlers.values()) n += set.size
@@ -62,6 +66,8 @@ export class Emitter {
 }
 
 /** @param {unknown} err */
-function rethrowLater (err) {
-  queueMicrotask(() => { throw err })
+function rethrowLater(err) {
+  queueMicrotask(() => {
+    throw err
+  })
 }

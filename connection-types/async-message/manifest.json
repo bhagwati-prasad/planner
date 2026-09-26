@@ -10,10 +10,7 @@
   "properties": {
     "mode": {
       "type": "enum",
-      "values": [
-        "sync",
-        "async"
-      ],
+      "values": ["sync", "async"],
       "default": "async",
       "group": "Connection"
     },
@@ -26,11 +23,7 @@
     },
     "ackMode": {
       "type": "enum",
-      "values": [
-        "auto",
-        "manual",
-        "none"
-      ],
+      "values": ["auto", "manual", "none"],
       "default": "auto",
       "group": "Messaging"
     }

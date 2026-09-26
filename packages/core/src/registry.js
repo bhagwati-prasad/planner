@@ -23,8 +23,9 @@ const ID_RE = /^[a-z0-9]+(?:[-_.:/][a-z0-9]+)*$/
  * @param {string} ref
  * @returns {{ id: string, version: string|null }}
  */
-export function parseTypeRef (ref) {
-  if (typeof ref !== 'string' || !ref) fail('INVALID', `Invalid component type reference ${JSON.stringify(ref)}`)
+export function parseTypeRef(ref) {
+  if (typeof ref !== 'string' || !ref)
+    fail('INVALID', `Invalid component type reference ${JSON.stringify(ref)}`)
   const at = ref.lastIndexOf('@')
   if (at <= 0) return { id: ref, version: null }
   const version = ref.slice(at + 1)
@@ -40,53 +41,84 @@ export const typeRefOf = manifest => `${manifest.id}@${manifest.version}`
  * @param {unknown} input
  * @returns {Manifest}
  */
-export function normalizeManifest (input) {
+export function normalizeManifest(input) {
   const m = /** @type {Record<string, any>} */ (toPlain(input, 'manifest'))
   const errors = []
   if (!isPlainObject(m)) fail('INVALID', 'A manifest must be an object')
-  if (typeof m.id !== 'string' || !ID_RE.test(m.id)) errors.push("id must be lowercase letters and digits separated by '.', ':', '/', '-' or '_' (e.g. 'acme.message-queue')")
+  if (typeof m.id !== 'string' || !ID_RE.test(m.id))
+    errors.push(
+      "id must be lowercase letters and digits separated by '.', ':', '/', '-' or '_' (e.g. 'acme.message-queue')"
+    )
   if (typeof m.name !== 'string' || !m.name.trim()) errors.push('name is required')
   if (!isSemver(m.version)) errors.push('version must be a semantic version such as 1.2.0')
   if (m.strataApi !== undefined) {
     try {
-      if (!satisfies(CORE_API_VERSION, m.strataApi)) errors.push(`strataApi '${m.strataApi}' is not compatible with this core (API ${CORE_API_VERSION})`)
+      if (!satisfies(CORE_API_VERSION, m.strataApi))
+        errors.push(
+          `strataApi '${m.strataApi}' is not compatible with this core (API ${CORE_API_VERSION})`
+        )
     } catch (err) {
       errors.push(`strataApi: ${err.message}`)
     }
   }
-  if (m.kind !== undefined && !PLUGIN_KINDS.includes(m.kind)) errors.push(`kind must be one of ${PLUGIN_KINDS.join(', ')}`)
-  if (m.kind === 'connection-type' && Array.isArray(m.ports) && m.ports.length) errors.push('a connection type has no ports')
+  if (m.kind !== undefined && !PLUGIN_KINDS.includes(m.kind))
+    errors.push(`kind must be one of ${PLUGIN_KINDS.join(', ')}`)
+  if (m.kind === 'connection-type' && Array.isArray(m.ports) && m.ports.length)
+    errors.push('a connection type has no ports')
   if (m.extends !== undefined && m.extends !== null) {
-    try { parseTypeRef(m.extends) } catch (err) { errors.push(`extends: ${err.message}`) }
+    try {
+      parseTypeRef(m.extends)
+    } catch (err) {
+      errors.push(`extends: ${err.message}`)
+    }
   }
 
   const ports = []
   if (m.ports !== undefined && !Array.isArray(m.ports)) errors.push('ports must be a list')
   const seenPorts = new Set()
   for (const [i, p] of (Array.isArray(m.ports) ? m.ports : []).entries()) {
-    if (!isPlainObject(p) || typeof p.name !== 'string' || !p.name) { errors.push(`ports[${i}].name is required`); continue }
+    if (!isPlainObject(p) || typeof p.name !== 'string' || !p.name) {
+      errors.push(`ports[${i}].name is required`)
+      continue
+    }
     if (seenPorts.has(p.name)) errors.push(`ports[${i}]: duplicate port name '${p.name}'`)
     seenPorts.add(p.name)
-    if (!PORT_DIRECTIONS.includes(p.direction)) errors.push(`ports[${i}].direction must be in, out or both`)
-    if (p.accepts !== undefined && (!Array.isArray(p.accepts) || p.accepts.some(a => typeof a !== 'string'))) errors.push(`ports[${i}].accepts must be a list of connection type names`)
+    if (!PORT_DIRECTIONS.includes(p.direction))
+      errors.push(`ports[${i}].direction must be in, out or both`)
+    if (
+      p.accepts !== undefined &&
+      (!Array.isArray(p.accepts) || p.accepts.some(a => typeof a !== 'string'))
+    )
+      errors.push(`ports[${i}].accepts must be a list of connection type names`)
     ports.push({ ...p, name: p.name, direction: p.direction, accepts: p.accepts ?? [] })
   }
 
   const properties = m.properties ?? {}
   if (!isPlainObject(properties)) errors.push('properties must be an object')
-  else for (const [key, schema] of Object.entries(properties)) errors.push(...checkSchema(schema, `properties.${key}`))
+  else
+    for (const [key, schema] of Object.entries(properties))
+      errors.push(...checkSchema(schema, `properties.${key}`))
 
   const metrics = m.metrics ?? {}
   if (!isPlainObject(metrics)) errors.push('metrics must be an object')
   else {
     for (const [key, metric] of Object.entries(metrics)) {
-      if (!isPlainObject(metric)) { errors.push(`metrics.${key} must be an object`); continue }
+      if (!isPlainObject(metric)) {
+        errors.push(`metrics.${key} must be an object`)
+        continue
+      }
       const rule = typeof metric.rollup === 'string' ? metric.rollup : metric.rollup?.rule
-      if (metric.rollup !== undefined && !ROLLUP_RULES.includes(rule)) errors.push(`metrics.${key}.rollup must be one of ${ROLLUP_RULES.join(', ')}`)
+      if (metric.rollup !== undefined && !ROLLUP_RULES.includes(rule))
+        errors.push(`metrics.${key}.rollup must be one of ${ROLLUP_RULES.join(', ')}`)
     }
   }
 
-  if (errors.length) fail('INVALID', `Invalid manifest${typeof m.id === 'string' ? ` '${m.id}'` : ''}: ${errors.join('; ')}`, errors)
+  if (errors.length)
+    fail(
+      'INVALID',
+      `Invalid manifest${typeof m.id === 'string' ? ` '${m.id}'` : ''}: ${errors.join('; ')}`,
+      errors
+    )
 
   return deepFreeze({
     ...m,
@@ -102,7 +134,7 @@ export function normalizeManifest (input) {
     abstract: m.abstract === true,
     ports,
     properties,
-    metrics
+    metrics,
   })
 }
 
@@ -118,18 +150,19 @@ export class Registry {
    * @param {{ replace?: boolean }} [options]
    * @returns {Manifest}
    */
-  register (manifest, { replace = false } = {}) {
+  register(manifest, { replace = false } = {}) {
     const m = normalizeManifest(manifest)
     let versions = this.#byId.get(m.id)
     if (!versions) this.#byId.set(m.id, (versions = new Map()))
-    if (versions.has(m.version) && !replace) fail('CONFLICT', `Component ${typeRefOf(m)} is already registered`)
+    if (versions.has(m.version) && !replace)
+      fail('CONFLICT', `Component ${typeRefOf(m)} is already registered`)
     versions.set(m.version, m)
     this.#effective.clear()
     return m
   }
 
   /** @param {string} id @param {string} [version] */
-  unregister (id, version) {
+  unregister(id, version) {
     const versions = this.#byId.get(id)
     if (!versions) return false
     const removed = version ? versions.delete(version) : versions.size > 0
@@ -139,7 +172,7 @@ export class Registry {
   }
 
   /** @param {string} ref id or id@version */
-  has (ref) {
+  has(ref) {
     return this.get(ref) !== null
   }
 
@@ -148,7 +181,7 @@ export class Registry {
    * @param {string} ref id (latest version) or id@version
    * @returns {Manifest|null}
    */
-  get (ref) {
+  get(ref) {
     const { id, version } = parseTypeRef(ref)
     const versions = this.#byId.get(id)
     if (!versions) return null
@@ -157,7 +190,7 @@ export class Registry {
   }
 
   /** @param {string} id */
-  versions (id) {
+  versions(id) {
     return [...(this.#byId.get(id)?.keys() ?? [])].sort(compareSemver)
   }
 
@@ -166,7 +199,7 @@ export class Registry {
    * @param {string} ref
    * @returns {EffectiveManifest|null}
    */
-  resolve (ref) {
+  resolve(ref) {
     const m = this.get(ref)
     if (!m) return null
     const key = typeRefOf(m)
@@ -186,14 +219,25 @@ export class Registry {
    * @param {{ kind?: 'component'|'connection-type' }} [options]  only types of this kind
    * @returns {Manifest|null}
    */
-  find (name, { kind } = {}) {
+  find(name, { kind } = {}) {
     const direct = this.get(name)
     if (direct) return !kind || direct.kind === kind ? direct : null
     const { id, version } = parseTypeRef(name)
-    let matches = [...this.#byId.keys()].filter(k => /[.:/]/.test(k) && [...'.:/'].some(sep => k.endsWith(sep + id)))
-    if (kind) matches = matches.filter(k => latest(/** @type {Map<string, Manifest>} */ (this.#byId.get(k)))?.kind === kind)
-    if (matches.length > 1 && matches.some(k => !k.startsWith('base:'))) matches = matches.filter(k => !k.startsWith('base:'))
-    if (matches.length > 1) fail('AMBIGUOUS', `'${id}' matches several component types: ${matches.sort().join(', ')}. Use the full id.`, matches)
+    let matches = [...this.#byId.keys()].filter(
+      k => /[.:/]/.test(k) && [...'.:/'].some(sep => k.endsWith(sep + id))
+    )
+    if (kind)
+      matches = matches.filter(
+        k => latest(/** @type {Map<string, Manifest>} */ (this.#byId.get(k)))?.kind === kind
+      )
+    if (matches.length > 1 && matches.some(k => !k.startsWith('base:')))
+      matches = matches.filter(k => !k.startsWith('base:'))
+    if (matches.length > 1)
+      fail(
+        'AMBIGUOUS',
+        `'${id}' matches several component types: ${matches.sort().join(', ')}. Use the full id.`,
+        matches
+      )
     if (matches.length === 0) return null
     return this.get(version ? `${matches[0]}@${version}` : matches[0])
   }
@@ -203,12 +247,17 @@ export class Registry {
    * @param {string} name
    * @param {{ kind?: 'component'|'connection-type' }} [options]
    */
-  require (name, options = {}) {
+  require(name, options = {}) {
     const m = this.find(name, options)
     if (m) return m
-    const ids = [...this.#byId.keys()].filter(k => !options.kind || this.get(k)?.kind === options.kind)
+    const ids = [...this.#byId.keys()].filter(
+      k => !options.kind || this.get(k)?.kind === options.kind
+    )
     const shortNames = ids.map(k => k.split(/[.:/]/).pop())
-    return fail('NOT_FOUND', `Unknown component type '${name}'.${didYouMean(suggest(name, [...ids, ...shortNames]))}`)
+    return fail(
+      'NOT_FOUND',
+      `Unknown component type '${name}'.${didYouMean(suggest(name, [...ids, ...shortNames]))}`
+    )
   }
 
   /**
@@ -216,7 +265,7 @@ export class Registry {
    * @param {string} ref
    * @param {string} baseId
    */
-  isA (ref, baseId) {
+  isA(ref, baseId) {
     const eff = this.resolve(ref)
     return !!eff && eff.lineage.includes(parseTypeRef(baseId).id)
   }
@@ -225,21 +274,32 @@ export class Registry {
    * Latest version of every registered type, sorted by id.
    * @param {{ kind?: 'component'|'connection-type' }} [options]
    */
-  list ({ kind } = {}) {
-    const all = [...this.#byId.keys()].sort().map(id => /** @type {Manifest} */ (latest(/** @type {Map<string, Manifest>} */ (this.#byId.get(id)))))
+  list({ kind } = {}) {
+    const all = [...this.#byId.keys()]
+      .sort()
+      .map(
+        id =>
+          /** @type {Manifest} */ (
+            latest(/** @type {Map<string, Manifest>} */ (this.#byId.get(id)))
+          )
+      )
     return kind ? all.filter(m => m.kind === kind) : all
   }
 
   /** @param {Manifest} m @returns {EffectiveManifest} */
-  #merge (m) {
+  #merge(m) {
     const chain = [m]
     const seen = new Set([m.id])
     let missingBase = null
     let cur = m
     while (cur.extends) {
       const base = this.get(cur.extends)
-      if (!base) { missingBase = cur.extends; break }
-      if (seen.has(base.id)) fail('CYCLE', `Component '${m.id}' has a circular 'extends' chain through '${base.id}'`)
+      if (!base) {
+        missingBase = cur.extends
+        break
+      }
+      if (seen.has(base.id))
+        fail('CYCLE', `Component '${m.id}' has a circular 'extends' chain through '${base.id}'`)
       seen.add(base.id)
       chain.push(base)
       cur = base
@@ -250,27 +310,32 @@ export class Registry {
     const metrics = {}
     for (const layer of [...chain].reverse()) {
       for (const p of layer.ports) ports[p.name] = { ...(ports[p.name] ?? {}), ...p }
-      for (const [k, s] of Object.entries(layer.properties)) properties[k] = { ...(properties[k] ?? {}), ...s }
-      for (const [k, s] of Object.entries(layer.metrics)) metrics[k] = { ...(metrics[k] ?? {}), ...s }
+      for (const [k, s] of Object.entries(layer.properties))
+        properties[k] = { ...(properties[k] ?? {}), ...s }
+      for (const [k, s] of Object.entries(layer.metrics))
+        metrics[k] = { ...(metrics[k] ?? {}), ...s }
     }
-    return /** @type {EffectiveManifest} */ (deepFreeze({
-      ...m,
-      typeRef: typeRefOf(m),
-      lineage: chain.map(c => c.id),
-      missingBase,
-      category: m.category ?? chain.find(c => c.category)?.category ?? null,
-      icon: m.icon ?? chain.find(c => c.icon)?.icon ?? null,
-      ports: Object.values(ports),
-      properties,
-      metrics
-    }))
+    return /** @type {EffectiveManifest} */ (
+      deepFreeze({
+        ...m,
+        typeRef: typeRefOf(m),
+        lineage: chain.map(c => c.id),
+        missingBase,
+        category: m.category ?? chain.find(c => c.category)?.category ?? null,
+        icon: m.icon ?? chain.find(c => c.icon)?.icon ?? null,
+        ports: Object.values(ports),
+        properties,
+        metrics,
+      })
+    )
   }
 }
 
 /** @param {Map<string, Manifest>} versions */
-function latest (versions) {
+function latest(versions) {
   let best = null
-  for (const [version, m] of versions) if (!best || compareSemver(version, best.version) > 0) best = m
+  for (const [version, m] of versions)
+    if (!best || compareSemver(version, best.version) > 0) best = m
   return best
 }
 
@@ -278,7 +343,7 @@ function latest (versions) {
  * Creates a registry, by default pre-loaded with the built-in base types (base:service, ...).
  * @param {{ builtins?: boolean }} [options]
  */
-export function createRegistry ({ builtins = true } = {}) {
+export function createRegistry({ builtins = true } = {}) {
   const registry = new Registry()
   if (builtins) for (const m of BUILTIN_MANIFESTS) registry.register(m)
   return registry

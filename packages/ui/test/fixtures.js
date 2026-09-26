@@ -10,26 +10,47 @@ export const COMPONENTS = [
     ports: [
       { name: 'in', direction: 'in', accepts: ['http'] },
       { name: 'out', direction: 'out', accepts: ['http'] },
-      { name: 'db', direction: 'out', accepts: ['db-protocol'], side: 'bottom' }
-    ]
+      { name: 'db', direction: 'out', accepts: ['db-protocol'], side: 'bottom' },
+    ],
   },
-  { id: 'starter.relational-db', name: 'Relational DB', version: '1.0.0', extends: 'base:store', ports: [{ name: 'in', direction: 'in', accepts: ['db-protocol'], side: 'top' }] },
-  { id: 'starter.gateway', name: 'API gateway', version: '1.0.0', extends: 'base:proxy', ports: [{ name: 'in', direction: 'in', accepts: ['http'] }, { name: 'out', direction: 'out', accepts: ['http'] }] },
-  { id: 'starter.queue', name: 'Message queue', version: '1.0.0', extends: 'base:queue' }
+  {
+    id: 'starter.relational-db',
+    name: 'Relational DB',
+    version: '1.0.0',
+    extends: 'base:store',
+    ports: [{ name: 'in', direction: 'in', accepts: ['db-protocol'], side: 'top' }],
+  },
+  {
+    id: 'starter.gateway',
+    name: 'API gateway',
+    version: '1.0.0',
+    extends: 'base:proxy',
+    ports: [
+      { name: 'in', direction: 'in', accepts: ['http'] },
+      { name: 'out', direction: 'out', accepts: ['http'] },
+    ],
+  },
+  { id: 'starter.queue', name: 'Message queue', version: '1.0.0', extends: 'base:queue' },
 ]
 
 /** A facade with deterministic time and ids and the fixture components registered. */
-export function createFixtureStrata () {
+export function createFixtureStrata() {
   let seed = 7
-  const random = n => Uint8Array.from({ length: n }, () => (seed = (seed * 1103515245 + 12345) % 2147483648) & 0xff)
+  const random = n =>
+    Uint8Array.from({ length: n }, () => (seed = (seed * 1103515245 + 12345) % 2147483648) & 0xff)
   let now = Date.UTC(2026, 8, 26, 10)
-  const strata = createStrata({ clock: () => now++, random, identity: { id: 'u1', name: 'Tester' }, output: () => {} })
+  const strata = createStrata({
+    clock: () => now++,
+    random,
+    identity: { id: 'u1', name: 'Tester' },
+    output: () => {},
+  })
   for (const m of COMPONENTS) strata.components.register(m)
   return strata
 }
 
 /** A project with client → gateway → service → db, the service and db extracted into "Orders". */
-export async function ordersProject () {
+export async function ordersProject() {
   const strata = createFixtureStrata()
   const p = await strata.projects.create('Shop')
   const root = p.root

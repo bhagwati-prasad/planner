@@ -10,11 +10,14 @@
  * @param {{ maxLines?: number, ellipsis?: string }} [options]
  * @returns {string[]}
  */
-export function wrapText (text, maxWidth, measure, { maxLines = Infinity, ellipsis = '…' } = {}) {
+export function wrapText(text, maxWidth, measure, { maxLines = Infinity, ellipsis = '…' } = {}) {
   const lines = []
   for (const paragraph of String(text ?? '').split('\n')) {
     const words = paragraph.split(/\s+/).filter(Boolean)
-    if (!words.length) { lines.push(''); continue }
+    if (!words.length) {
+      lines.push('')
+      continue
+    }
     let line = ''
     for (const word of words) {
       const candidate = line ? `${line} ${word}` : word

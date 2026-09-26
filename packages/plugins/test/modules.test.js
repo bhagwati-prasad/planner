@@ -12,14 +12,20 @@ import { loadModules } from './fixtures.js'
 const repo = fileURLToPath(new URL('../../..', import.meta.url))
 
 /** Bundles `files` from `entry` and loads it; throws on bundling errors. */
-function run (files, entry = 'main.js') {
+function run(files, entry = 'main.js') {
   const b = bundleModules(files, [entry])
   const errors = b.problems.filter(p => p.level === 'error')
   if (errors.length) throw new Error(errors.map(formatProblem).join('\n'))
-  return loadModules(Object.fromEntries(Object.entries(b.modules).map(([p, m]) => [p, m.code])), entry)
+  return loadModules(
+    Object.fromEntries(Object.entries(b.modules).map(([p, m]) => [p, m.code])),
+    entry
+  )
 }
 
-const errorsOf = (files, entry = 'main.js') => bundleModules(files, [entry]).problems.filter(p => p.level === 'error').map(formatProblem)
+const errorsOf = (files, entry = 'main.js') =>
+  bundleModules(files, [entry])
+    .problems.filter(p => p.level === 'error')
+    .map(formatProblem)
 
 test('named, default, namespace and aliased imports', () => {
   const ns = run({
@@ -28,11 +34,17 @@ import * as all from './lib/x.js'
 export const result = [def(), a, bee, all.a, Object.keys(all).sort().join()]`,
     'lib/x.js': `export const a = 1
 export let b = 2
-export default function () { return 'def' }`
+export default function () { return 'def' }`,
   })
   assert.deepEqual(ns.result, ['def', 1, 2, 1, 'a,b,default'])
   assert.equal(Object.prototype.toString.call(ns), '[object Module]')
-  assert.throws(() => { ns.extra = 1 }, TypeError, 'namespaces are not extensible')
+  assert.throws(
+    () => {
+      ns.extra = 1
+    },
+    TypeError,
+    'namespaces are not extensible'
+  )
 })
 
 test('every export form', () => {
@@ -52,10 +64,28 @@ export { local as aliased, local }
 export default class extends K {}`,
     'lib/a.js': 'export const x = "x"\nexport const y = "y"',
     'lib/b.js': 'export const fromB = "b"\nexport default "b-default"',
-    'lib/c.js': 'export const inC = "c"'
+    'lib/c.js': 'export const inC = "c"',
   })
   assert.deepEqual(
-    [ns.x, ns.why, ns.fromB, ns.c.inC, ns.fn(), ns.gen().next().value, ns.K.id, ns.one, ns.two, ns.p, ns.renamed, ns.rest, ns.first, ns.third, ns.others, ns.aliased, ns.local],
+    [
+      ns.x,
+      ns.why,
+      ns.fromB,
+      ns.c.inC,
+      ns.fn(),
+      ns.gen().next().value,
+      ns.K.id,
+      ns.one,
+      ns.two,
+      ns.p,
+      ns.renamed,
+      ns.rest,
+      ns.first,
+      ns.third,
+      ns.others,
+      ns.aliased,
+      ns.local,
+    ],
     ['x', 'y', 'b', 'c', 'fn', 1, 'K', 1, 2, 'p', 'q', { r: 'r' }, 'f', 3, ['o'], 'local', 'local']
   )
   assert.equal(Object.getPrototypeOf(ns.default), ns.K, 'anonymous default class')
@@ -64,8 +94,14 @@ export default class extends K {}`,
 
 test('default exports: expressions, named functions and anonymous functions', () => {
   assert.equal(run({ 'main.js': 'export default 6 * 7' }).default, 42)
-  assert.equal(run({ 'main.js': 'export default function named () { return named.name }' }).default(), 'named')
-  assert.equal(run({ 'main.js': 'export default async function () {}' }).default.constructor.name, 'AsyncFunction')
+  assert.equal(
+    run({ 'main.js': 'export default function named () { return named.name }' }).default(),
+    'named'
+  )
+  assert.equal(
+    run({ 'main.js': 'export default async function () {}' }).default.constructor.name,
+    'AsyncFunction'
+  )
   assert.equal(run({ 'main.js': 'const v = { k: 1 }\nexport { v as default }' }).default.k, 1)
 })
 
@@ -80,9 +116,17 @@ const half = 10 / 2 / 5
 const o = { import: 1, export: 2, default: 3 }
 class C { import () { return 'method' } static export () { return 'static' } }
 const call = o.import + o.export
-export const out = [s, t, re.source, half, call, new C().import(), C.export()]`
+export const out = [s, t, re.source, half, call, new C().import(), C.export()]`,
   })
-  assert.deepEqual(ns.out, ["import x from './nope.js'", "export } import ' done", '[\'"\\/]import', 1, 3, 'method', 'static'])
+  assert.deepEqual(ns.out, [
+    "import x from './nope.js'",
+    "export } import ' done",
+    '[\'"\\/]import',
+    1,
+    3,
+    'method',
+    'static',
+  ])
 })
 
 test('dynamic import, import.meta and JSON modules', async () => {
@@ -92,7 +136,7 @@ export const url = import.meta.url
 export const value = data.nested.value
 export const later = () => import('./lazy.js')`,
     'data.json': '{ "nested": { "value": 7 } }',
-    'lazy.js': 'export const lazy = "loaded"'
+    'lazy.js': 'export const lazy = "loaded"',
   })
   assert.equal(ns.url, 'main.js')
   assert.equal(ns.value, 7)
@@ -119,19 +163,56 @@ export function f () {
 })
 
 test('problems name the file, the line and what to do', () => {
-  assert.match(errorsOf({ 'main.js': "import { x } from './lib/x'", 'lib/x.js': 'export const x = 1' })[0], /main\.js:1: error: imports 'lib\/x', which does not exist\. Did you mean 'lib\/x\.js'\?/)
+  assert.match(
+    errorsOf({ 'main.js': "import { x } from './lib/x'", 'lib/x.js': 'export const x = 1' })[0],
+    /main\.js:1: error: imports 'lib\/x', which does not exist\. Did you mean 'lib\/x\.js'\?/
+  )
   assert.match(errorsOf({ 'main.js': "import d3 from 'd3'" })[0], /npm packages/)
-  assert.match(errorsOf({ 'main.js': "import x from 'https://cdn.example/x.js'" })[0], /only relative imports/)
+  assert.match(
+    errorsOf({ 'main.js': "import x from 'https://cdn.example/x.js'" })[0],
+    /only relative imports/
+  )
   assert.match(errorsOf({ 'main.js': "import x from '../outside.js'" })[0], /outside the folder/)
-  assert.match(errorsOf({ 'main.js': "import { backof } from './b.js'", 'b.js': 'export function backoff () {}' })[0], /no export named 'backof'/)
-  assert.match(errorsOf({ 'main.js': "import { Backoff } from './b.js'", 'b.js': 'export function backoff () {}' })[0], /Did you mean 'backoff'\?/)
-  assert.match(errorsOf({ 'main.js': "import './a.js'", 'a.js': "import './b.js'", 'b.js': "import './a.js'" })[0], /import cycle: a\.js → b\.js → a\.js/)
+  assert.match(
+    errorsOf({
+      'main.js': "import { backof } from './b.js'",
+      'b.js': 'export function backoff () {}',
+    })[0],
+    /no export named 'backof'/
+  )
+  assert.match(
+    errorsOf({
+      'main.js': "import { Backoff } from './b.js'",
+      'b.js': 'export function backoff () {}',
+    })[0],
+    /Did you mean 'backoff'\?/
+  )
+  assert.match(
+    errorsOf({
+      'main.js': "import './a.js'",
+      'a.js': "import './b.js'",
+      'b.js': "import './a.js'",
+    })[0],
+    /import cycle: a\.js → b\.js → a\.js/
+  )
   assert.match(errorsOf({ 'main.js': 'const __require = 1' })[0], /reserved/)
   assert.match(errorsOf({ 'main.js': 'await Promise.resolve()' })[0], /Top-level await/)
-  assert.match(errorsOf({ 'main.js': 'export let n = 0\nexport function inc () { n += 1 }' })[0], /main\.js:2: .*'n' is reassigned/)
-  assert.match(errorsOf({ 'main.js': 'const a = 1\nconst s = "open' })[0], /main\.js:2: error: Unterminated string/)
+  assert.match(
+    errorsOf({ 'main.js': 'export let n = 0\nexport function inc () { n += 1 }' })[0],
+    /main\.js:2: .*'n' is reassigned/
+  )
+  assert.match(
+    errorsOf({ 'main.js': 'const a = 1\nconst s = "open' })[0],
+    /main\.js:2: error: Unterminated string/
+  )
   assert.match(errorsOf({ 'main.js': 'function f () {\n  return 1\n' })[0], /Unclosed '\{'/)
-  assert.match(errorsOf({ 'data.json': '{ nope }', 'main.js': "import d from './data.json' with { type: 'json' }" })[0], /data\.json: error: Invalid JSON/)
+  assert.match(
+    errorsOf({
+      'data.json': '{ nope }',
+      'main.js': "import d from './data.json' with { type: 'json' }",
+    })[0],
+    /data\.json: error: Invalid JSON/
+  )
   assert.throws(() => transformModule('export = 1'), ModuleError)
 })
 
@@ -147,13 +228,15 @@ test('the tokenizer reads every JavaScript file in this repository', () => {
   }
   walk(repo)
   assert.ok(files.length > 80)
-  for (const file of files) assert.doesNotThrow(() => tokenize(readFileSync(file, 'utf8')), relative(repo, file))
+  for (const file of files)
+    assert.doesNotThrow(() => tokenize(readFileSync(file, 'utf8')), relative(repo, file))
 })
 
 test('minify keeps every token and every line break of every file in this repository', () => {
   const walk = (dir, out = []) => {
     for (const name of readdirSync(dir)) {
-      if (name === 'node_modules' || name.startsWith('.') || name === 'vendor' || name === 'dist') continue
+      if (name === 'node_modules' || name.startsWith('.') || name === 'vendor' || name === 'dist')
+        continue
       const path = join(dir, name)
       if (statSync(path).isDirectory()) walk(path, out)
       else if (name.endsWith('.js')) out.push(path)
@@ -171,7 +254,7 @@ test('minify keeps every token and every line break of every file in this reposi
     const shape = code => tokenize(code).map((t, i) => `${i && t.nl ? '\n' : ''}${t.value}`)
     assert.deepEqual(shape(out), shape(src), relative(repo, file))
   }
-  assert.ok(after < before * 0.8, `minified to ${Math.round(after / before * 100)}%`)
+  assert.ok(after < before * 0.8, `minified to ${Math.round((after / before) * 100)}%`)
 })
 
 test('the facade bundles into one CommonJS script that works', async () => {
@@ -180,14 +263,18 @@ test('the facade bundles into one CommonJS script that works', async () => {
     for (const name of readdirSync(dir)) {
       const path = join(dir, name)
       if (statSync(path).isDirectory()) walk(path)
-      else if (name.endsWith('.js')) files[relative(repo, path).split('\\').join('/')] = readFileSync(path, 'utf8')
+      else if (name.endsWith('.js'))
+        files[relative(repo, path).split('\\').join('/')] = readFileSync(path, 'utf8')
     }
   }
   walk(join(repo, 'packages'))
   const entry = 'packages/facade/src/index.js'
   const bundle = bundleModules(files, [entry])
   assert.deepEqual(bundle.problems, [])
-  assert.ok(bundle.order.indexOf('packages/core/src/errors.js') < bundle.order.indexOf(entry), 'dependencies come first')
+  assert.ok(
+    bundle.order.indexOf('packages/core/src/errors.js') < bundle.order.indexOf(entry),
+    'dependencies come first'
+  )
   const script = minify(emitScript(bundle, { entry, format: 'cjs', banner: '/* strata */' }))
   const module = { exports: {} }
   // eslint-disable-next-line no-new-func
@@ -200,7 +287,10 @@ test('the facade bundles into one CommonJS script that works', async () => {
   const sub = p.root.extract([svc, db], { name: 'Orders system' })
   assert.equal(p.root.nodes().length, 1)
   assert.equal(sub.nodes().length, 2)
-  assert.throws(() => p.root.add('nope'), err => err.code === 'NOT_FOUND')
+  assert.throws(
+    () => p.root.add('nope'),
+    err => err.code === 'NOT_FOUND'
+  )
 
   const iife = emitScript(bundle, { entry, format: 'iife', globalName: '__strataTest' })
   // eslint-disable-next-line no-new-func

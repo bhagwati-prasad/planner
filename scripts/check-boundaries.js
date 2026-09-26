@@ -35,7 +35,7 @@ const ALLOWED = {
   ui: ['facade', 'graph', '3d'],
   // Node only: the local server and the command line.
   server: ['core', 'plugins', 'facade', 'storage'],
-  cli: ['core', 'plugins', 'facade', 'storage', 'server']
+  cli: ['core', 'plugins', 'facade', 'storage', 'server'],
 }
 
 /**
@@ -55,18 +55,39 @@ const HEADLESS = {
   plan: () => true,
   comments: () => true,
   graph: rel => !rel.split(sep).includes('dom'),
-  ui: rel => !rel.split(sep).includes('elements')
+  ui: rel => !rel.split(sep).includes('elements'),
 }
 
 /** Packages whose sources load in browsers: relative imports only. */
-const BROWSER = new Set(['core', 'plugins', 'facade', 'sim', 'debug', 'test', 'docs', 'plan', 'comments', 'storage', 'graph', '3d', 'ui'])
+const BROWSER = new Set([
+  'core',
+  'plugins',
+  'facade',
+  'sim',
+  'debug',
+  'test',
+  'docs',
+  'plan',
+  'comments',
+  'storage',
+  'graph',
+  '3d',
+  'ui',
+])
 
 const DOM_GLOBALS = [
-  'document', 'window', 'localStorage', 'sessionStorage', 'indexedDB',
-  'HTMLElement', 'customElements', 'navigator', 'location'
+  'document',
+  'window',
+  'localStorage',
+  'sessionStorage',
+  'indexedDB',
+  'HTMLElement',
+  'customElements',
+  'navigator',
+  'location',
 ]
 
-function walk (dir, out = []) {
+function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name)
     if (statSync(path).isDirectory()) walk(path, out)
@@ -76,7 +97,7 @@ function walk (dir, out = []) {
 }
 
 /** Removes comments and string/template contents so identifier checks ignore them. */
-function stripCode (src) {
+function stripCode(src) {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:\\])\/\/.*$/gm, '$1')
@@ -85,10 +106,13 @@ function stripCode (src) {
     .replace(/`(?:\\.|[^`\\])*`/g, '``')
 }
 
-const IMPORT_RE = /\bimport\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)|\bexport\s+(?:\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
+const IMPORT_RE =
+  /\bimport\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)|\bexport\s+(?:\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
 
 const problems = []
-const packages = readdirSync(packagesDir).filter(name => statSync(join(packagesDir, name)).isDirectory())
+const packages = readdirSync(packagesDir).filter(name =>
+  statSync(join(packagesDir, name)).isDirectory()
+)
 
 for (const pkg of packages) {
   if (!(pkg in ALLOWED)) {
@@ -97,7 +121,11 @@ for (const pkg of packages) {
   }
   const srcDir = join(packagesDir, pkg, 'src')
   let files = []
-  try { files = walk(srcDir) } catch { continue }
+  try {
+    files = walk(srcDir)
+  } catch {
+    continue
+  }
   for (const file of files) {
     const rel = relative(root, file)
     const src = readFileSync(file, 'utf8')
@@ -113,14 +141,17 @@ for (const pkg of packages) {
           problems.push(`${rel}: '${pkg}' may not depend on '${targetPkg}' (imports '${spec}')`)
         }
       } else if (BROWSER.has(pkg)) {
-        problems.push(`${rel}: '${pkg}' runs in browsers and imports '${spec}'; only relative imports are allowed`)
+        problems.push(
+          `${rel}: '${pkg}' runs in browsers and imports '${spec}'; only relative imports are allowed`
+        )
       }
     }
     if (HEADLESS[pkg]?.(relative(srcDir, file))) {
       const code = stripCode(src)
       for (const name of DOM_GLOBALS) {
         const re = new RegExp(`(?<![.\\w$])${name}(?![\\w$])`, 'g')
-        if (re.test(code)) problems.push(`${rel}: headless code references the browser global '${name}'`)
+        if (re.test(code))
+          problems.push(`${rel}: headless code references the browser global '${name}'`)
       }
     }
   }

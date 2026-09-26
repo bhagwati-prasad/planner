@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M00 Foundation and walking skeleton](../ROADMAP.md#m00-foundation-and-walking-skeleton) | R0 | todo | [0001](../M00-foundation-and-walking-skeleton/0001-repo-scaffold.md) |
+| [M00 Foundation and walking skeleton](../ROADMAP.md#m00-foundation-and-walking-skeleton) | R0 | done | [0001](../M00-foundation-and-walking-skeleton/0001-repo-scaffold.md) |
 
 ## Read first
 
@@ -18,10 +18,10 @@ Configure Prettier, ESLint and `tsc --noEmit --checkJs` with the style rules, pi
 
 Write these tests first, in `tools/test/tooling.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] A fixture with bad formatting fails `npm run format:check`
-- [ ] A fixture using `var` or `==` fails `npm run lint`
-- [ ] A fixture with a JSDoc type error fails `npm run typecheck`
-- [ ] `package-lock.json` pins exact versions and `npm ci --ignore-scripts` succeeds
+- [x] A fixture with bad formatting fails `npm run format:check`
+- [x] A fixture using `var` or `==` fails `npm run lint`
+- [x] A fixture with a JSDoc type error fails `npm run typecheck`
+- [x] `package-lock.json` pins exact versions and `npm ci --ignore-scripts` succeeds
 
 ## Notes
 
@@ -29,8 +29,8 @@ Write these tests first, in `tools/test/tooling.test.js`. Run them and confirm e
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] Every check that exists so far passes (`npm run check` arrives in task 0007)
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] Every check that exists so far passes (`npm run check` arrives in task 0007)
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

@@ -12,11 +12,7 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": [
-        "http",
-        "grpc",
-        "websocket"
-      ]
+      "accepts": ["http", "grpc", "websocket"]
     },
     {
       "name": "out",
@@ -35,13 +31,7 @@
     },
     "authMode": {
       "type": "enum",
-      "values": [
-        "none",
-        "api-key",
-        "jwt",
-        "oauth2",
-        "mtls"
-      ],
+      "values": ["none", "api-key", "jwt", "oauth2", "mtls"],
       "default": "jwt",
       "group": "Security"
     },

@@ -84,7 +84,13 @@
 import { containsPoint, union } from './geometry.js'
 
 export const DEFAULT_NODE_SIZE = Object.freeze({ w: 160, h: 64 })
-const ANNOTATION_SIZE = { sticky: { w: 160, h: 120 }, text: { w: 160, h: 32 }, callout: { w: 160, h: 64 }, region: { w: 240, h: 160 }, shape: { w: 120, h: 80 } }
+const ANNOTATION_SIZE = {
+  sticky: { w: 160, h: 120 },
+  text: { w: 160, h: 32 },
+  callout: { w: 160, h: 64 },
+  region: { w: 240, h: 160 },
+  shape: { w: 120, h: 80 },
+}
 export const FRAME_KINDS = Object.freeze(['group', 'trust-boundary', 'zone', 'system'])
 export const ANNOTATION_KINDS = Object.freeze(Object.keys(ANNOTATION_SIZE))
 
@@ -111,39 +117,63 @@ export class GraphModel {
    * @param {GraphData} data
    * @param {{ portsOf?: (node: NodeData) => PortSpec[], sizeOf?: (node: NodeData) => {w: number, h: number}} } [options]
    */
-  constructor (data = {}, { portsOf = () => [], sizeOf = () => DEFAULT_NODE_SIZE } = {}) {
+  constructor(data = {}, { portsOf = () => [], sizeOf = () => DEFAULT_NODE_SIZE } = {}) {
     const seen = new Set()
     const problem = (kind, id, message) => this.problems.push({ kind, id, message })
     const unique = (kind, item) => {
-      if (!item || typeof item.id !== 'string' || !item.id) { problem(kind, String(item?.id), `A ${kind} needs a string id`); return false }
-      if (seen.has(item.id)) { problem(kind, item.id, `Duplicate id '${item.id}'`); return false }
+      if (!item || typeof item.id !== 'string' || !item.id) {
+        problem(kind, String(item?.id), `A ${kind} needs a string id`)
+        return false
+      }
+      if (seen.has(item.id)) {
+        problem(kind, item.id, `Duplicate id '${item.id}'`)
+        return false
+      }
       seen.add(item.id)
       return true
     }
     const finite = (kind, item, keys) => {
       for (const key of keys) {
-        if (item[key] !== undefined && !Number.isFinite(item[key])) { problem(kind, item.id, `${kind} '${item.id}' has a non-numeric ${key}`); return false }
+        if (item[key] !== undefined && !Number.isFinite(item[key])) {
+          problem(kind, item.id, `${kind} '${item.id}' has a non-numeric ${key}`)
+          return false
+        }
       }
       return true
     }
 
-    for (const layer of data.layers ?? []) if (layer?.id) this.layers.set(layer.id, { hidden: false, locked: false, ...layer })
+    for (const layer of data.layers ?? [])
+      if (layer?.id) this.layers.set(layer.id, { hidden: false, locked: false, ...layer })
 
     for (const f of data.frames ?? []) {
       if (!unique('frame', f) || !finite('frame', f, ['x', 'y', 'w', 'h'])) continue
       this.frames.set(f.id, { label: '', kind: 'group', parent: undefined, ...f, depth: 0 })
     }
     for (const f of this.frames.values()) {
-      if (f.parent && !this.frames.has(f.parent)) { problem('frame', f.id, `Frame '${f.id}' has a missing parent '${f.parent}'`); f.parent = undefined }
+      if (f.parent && !this.frames.has(f.parent)) {
+        problem('frame', f.id, `Frame '${f.id}' has a missing parent '${f.parent}'`)
+        f.parent = undefined
+      }
     }
     for (const f of this.frames.values()) f.depth = this.#depth(f.id)
 
     for (const n of data.nodes ?? []) {
       if (!unique('node', n) || !finite('node', n, ['x', 'y', 'w', 'h'])) continue
       const size = sizeOf(n)
-      const node = /** @type {any} */ ({ shape: 'box', label: '', ...n, w: n.w ?? size.w, h: n.h ?? size.h, x: n.x ?? 0, y: n.y ?? 0 })
+      const node = /** @type {any} */ ({
+        shape: 'box',
+        label: '',
+        ...n,
+        w: n.w ?? size.w,
+        h: n.h ?? size.h,
+        x: n.x ?? 0,
+        y: n.y ?? 0,
+      })
       node.ports = n.ports ?? portsOf(node) ?? []
-      if (node.parent && !this.frames.has(node.parent)) { problem('node', n.id, `Node '${n.id}' has a missing parent frame '${n.parent}'`); node.parent = undefined }
+      if (node.parent && !this.frames.has(node.parent)) {
+        problem('node', n.id, `Node '${n.id}' has a missing parent frame '${n.parent}'`)
+        node.parent = undefined
+      }
       this.nodes.set(n.id, node)
     }
 
@@ -159,28 +189,45 @@ export class GraphModel {
       const source = endRef(e.source)
       const target = endRef(e.target)
       const bad = [source, target].find(end => !end || !this.nodes.has(end.node))
-      if (bad !== undefined) { problem('edge', e.id, `Edge '${e.id}' connects a missing node`); continue }
+      if (bad !== undefined) {
+        problem('edge', e.id, `Edge '${e.id}' connects a missing node`)
+        continue
+      }
       const s = /** @type {Required<EndRef>} */ (source)
       const t = /** @type {Required<EndRef>} */ (target)
       for (const end of [s, t]) {
         if (end.port && !this.nodes.get(end.node)?.ports.some(p => p.id === end.port)) {
-          problem('edge', e.id, `Edge '${e.id}' uses an unknown port '${end.port}' on '${end.node}'`)
+          problem(
+            'edge',
+            e.id,
+            `Edge '${e.id}' uses an unknown port '${end.port}' on '${end.node}'`
+          )
           end.port = null
         }
       }
       // An edge without its own routing follows the graph's current default.
-      this.edges.set(e.id, /** @type {any} */ ({ label: '', arrow: true, ...e, source: s, target: t, waypoints: e.waypoints ?? [] }))
+      this.edges.set(
+        e.id,
+        /** @type {any} */ ({
+          label: '',
+          arrow: true,
+          ...e,
+          source: s,
+          target: t,
+          waypoints: e.waypoints ?? [],
+        })
+      )
     }
   }
 
-  #depth (frameId, guard = 0) {
+  #depth(frameId, guard = 0) {
     const f = this.frames.get(frameId)
     if (!f?.parent || guard > 64) return 0
     return 1 + this.#depth(f.parent, guard + 1)
   }
 
   /** @param {string} id */
-  kindOf (id) {
+  kindOf(id) {
     if (this.nodes.has(id)) return 'node'
     if (this.edges.has(id)) return 'edge'
     if (this.frames.has(id)) return 'frame'
@@ -189,28 +236,37 @@ export class GraphModel {
   }
 
   /** The item with this id, whatever its kind. @param {string} id */
-  get (id) {
-    return this.nodes.get(id) ?? this.frames.get(id) ?? this.annotations.get(id) ?? this.edges.get(id)
+  get(id) {
+    return (
+      this.nodes.get(id) ?? this.frames.get(id) ?? this.annotations.get(id) ?? this.edges.get(id)
+    )
   }
 
   /** @param {{ layer?: string }} item */
-  isHidden (item) {
+  isHidden(item) {
     return !!(item.layer && this.layers.get(item.layer)?.hidden)
   }
 
   /** Locked by itself or by its layer. @param {{ layer?: string, locked?: boolean }} item */
-  isLocked (item) {
+  isLocked(item) {
     return !!(item.locked || (item.layer && this.layers.get(item.layer)?.locked))
   }
 
   /** Bounding rectangle of a node, frame or annotation. @param {string} id @returns {Rect|null} */
-  rectOf (id) {
+  rectOf(id) {
     const item = this.nodes.get(id) ?? this.frames.get(id) ?? this.annotations.get(id)
-    return item ? { x: item.x, y: item.y, w: /** @type {number} */ (item.w), h: /** @type {number} */ (item.h) } : null
+    return item
+      ? {
+          x: item.x,
+          y: item.y,
+          w: /** @type {number} */ (item.w),
+          h: /** @type {number} */ (item.h),
+        }
+      : null
   }
 
   /** Frames, parents before children. */
-  framesInOrder () {
+  framesInOrder() {
     return [...this.frames.values()].sort((a, b) => a.depth - b.depth)
   }
 
@@ -218,7 +274,7 @@ export class GraphModel {
    * Everything nested inside a frame at any depth (nodes, frames, annotations).
    * @param {string} frameId
    */
-  descendants (frameId) {
+  descendants(frameId) {
     const out = []
     const inside = parent => {
       let p = parent
@@ -229,7 +285,8 @@ export class GraphModel {
       return false
     }
     for (const map of [this.frames, this.nodes, this.annotations]) {
-      for (const item of map.values()) if (item.id !== frameId && inside(item.parent)) out.push(item.id)
+      for (const item of map.values())
+        if (item.id !== frameId && inside(item.parent)) out.push(item.id)
     }
     return out
   }
@@ -239,7 +296,7 @@ export class GraphModel {
    * @param {{ x: number, y: number }} point
    * @param {Set<string>} [exclude]
    */
-  frameAt (point, exclude = new Set()) {
+  frameAt(point, exclude = new Set()) {
     let best = null
     for (const f of this.frames.values()) {
       if (exclude.has(f.id) || this.isHidden(f) || !containsPoint(f, point)) continue
@@ -249,9 +306,11 @@ export class GraphModel {
   }
 
   /** Bounds of the given items (default: everything visible). @param {Iterable<string>} [ids] */
-  bounds (ids) {
+  bounds(ids) {
     const rects = []
-    const list = ids ? [...ids] : [...this.nodes.keys(), ...this.frames.keys(), ...this.annotations.keys()]
+    const list = ids
+      ? [...ids]
+      : [...this.nodes.keys(), ...this.frames.keys(), ...this.annotations.keys()]
     for (const id of list) {
       const item = this.get(id)
       if (!item || this.isHidden(item)) continue
@@ -270,7 +329,7 @@ export class GraphModel {
 }
 
 /** @param {EndRef|string|undefined} ref @returns {EndRef|null} */
-function endRef (ref) {
+function endRef(ref) {
   if (typeof ref === 'string') return { node: ref, port: null }
   if (ref && typeof ref.node === 'string') return { node: ref.node, port: ref.port ?? null }
   return null

@@ -32,20 +32,25 @@ export class ComponentCatalog {
   #scanning = Promise.resolve()
 
   /** @param {string[]} dirs directories that contain component folders */
-  constructor (dirs) {
+  constructor(dirs) {
     this.#dirs = dirs
   }
 
-  get dirs () { return [...this.#dirs] }
+  get dirs() {
+    return [...this.#dirs]
+  }
 
   /** Packs every component folder; returns what changed since the last scan. */
-  scan () {
+  scan() {
     const run = this.#scanning.then(() => this.#scan())
-    this.#scanning = run.then(() => {}, () => {})
+    this.#scanning = run.then(
+      () => {},
+      () => {}
+    )
     return run
   }
 
-  async #scan () {
+  async #scan() {
     const folders = (await Promise.all(this.#dirs.map(componentFolders))).flat()
     /** @type {CatalogChange[]} */
     const changes = []
@@ -57,27 +62,38 @@ export class ComponentCatalog {
       /** @type {CatalogEntry} */
       const entry = { folder, name: folder.split(sep).pop() ?? folder, ...result }
       this.#entries.set(folder, entry)
-      const typeRef = entry.bundle ? `${entry.bundle.manifest.id}@${entry.bundle.manifest.version}` : null
+      const typeRef = entry.bundle
+        ? `${entry.bundle.manifest.id}@${entry.bundle.manifest.version}`
+        : null
       if (!entry.bundle) {
-        if (JSON.stringify(before?.problems) !== JSON.stringify(entry.problems)) changes.push({ action: 'failed', folder, typeRef })
-      } else if (!before?.bundle) changes.push({ action: before ? 'changed' : 'added', folder, typeRef })
-      else if (before.bundle.integrity !== entry.bundle.integrity) changes.push({ action: 'changed', folder, typeRef })
+        if (JSON.stringify(before?.problems) !== JSON.stringify(entry.problems))
+          changes.push({ action: 'failed', folder, typeRef })
+      } else if (!before?.bundle)
+        changes.push({ action: before ? 'changed' : 'added', folder, typeRef })
+      else if (before.bundle.integrity !== entry.bundle.integrity)
+        changes.push({ action: 'changed', folder, typeRef })
     }
     for (const [folder, entry] of this.#entries) {
       if (seen.has(folder)) continue
       this.#entries.delete(folder)
-      changes.push({ action: 'removed', folder, typeRef: entry.bundle ? `${entry.bundle.manifest.id}@${entry.bundle.manifest.version}` : null })
+      changes.push({
+        action: 'removed',
+        folder,
+        typeRef: entry.bundle
+          ? `${entry.bundle.manifest.id}@${entry.bundle.manifest.version}`
+          : null,
+      })
     }
     return changes
   }
 
   /** Every component folder found, in folder order. */
-  entries () {
+  entries() {
     return [...this.#entries.values()]
   }
 
   /** @param {string} folder absolute path */
-  get (folder) {
+  get(folder) {
     return this.#entries.get(folder) ?? null
   }
 
@@ -85,7 +101,7 @@ export class ComponentCatalog {
    * Watches the directories and repacks after changes settle.
    * @param {{ debounce?: number }} [options]
    */
-  watch ({ debounce = 120 } = {}) {
+  watch({ debounce = 120 } = {}) {
     if (this.#watchers.length) return
     const schedule = () => {
       clearTimeout(this.#timer)
@@ -96,10 +112,12 @@ export class ComponentCatalog {
     }
     for (const dir of this.#dirs) {
       try {
-        this.#watchers.push(watch(dir, { recursive: true }, (event, file) => {
-          if (file && /(^|[\\/])(\.|node_modules)|\.strata\.js$/.test(String(file))) return
-          schedule()
-        }))
+        this.#watchers.push(
+          watch(dir, { recursive: true }, (event, file) => {
+            if (file && /(^|[\\/])(\.|node_modules)|\.strata\.js$/.test(String(file))) return
+            schedule()
+          })
+        )
       } catch (err) {
         if (err.code !== 'ENOENT') throw err
       }
@@ -107,12 +125,12 @@ export class ComponentCatalog {
   }
 
   /** @param {(changes: CatalogChange[]) => void} fn @returns {() => void} */
-  onChange (fn) {
+  onChange(fn) {
     this.#listeners.add(fn)
     return () => this.#listeners.delete(fn)
   }
 
-  close () {
+  close() {
     clearTimeout(this.#timer)
     for (const w of this.#watchers) w.close()
     this.#watchers = []
@@ -120,7 +138,7 @@ export class ComponentCatalog {
   }
 
   /** Folder path relative to `root`, with POSIX separators. @param {string} folder @param {string} root */
-  static relativeFolder (folder, root) {
+  static relativeFolder(folder, root) {
     return relative(root, folder).split(sep).join('/')
   }
 }

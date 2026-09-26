@@ -12,7 +12,7 @@ export const ALIGN_MODES = Object.freeze(['left', 'center', 'right', 'top', 'mid
  * @param {'left'|'center'|'right'|'top'|'middle'|'bottom'} mode
  * @returns {{ id: string, x: number, y: number }[]}
  */
-export function align (items, mode) {
+export function align(items, mode) {
   if (items.length < 2) return items.map(({ id, x, y }) => ({ id, x, y }))
   const left = Math.min(...items.map(i => i.x))
   const right = Math.max(...items.map(i => i.x + i.w))
@@ -20,13 +20,20 @@ export function align (items, mode) {
   const bottom = Math.max(...items.map(i => i.y + i.h))
   return items.map(i => {
     switch (mode) {
-      case 'left': return { id: i.id, x: left, y: i.y }
-      case 'right': return { id: i.id, x: right - i.w, y: i.y }
-      case 'center': return { id: i.id, x: (left + right) / 2 - i.w / 2, y: i.y }
-      case 'top': return { id: i.id, x: i.x, y: top }
-      case 'bottom': return { id: i.id, x: i.x, y: bottom - i.h }
-      case 'middle': return { id: i.id, x: i.x, y: (top + bottom) / 2 - i.h / 2 }
-      default: throw new Error(`Unknown alignment '${mode}'`)
+      case 'left':
+        return { id: i.id, x: left, y: i.y }
+      case 'right':
+        return { id: i.id, x: right - i.w, y: i.y }
+      case 'center':
+        return { id: i.id, x: (left + right) / 2 - i.w / 2, y: i.y }
+      case 'top':
+        return { id: i.id, x: i.x, y: top }
+      case 'bottom':
+        return { id: i.id, x: i.x, y: bottom - i.h }
+      case 'middle':
+        return { id: i.id, x: i.x, y: (top + bottom) / 2 - i.h / 2 }
+      default:
+        throw new Error(`Unknown alignment '${mode}'`)
     }
   })
 }
@@ -37,7 +44,7 @@ export function align (items, mode) {
  * @param {'horizontal'|'vertical'} axis
  * @returns {{ id: string, x: number, y: number }[]}
  */
-export function distribute (items, axis) {
+export function distribute(items, axis) {
   if (items.length < 3) return items.map(({ id, x, y }) => ({ id, x, y }))
   const horizontal = axis === 'horizontal'
   const pos = i => (horizontal ? i.x : i.y)
@@ -53,5 +60,9 @@ export function distribute (items, axis) {
     placed.set(item.id, cursor)
     cursor += size(item) + gap
   }
-  return items.map(i => (horizontal ? { id: i.id, x: placed.get(i.id), y: i.y } : { id: i.id, x: i.x, y: placed.get(i.id) }))
+  return items.map(i =>
+    horizontal
+      ? { id: i.id, x: placed.get(i.id), y: i.y }
+      : { id: i.id, x: i.x, y: placed.get(i.id) }
+  )
 }

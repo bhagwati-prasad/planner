@@ -24,7 +24,7 @@ import { transformModule, transformJson, ModuleError, MODULE_PARAMS } from './mo
  * path climbs above the root.
  * @param {string} path
  */
-export function normalizePath (path) {
+export function normalizePath(path) {
   const out = []
   for (const seg of path.split('/')) {
     if (seg === '' || seg === '.') continue
@@ -37,7 +37,7 @@ export function normalizePath (path) {
 }
 
 /** @param {string} path */
-const dirOf = path => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
+const dirOf = path => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '')
 
 /**
  * Resolves a relative import against the importing file.
@@ -45,14 +45,18 @@ const dirOf = path => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) 
  * @param {string} specifier
  * @returns {{ path: string } | { error: string }}
  */
-export function resolveImport (from, specifier) {
+export function resolveImport(from, specifier) {
   if (!/^\.\.?\//.test(specifier)) {
-    return { error: /^[a-z][a-z0-9+.-]*:/i.test(specifier) || specifier.startsWith('/')
-      ? `imports '${specifier}': only relative imports ('./lib/x.js') can be bundled`
-      : `imports the package '${specifier}': bundles cannot use npm packages; copy the code into the folder and import it with a relative path` }
+    return {
+      error:
+        /^[a-z][a-z0-9+.-]*:/i.test(specifier) || specifier.startsWith('/')
+          ? `imports '${specifier}': only relative imports ('./lib/x.js') can be bundled`
+          : `imports the package '${specifier}': bundles cannot use npm packages; copy the code into the folder and import it with a relative path`,
+    }
   }
   const path = normalizePath(`${dirOf(from)}/${specifier}`)
-  if (path === null) return { error: `imports '${specifier}', which is outside the folder being bundled` }
+  if (path === null)
+    return { error: `imports '${specifier}', which is outside the folder being bundled` }
   return { path }
 }
 
@@ -62,7 +66,7 @@ export function resolveImport (from, specifier) {
  * @param {string[]} entries
  * @returns {BundleResult}
  */
-export function bundleModules (files, entries) {
+export function bundleModules(files, entries) {
   /** @type {Problem[]} */
   const problems = []
   /** @type {Record<string, import('./modules.js').TransformedModule>} */
@@ -75,7 +79,11 @@ export function bundleModules (files, entries) {
     if (deps.has(path)) return
     if (!(path in files)) {
       const hint = [`${path}.js`, `${path}/index.js`].find(p => p in files)
-      error(from ?? path, `${from ? `imports '${path}'` : `entry '${path}'`}, which does not exist${hint ? `. Did you mean '${hint}'? Imports need the file extension` : ''}`, line)
+      error(
+        from ?? path,
+        `${from ? `imports '${path}'` : `entry '${path}'`}, which does not exist${hint ? `. Did you mean '${hint}'? Imports need the file extension` : ''}`,
+        line
+      )
       deps.set(path, [])
       return
     }
@@ -93,20 +101,37 @@ export function bundleModules (files, entries) {
     deps.set(path, list)
     for (const imp of mod.imports) {
       const r = resolveImport(path, imp.specifier)
-      if ('error' in r) { error(path, r.error, imp.line); continue }
+      if ('error' in r) {
+        error(path, r.error, imp.line)
+        continue
+      }
       if (r.path.endsWith('.json') && imp.attributes?.type !== 'json') {
-        problems.push({ level: 'warning', file: path, line: imp.line, message: `imports JSON '${imp.specifier}' without "with { type: 'json' }"; browsers require it for native modules` })
+        problems.push({
+          level: 'warning',
+          file: path,
+          line: imp.line,
+          message: `imports JSON '${imp.specifier}' without "with { type: 'json' }"; browsers require it for native modules`,
+        })
       }
       list.push(r.path)
       visit(r.path, path, imp.line)
     }
     for (const d of mod.dynamic) {
       if (d.specifier === null) {
-        problems.push({ level: 'warning', file: path, line: d.line, message: 'import() with a computed specifier can only load modules that are bundled anyway' })
+        problems.push({
+          level: 'warning',
+          file: path,
+          line: d.line,
+          message:
+            'import() with a computed specifier can only load modules that are bundled anyway',
+        })
         continue
       }
       const r = resolveImport(path, d.specifier)
-      if ('error' in r) { error(path, r.error, d.line); continue }
+      if ('error' in r) {
+        error(path, r.error, d.line)
+        continue
+      }
       visit(r.path, path, d.line)
     }
   }
@@ -125,7 +150,10 @@ export function bundleModules (files, entries) {
     for (const dep of deps.get(path) ?? []) {
       if (state.get(dep) === 'active') {
         const cycle = [...stack.slice(stack.indexOf(dep)), dep]
-        error(path, `import cycle: ${cycle.join(' → ')}. Bundled imports must not form a cycle; move the shared code into a module both can import`)
+        error(
+          path,
+          `import cycle: ${cycle.join(' → ')}. Bundled imports must not form a cycle; move the shared code into a module both can import`
+        )
       } else if (!state.has(dep)) walk(dep, stack)
     }
     stack.pop()
@@ -156,11 +184,18 @@ export function bundleModules (files, entries) {
       const r = resolveImport(path, imp.specifier)
       if (!('path' in r) || !modules[r.path]) continue
       const available = exportsOf(r.path)
-      const wanted = [...imp.bindings.map(b => b.imported), ...imp.reexports.map(x => x.imported)].filter(n => n !== '*')
+      const wanted = [
+        ...imp.bindings.map(b => b.imported),
+        ...imp.reexports.map(x => x.imported),
+      ].filter(n => n !== '*')
       for (const name of wanted) {
         if (available.has(name)) continue
         const close = [...available].find(a => a.toLowerCase() === name.toLowerCase())
-        error(path, `'${imp.specifier}' has no export named '${name}'${close ? `. Did you mean '${close}'?` : ''}`, imp.line)
+        error(
+          path,
+          `'${imp.specifier}' has no export named '${name}'${close ? `. Did you mean '${close}'?` : ''}`,
+          imp.line
+        )
       }
     }
   }
@@ -173,10 +208,17 @@ export function bundleModules (files, entries) {
  * can be embedded in generated scripts and in the simulation worker.
  * @param {Record<string, Function>} defs  path → wrapped module function
  */
-export function createModuleRuntime (defs) {
+export function createModuleRuntime(defs) {
   const cache = Object.create(null)
-  function resolve (from, spec) {
-    if (!/^\.\.?\//.test(spec)) throw new Error('Cannot import \'' + spec + '\' from ' + from + ': only bundled relative imports are available')
+  function resolve(from, spec) {
+    if (!/^\.\.?\//.test(spec))
+      throw new Error(
+        "Cannot import '" +
+          spec +
+          "' from " +
+          from +
+          ': only bundled relative imports are available'
+      )
     const parts = from.split('/')
     parts.pop()
     for (const seg of spec.split('/')) {
@@ -185,7 +227,7 @@ export function createModuleRuntime (defs) {
     }
     return parts.join('/')
   }
-  function load (path) {
+  function load(path) {
     if (cache[path]) return cache[path]
     const def = defs[path]
     if (typeof def !== 'function') throw new Error('Module not found: ' + path)
@@ -193,15 +235,28 @@ export function createModuleRuntime (defs) {
     Object.defineProperty(ns, Symbol.toStringTag, { value: 'Module' })
     cache[path] = ns
     const define = function (getters, stars) {
-      for (const key of Object.keys(getters)) Object.defineProperty(ns, key, { get: getters[key], enumerable: true })
+      for (const key of Object.keys(getters))
+        Object.defineProperty(ns, key, { get: getters[key], enumerable: true })
       for (const star of stars || []) {
         for (const key of Object.keys(star)) {
-          if (key !== 'default' && !Object.prototype.hasOwnProperty.call(ns, key)) Object.defineProperty(ns, key, { get: function () { return star[key] }, enumerable: true })
+          if (key !== 'default' && !Object.prototype.hasOwnProperty.call(ns, key))
+            Object.defineProperty(ns, key, {
+              get: function () {
+                return star[key]
+              },
+              enumerable: true,
+            })
         }
       }
     }
-    const req = function (spec) { return load(resolve(path, spec)) }
-    const dyn = function (spec) { return new Promise(function (ok) { ok(req(spec)) }) }
+    const req = function (spec) {
+      return load(resolve(path, spec))
+    }
+    const dyn = function (spec) {
+      return new Promise(function (ok) {
+        ok(req(spec))
+      })
+    }
     def(req, define, { url: path }, dyn)
     Object.preventExtensions(ns)
     return ns
@@ -214,11 +269,14 @@ export function createModuleRuntime (defs) {
  * @param {Record<string, import('./modules.js').TransformedModule|string>} modules
  * @param {string[]} order
  */
-export function moduleTable (modules, order) {
-  return `{\n${order.filter(p => p in modules).map(p => {
-    const m = modules[p]
-    return `// ${p}\n${JSON.stringify(p)}: ${typeof m === 'string' ? m : m.code}`
-  }).join(',\n')}\n}`
+export function moduleTable(modules, order) {
+  return `{\n${order
+    .filter(p => p in modules)
+    .map(p => {
+      const m = modules[p]
+      return `// ${p}\n${JSON.stringify(p)}: ${typeof m === 'string' ? m : m.code}`
+    })
+    .join(',\n')}\n}`
 }
 
 /**
@@ -228,13 +286,17 @@ export function moduleTable (modules, order) {
  * @param {BundleResult} bundle
  * @param {{ entry: string, format: 'iife'|'cjs', globalName?: string, banner?: string }} options
  */
-export function emitScript (bundle, { entry, format, globalName, banner = '' }) {
+export function emitScript(bundle, { entry, format, globalName, banner = '' }) {
   const errors = bundle.problems.filter(p => p.level === 'error')
-  if (errors.length) throw new Error(`Cannot emit a bundle with errors:\n${errors.map(formatProblem).join('\n')}`)
+  if (errors.length)
+    throw new Error(`Cannot emit a bundle with errors:\n${errors.map(formatProblem).join('\n')}`)
   const run = `__runtime.load(${JSON.stringify(normalizePath(entry))})`
-  const expose = format === 'cjs'
-    ? `module.exports = ${run};`
-    : globalName ? `globalThis[${JSON.stringify(globalName)}] = ${run};` : `${run};`
+  const expose =
+    format === 'cjs'
+      ? `module.exports = ${run};`
+      : globalName
+        ? `globalThis[${JSON.stringify(globalName)}] = ${run};`
+        : `${run};`
   return `${banner ? `${banner.trim()}\n` : ''}(function () {
 'use strict';
 var __runtime = (${String(createModuleRuntime)})(${moduleTable(bundle.modules, bundle.order)});
@@ -244,7 +306,7 @@ ${expose}
 }
 
 /** @param {Problem} p */
-export function formatProblem (p) {
+export function formatProblem(p) {
   return `${p.file}${p.line ? `:${p.line}` : ''}: ${p.level}: ${p.message}`
 }
 

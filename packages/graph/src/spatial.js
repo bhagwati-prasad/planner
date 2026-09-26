@@ -14,24 +14,27 @@ export class SpatialIndex {
   #items = new Map()
 
   /** @param {number} [cellSize] world units per cell */
-  constructor (cellSize = 256) {
+  constructor(cellSize = 256) {
     this.#cell = cellSize
   }
 
-  get size () { return this.#items.size }
+  get size() {
+    return this.#items.size
+  }
 
   /** @param {Rect} r */
-  #keys (r) {
+  #keys(r) {
     const c = this.#cell
     const keys = []
     const x2 = Math.floor((r.x + r.w) / c)
     const y2 = Math.floor((r.y + r.h) / c)
-    for (let i = Math.floor(r.x / c); i <= x2; i++) for (let j = Math.floor(r.y / c); j <= y2; j++) keys.push(`${i},${j}`)
+    for (let i = Math.floor(r.x / c); i <= x2; i++)
+      for (let j = Math.floor(r.y / c); j <= y2; j++) keys.push(`${i},${j}`)
     return keys
   }
 
   /** Adds or moves an item. @param {string} id @param {Rect} rect */
-  set (id, rect) {
+  set(id, rect) {
     this.delete(id)
     const keys = this.#keys(rect)
     for (const k of keys) {
@@ -43,7 +46,7 @@ export class SpatialIndex {
   }
 
   /** @param {string} id */
-  delete (id) {
+  delete(id) {
     const item = this.#items.get(id)
     if (!item) return false
     for (const k of item.keys) {
@@ -55,20 +58,22 @@ export class SpatialIndex {
     return true
   }
 
-  clear () {
+  clear() {
     this.#cells.clear()
     this.#items.clear()
   }
 
   /** @param {string} id */
-  get (id) { return this.#items.get(id)?.rect }
+  get(id) {
+    return this.#items.get(id)?.rect
+  }
 
   /**
    * Ids whose rectangles overlap `rect` (touching counts), in insertion order.
    * @param {Rect} rect
    * @param {(id: string) => boolean} [filter]
    */
-  query (rect, filter) {
+  query(rect, filter) {
     const seen = new Set()
     const out = []
     const probe = { x: rect.x - 1e-9, y: rect.y - 1e-9, w: rect.w + 2e-9, h: rect.h + 2e-9 }
@@ -87,10 +92,15 @@ export class SpatialIndex {
    * Ids whose rectangles lie entirely inside `rect`.
    * @param {Rect} rect
    */
-  within (rect) {
+  within(rect) {
     return this.query(rect).filter(id => {
       const r = /** @type {Rect} */ (this.get(id))
-      return r.x >= rect.x && r.y >= rect.y && r.x + r.w <= rect.x + rect.w && r.y + r.h <= rect.y + rect.h
+      return (
+        r.x >= rect.x &&
+        r.y >= rect.y &&
+        r.x + r.w <= rect.x + rect.w &&
+        r.y + r.h <= rect.y + rect.h
+      )
     })
   }
 
@@ -100,15 +110,21 @@ export class SpatialIndex {
    * @param {number} radius
    * @param {(id: string) => boolean} [filter]
    */
-  nearest (point, radius, filter) {
+  nearest(point, radius, filter) {
     let best = null
     let bestD = Infinity
-    for (const id of this.query({ x: point.x - radius, y: point.y - radius, w: 2 * radius, h: 2 * radius }, filter)) {
+    for (const id of this.query(
+      { x: point.x - radius, y: point.y - radius, w: 2 * radius, h: 2 * radius },
+      filter
+    )) {
       const r = /** @type {Rect} */ (this.get(id))
       const dx = Math.max(r.x - point.x, 0, point.x - (r.x + r.w))
       const dy = Math.max(r.y - point.y, 0, point.y - (r.y + r.h))
       const d = Math.hypot(dx, dy)
-      if (d <= radius && d < bestD) { best = id; bestD = d }
+      if (d <= radius && d < bestD) {
+        best = id
+        bestD = d
+      }
     }
     return best
   }

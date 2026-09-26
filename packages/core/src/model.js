@@ -18,12 +18,12 @@ const MAX_PORT_HOPS = 256
  */
 
 /** @param {Source} src */
-export function projectOf (src) {
+export function projectOf(src) {
   return src.all('project')[0] ?? null
 }
 
 /** @param {Source} src */
-export function requireProject (src) {
+export function requireProject(src) {
   const project = projectOf(src)
   if (!project) fail('NOT_FOUND', 'The model has no project; dispatch project.init first')
   return project
@@ -43,7 +43,7 @@ export const viewsOf = (src, systemId) => src.find('view', 'systemId', systemId)
 export const referencingNodes = (src, systemId) => src.find('node', 'systemRef', systemId)
 
 /** Edges attached to a port, in id order. @param {Source} src @param {string} portId */
-export function edgesAtPort (src, portId) {
+export function edgesAtPort(src, portId) {
   const seen = new Map()
   for (const e of src.find('edge', 'fromPort', portId)) seen.set(e.id, e)
   for (const e of src.find('edge', 'toPort', portId)) seen.set(e.id, e)
@@ -51,23 +51,25 @@ export function edgesAtPort (src, portId) {
 }
 
 /** @param {Source} src @param {string} nodeId @param {string} name */
-export function portByName (src, nodeId, name) {
+export function portByName(src, nodeId, name) {
   return portsOf(src, nodeId).find(p => p.name === name) ?? null
 }
 
 /** @param {Source} src @param {string} portId */
-export function nodeOfPort (src, portId) {
+export function nodeOfPort(src, portId) {
   return src.require('node', src.require('port', portId).nodeId)
 }
 
 /** The system a port's node lives in. @param {Source} src @param {string} portId */
-export function systemOfPort (src, portId) {
+export function systemOfPort(src, portId) {
   return nodeOfPort(src, portId).systemId
 }
 
 /** Systems placed directly inside `systemId`, in node order. @param {Source} src @param {string} systemId */
-export function childSystemIds (src, systemId) {
-  return nodesOf(src, systemId).filter(n => n.kind === 'composite').map(n => n.systemRef)
+export function childSystemIds(src, systemId) {
+  return nodesOf(src, systemId)
+    .filter(n => n.kind === 'composite')
+    .map(n => n.systemRef)
 }
 
 /**
@@ -76,7 +78,7 @@ export function childSystemIds (src, systemId) {
  * @param {string} outer
  * @param {string} inner
  */
-export function containsSystem (src, outer, inner) {
+export function containsSystem(src, outer, inner) {
   const seen = new Set()
   const stack = [...childSystemIds(src, outer)]
   while (stack.length) {
@@ -95,7 +97,7 @@ export function containsSystem (src, outer, inner) {
  * @param {string} containerId
  * @param {string} childId
  */
-export function wouldCycle (src, containerId, childId) {
+export function wouldCycle(src, containerId, childId) {
   return containerId === childId || containsSystem(src, childId, containerId)
 }
 
@@ -104,7 +106,7 @@ export function wouldCycle (src, containerId, childId) {
  * @param {Source} src
  * @param {string} systemId
  */
-export function subtreeSystemIds (src, systemId) {
+export function subtreeSystemIds(src, systemId) {
   const out = []
   const seen = new Set()
   const visit = id => {
@@ -125,7 +127,7 @@ export function subtreeSystemIds (src, systemId) {
  * @param {string} systemId
  * @param {{ limit?: number }} [options]
  */
-export function pathsTo (src, systemId, { limit = 100 } = {}) {
+export function pathsTo(src, systemId, { limit = 100 } = {}) {
   const rootId = requireProject(src).rootSystemId
   /** @type {{systemId: string, viaNodeId: string|null}[][]} */
   const out = []
@@ -137,7 +139,11 @@ export function pathsTo (src, systemId, { limit = 100 } = {}) {
     }
     for (const node of referencingNodes(src, id)) {
       if (seen.has(node.systemId)) continue
-      walk(node.systemId, [{ systemId: id, viaNodeId: node.id }, ...suffix], new Set([...seen, node.systemId]))
+      walk(
+        node.systemId,
+        [{ systemId: id, viaNodeId: node.id }, ...suffix],
+        new Set([...seen, node.systemId])
+      )
     }
   }
   walk(systemId, [], new Set([systemId]))
@@ -149,7 +155,7 @@ export function pathsTo (src, systemId, { limit = 100 } = {}) {
  * @param {Source} src
  * @param {{ id: string, ownerNodeId: string|null }} system
  */
-export function isLibrarySystem (src, system) {
+export function isLibrarySystem(src, system) {
   return !system.ownerNodeId && system.id !== projectOf(src)?.rootSystemId
 }
 
@@ -158,7 +164,7 @@ export function isLibrarySystem (src, system) {
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {{ kind: string, typeRef: string|null }} node
  */
-export function manifestOf (registry, node) {
+export function manifestOf(registry, node) {
   if (node.kind !== 'atomic' || !node.typeRef || !registry) return null
   return registry.resolve(node.typeRef)
 }
@@ -169,7 +175,7 @@ export function manifestOf (registry, node) {
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {{ connectionType: string|null }} edge
  */
-export function connectionTypeOf (registry, edge) {
+export function connectionTypeOf(registry, edge) {
   if (!edge.connectionType || !registry) return null
   let found = null
   try {
@@ -186,7 +192,7 @@ export function connectionTypeOf (registry, edge) {
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {any} entity
  */
-function describedBy (registry, entity) {
+function describedBy(registry, entity) {
   return 'fromPort' in entity ? connectionTypeOf(registry, entity) : manifestOf(registry, entity)
 }
 
@@ -197,7 +203,7 @@ function describedBy (registry, entity) {
  * @param {{ props: Record<string, unknown> }} entity
  * @returns {Record<string, any>}
  */
-export function effectiveProps (registry, entity) {
+export function effectiveProps(registry, entity) {
   const manifest = describedBy(registry, entity)
   return { ...defaultProps(manifest?.properties), ...entity.props }
 }
@@ -208,12 +214,18 @@ export function effectiveProps (registry, entity) {
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {{ props: Record<string, unknown> }} entity  a node or an edge
  */
-export function explainProps (registry, entity) {
+export function explainProps(registry, entity) {
   const manifest = describedBy(registry, entity)
   /** @type {Record<string, {value: unknown, source: 'default'|'override', unit?: string, group?: string}>} */
   const out = {}
   for (const [key, schema] of Object.entries(manifest?.properties ?? {})) {
-    if (schema.default !== undefined) out[key] = { value: schema.default, source: 'default', unit: schema.unit, group: schema.group }
+    if (schema.default !== undefined)
+      out[key] = {
+        value: schema.default,
+        source: 'default',
+        unit: schema.unit,
+        group: schema.group,
+      }
   }
   for (const [key, value] of Object.entries(entity.props ?? {})) {
     const schema = manifest?.properties?.[key]
@@ -230,12 +242,13 @@ export function explainProps (registry, entity) {
  * @param {string} portId
  * @returns {{ port: any, chain: string[], boundaryPortIds: string[], unmapped: boolean }}
  */
-export function resolvePort (src, portId) {
+export function resolvePort(src, portId) {
   let port = src.require('port', portId)
   const chain = [port.id]
   const boundaryPortIds = []
   for (let hops = 0; port.boundaryPortId; hops++) {
-    if (hops > MAX_PORT_HOPS) fail('CYCLE', `Port '${portId}' resolves through more than ${MAX_PORT_HOPS} boundary ports`)
+    if (hops > MAX_PORT_HOPS)
+      fail('CYCLE', `Port '${portId}' resolves through more than ${MAX_PORT_HOPS} boundary ports`)
     const bp = src.get('boundaryPort', port.boundaryPortId)
     if (!bp) return { port, chain, boundaryPortIds, unmapped: true }
     boundaryPortIds.push(bp.id)
@@ -254,7 +267,7 @@ export function resolvePort (src, portId) {
  * @param {Source} src
  * @param {any} port
  */
-export function acceptsOf (src, port) {
+export function acceptsOf(src, port) {
   if (!port.boundaryPortId) return port.accepts ?? []
   const { port: target, unmapped } = resolvePort(src, port.id)
   return unmapped ? [] : (target.accepts ?? [])
@@ -264,7 +277,7 @@ export function acceptsOf (src, port) {
  * The next C4 level below a system's level, used when extracting a child system.
  * @param {string|null} levelTag
  */
-export function childLevel (levelTag) {
+export function childLevel(levelTag) {
   if (levelTag === 'context') return 'container'
   if (levelTag === 'container') return 'component'
   return null

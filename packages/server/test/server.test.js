@@ -12,7 +12,7 @@ let root
 let server
 
 /** Writes a component folder under root/components/<name>. */
-function writeFolder (name, files) {
+function writeFolder(name, files) {
   for (const [path, content] of Object.entries(files)) {
     const target = join(root, 'components', name, path)
     mkdirSync(dirname(target), { recursive: true })
@@ -21,14 +21,19 @@ function writeFolder (name, files) {
 }
 
 /** A raw HTTP request, so tests can send any Host header and method. */
-function raw (path, { method = 'GET', host } = {}) {
+function raw(path, { method = 'GET', host } = {}) {
   const url = new URL(server.url)
   return new Promise((resolve, reject) => {
-    const req = request({ host: url.hostname, port: url.port, path, method, headers: host ? { host } : {} }, res => {
-      let body = ''
-      res.on('data', d => { body += d })
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }))
-    })
+    const req = request(
+      { host: url.hostname, port: url.port, path, method, headers: host ? { host } : {} },
+      res => {
+        let body = ''
+        res.on('data', d => {
+          body += d
+        })
+        res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }))
+      }
+    )
     req.on('error', reject)
     req.end()
   })
@@ -53,9 +58,22 @@ test('the component API lists packed components and their problems', async () =>
   const res = await fetch(`${server.url}/api/components`)
   assert.equal(res.headers.get('content-security-policy'), CSP)
   const { components } = await res.json()
-  assert.deepEqual(components.map(c => [c.folder, c.typeRef]), [['components/broken', null], ['components/message-queue', 'acme.message-queue@1.2.0']])
+  assert.deepEqual(
+    components.map(c => [c.folder, c.typeRef]),
+    [
+      ['components/broken', null],
+      ['components/message-queue', 'acme.message-queue@1.2.0'],
+    ]
+  )
   const [broken, queue] = components
-  assert.ok(broken.problems.some(p => p.level === 'error' && p.file === 'components/broken/manifest.json' && /strataApi is required/.test(p.message)))
+  assert.ok(
+    broken.problems.some(
+      p =>
+        p.level === 'error' &&
+        p.file === 'components/broken/manifest.json' &&
+        /strataApi is required/.test(p.message)
+    )
+  )
   assert.equal(queue.script, '/api/components/acme.message-queue%401.2.0.strata.js')
   assert.deepEqual(readBundle(queue.bundle), queue.bundle, 'bundles arrive intact')
 
@@ -73,13 +91,22 @@ test('static files, redirects and the security rules of served mode', async () =
   const app = await fetch(`${server.url}/app/`)
   assert.equal(app.status, 200)
   assert.match(await app.text(), /<title>app<\/title>/)
-  for (const header of ['x-content-type-options', 'referrer-policy', 'cross-origin-opener-policy']) assert.ok(app.headers.get(header), header)
+  for (const header of ['x-content-type-options', 'referrer-policy', 'cross-origin-opener-policy'])
+    assert.ok(app.headers.get(header), header)
 
-  assert.equal((await raw('/app/', { host: 'evil.example:80' })).status, 403, 'DNS rebinding: foreign Host headers are refused')
+  assert.equal(
+    (await raw('/app/', { host: 'evil.example:80' })).status,
+    403,
+    'DNS rebinding: foreign Host headers are refused'
+  )
   assert.equal((await raw('/app/', { host: `localhost:${new URL(server.url).port}` })).status, 200)
   assert.equal((await raw('/app/', { method: 'POST' })).status, 405)
   assert.equal((await raw('/.env')).status, 404, 'dotfiles are never served')
-  for (const path of ['/../../etc/passwd', '/%2e%2e/%2e%2e/etc/passwd', '/app/..%2f..%2f..%2fetc/passwd']) {
+  for (const path of [
+    '/../../etc/passwd',
+    '/%2e%2e/%2e%2e/etc/passwd',
+    '/app/..%2f..%2f..%2fetc/passwd',
+  ]) {
     assert.ok([403, 404].includes((await raw(path)).status), `${path} stays inside root`)
   }
   assert.equal((await fetch(`${server.url}/api/health`).then(r => r.json())).ok, true)
@@ -101,11 +128,14 @@ test('changing a component folder repacks it and notifies open pages', async () 
     }
     return text
   }
-  const before = (await (await fetch(`${server.url}/api/components`)).json()).components[1].integrity
+  const before = (await (await fetch(`${server.url}/api/components`)).json()).components[1]
+    .integrity
   writeFileSync(join(root, 'components', 'message-queue', 'README.md'), '# Changed\n')
   const event = await next()
   const data = JSON.parse(/data: (.*)\n/.exec(event)?.[1] ?? '{}')
-  assert.deepEqual(data.changes, [{ action: 'changed', folder: 'components/message-queue', typeRef: 'acme.message-queue@1.2.0' }])
+  assert.deepEqual(data.changes, [
+    { action: 'changed', folder: 'components/message-queue', typeRef: 'acme.message-queue@1.2.0' },
+  ])
   const after = (await (await fetch(`${server.url}/api/components`)).json()).components[1].integrity
   assert.notEqual(after, before)
   controller.abort()
@@ -113,7 +143,10 @@ test('changing a component folder repacks it and notifies open pages', async () 
 
 test('packFolder adds a V8 syntax check with the author’s line numbers', async () => {
   const dir = join(root, 'syntax')
-  const files = { ...messageQueueFolder(), 'lib/backoff.js': 'export function backoff (attempt) {\n  return attempt +\n}\n' }
+  const files = {
+    ...messageQueueFolder(),
+    'lib/backoff.js': 'export function backoff (attempt) {\n  return attempt +\n}\n',
+  }
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(dir, path)), { recursive: true })
     writeFileSync(join(dir, path), content)

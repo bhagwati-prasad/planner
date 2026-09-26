@@ -16,7 +16,7 @@ const MAX_FILE_BYTES = 8 * 1024 * 1024
  * @param {string} dir
  * @returns {Promise<Record<string, Uint8Array>>} POSIX path relative to `dir` → bytes
  */
-export async function readFolder (dir) {
+export async function readFolder(dir) {
   /** @type {Record<string, Uint8Array>} */
   const out = {}
   const walk = async current => {
@@ -42,15 +42,19 @@ export async function readFolder (dir) {
  * @param {Record<string, string>} modules  path → wrapped source
  * @returns {import('../../plugins/src/index.js').Problem[]}
  */
-export function syntaxProblems (modules) {
+export function syntaxProblems(modules) {
   const problems = []
   for (const [path, code] of Object.entries(modules)) {
     try {
-      // eslint-disable-next-line no-new
       new Script(`(${code})`, { filename: path })
     } catch (err) {
       const line = /:(\d+)\n/.exec(String(err.stack))?.[1]
-      problems.push({ level: /** @type {'error'} */ ('error'), file: path, line: line ? Number(line) : undefined, message: `${err.name}: ${err.message}` })
+      problems.push({
+        level: /** @type {'error'} */ ('error'),
+        file: path,
+        line: line ? Number(line) : undefined,
+        message: `${err.name}: ${err.message}`,
+      })
     }
   }
   return problems
@@ -61,12 +65,13 @@ export function syntaxProblems (modules) {
  * @param {string} dir
  * @returns {Promise<import('../../plugins/src/index.js').PackResult>}
  */
-export async function packFolder (dir) {
+export async function packFolder(dir) {
   const files = await readFolder(dir)
   const result = packComponent(files, { name: basename(dir) })
   if (!result.bundle) return result
   const syntax = syntaxProblems(result.bundle.modules)
-  if (syntax.length) return { bundle: null, script: null, fileName: null, problems: [...result.problems, ...syntax] }
+  if (syntax.length)
+    return { bundle: null, script: null, fileName: null, problems: [...result.problems, ...syntax] }
   return result
 }
 
@@ -75,7 +80,7 @@ export async function packFolder (dir) {
  * @param {string} dir
  * @returns {Promise<string[]>}
  */
-export async function componentFolders (dir) {
+export async function componentFolders(dir) {
   let entries
   try {
     entries = await readdir(dir, { withFileTypes: true })
@@ -87,7 +92,8 @@ export async function componentFolders (dir) {
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue
     try {
-      if ((await stat(join(dir, entry.name, 'manifest.json'))).isFile()) folders.push(join(dir, entry.name))
+      if ((await stat(join(dir, entry.name, 'manifest.json'))).isFile())
+        folders.push(join(dir, entry.name))
     } catch {}
   }
   return folders

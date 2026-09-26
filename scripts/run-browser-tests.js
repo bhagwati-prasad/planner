@@ -14,7 +14,11 @@ const filter = process.argv.slice(2)
 const files = readdirSync(join(root, 'packages'))
   .map(pkg => join(root, 'packages', pkg, 'test', 'browser'))
   .filter(dir => existsSync(dir))
-  .flatMap(dir => readdirSync(dir).filter(f => f.endsWith('.browser.js')).map(f => join(dir, f)))
+  .flatMap(dir =>
+    readdirSync(dir)
+      .filter(f => f.endsWith('.browser.js'))
+      .map(f => join(dir, f))
+  )
   .filter(file => filter.length === 0 || filter.some(f => file.includes(f)))
   .sort()
 
@@ -23,9 +27,16 @@ if (!files.length) {
   process.exit(0)
 }
 if (!(await findPlaywright())) {
-  console.log('Skipping browser tests: Playwright is not installed (npm i -g playwright, or set PLAYWRIGHT_MODULE).')
+  console.log(
+    'Skipping browser tests: Playwright is not installed (npm i -g playwright, or set PLAYWRIGHT_MODULE).'
+  )
   process.exit(0)
 }
-console.log(`Running ${files.length} browser test file(s):\n  ${files.map(f => relative(root, f)).join('\n  ')}\n`)
-const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...files], { stdio: 'inherit', cwd: root })
+console.log(
+  `Running ${files.length} browser test file(s):\n  ${files.map(f => relative(root, f)).join('\n  ')}\n`
+)
+const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...files], {
+  stdio: 'inherit',
+  cwd: root,
+})
 process.exit(result.status ?? 1)

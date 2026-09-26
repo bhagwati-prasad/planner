@@ -1,8 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  createUlidFactory, isUlid, ulidTime, createPrng, Emitter, toPlain, deepFreeze, deepEqual, thaw,
-  compareSemver, satisfies, isSemver, suggest, StrataError
+  createUlidFactory,
+  isUlid,
+  ulidTime,
+  createPrng,
+  Emitter,
+  toPlain,
+  deepFreeze,
+  deepEqual,
+  thaw,
+  compareSemver,
+  satisfies,
+  isSemver,
+  suggest,
+  StrataError,
 } from '../src/index.js'
 import { T0 } from './helpers.js'
 
@@ -57,15 +69,26 @@ test('emitter delivers events, supports wildcard, once and unsubscribe', () => {
   e.emit('y', 3)
   off()
   e.emit('x', 4)
-  assert.deepEqual(seen, [['x', 1], ['*', 'x', 1], ['once', 2], ['*', 'y', 2], ['*', 'y', 3], ['*', 'x', 4]])
+  assert.deepEqual(seen, [
+    ['x', 1],
+    ['*', 'x', 1],
+    ['once', 2],
+    ['*', 'y', 2],
+    ['*', 'y', 3],
+    ['*', 'x', 4],
+  ])
 })
 
 test('a throwing listener does not stop other listeners', () => {
   const errors = []
   const e = new Emitter({ onError: (err, event) => errors.push([event, err.message]) })
   let reached = false
-  e.on('x', () => { throw new Error('boom') })
-  e.on('x', () => { reached = true })
+  e.on('x', () => {
+    throw new Error('boom')
+  })
+  e.on('x', () => {
+    reached = true
+  })
   e.emit('x')
   assert.equal(reached, true)
   assert.deepEqual(errors, [['x', 'boom']])
