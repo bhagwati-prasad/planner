@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
-*.log
+test-results/
+playwright-report/
 .DS_Store
-*.strata.js
+*.log
