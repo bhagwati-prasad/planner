@@ -6,14 +6,14 @@ The product and technical specification lives in the Claude Docs document **"Str
 
 ## Status
 
-R0 (offline foundations) is built in six milestones. M1 and M2 are done.
+R0 (offline foundations) is built in six milestones. M1 to M3 are done.
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | M1 Core | Model store, command bus, undo/redo, events, recursion resolver, console facade, Node test harness | Done |
 | M2 strata-graph | D3 diagram library: shapes, ports, edges, zoom, selection, frames, export | Done |
-| M3 Shell | Web Components UI, library panel, inspector, breadcrumb, drill-down transitions | Next |
-| M4 Plugins | Manifest schema, in-house bundler, `strata pack`, `strata serve`, starter library | |
+| M3 Shell | Web Components UI, library panel, inspector, breadcrumb, drill-down transitions | Done |
+| M4 Plugins | Manifest schema, in-house bundler, `strata pack`, `strata serve`, starter library | Next |
 | M5 Persistence | IndexedDB, sessionStorage, `.strata` import/export, File System Access save | |
 | M6 Comments | Annotations, threaded comments, anchors, roll-up badges | |
 
@@ -27,13 +27,15 @@ packages/
                  queries, validation, recursion resolver, roll-up engine
   strata/        the facade: the one public API (browser console, Node, and the UI to come)
   strata-graph/  D3 diagramming library: renders graph data, emits intents, knows nothing about Strata
+  strata-ui/     the workspace: view adapter (headless) and Web Components shell (src/elements)
+app/             the app page: the workspace with a sample project
 vendor/          third-party code shipped for offline use (D3 7.9.0, ISC)
 examples/        runnable scripts and the diagram demo
 scripts/         test runners, dev server and architecture boundary check
 docs/            implementation notes
 ```
 
-Dependencies point downward only: `strata` → `strata-core`, and `strata-graph` depends on nothing of Strata's. `npm run check` enforces this and keeps headless code free of DOM, Node built-ins and npm dependencies, so it runs unchanged in a browser tab, a Web Worker and Node.
+Dependencies point downward only: `strata-ui` → `strata` → `strata-core`, `strata-ui` → `strata-graph`, and `strata-graph` depends on nothing of Strata's. `npm run check` enforces this and keeps headless code free of DOM, Node built-ins and npm dependencies, so it runs unchanged in a browser tab, a Web Worker and Node.
 
 ## Try it
 
@@ -45,7 +47,8 @@ npm run test:browser  # browser tests in Chromium via Playwright (skipped if Pla
 npm run check         # architecture boundary check
 npm run verify        # all of the above
 npm run demo          # the console session from the spec, headless
-npm run serve         # static server; then open http://127.0.0.1:4321/examples/graph-demo.html
+npm run serve         # static server; then open http://127.0.0.1:4321/app/
+                      # (the diagram library alone: /examples/graph-demo.html)
 ```
 
 ```js

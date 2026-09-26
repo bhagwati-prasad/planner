@@ -9,6 +9,7 @@
  *   - context ghosts: the parent's neighbours, faded, outside the frame (spec §6 "Drill-down").
  * These synthetic items carry prefixed ids (see `ids`) so intents about them can be routed.
  */
+import { StrataError } from '../../strata/src/index.js'
 import { BUILTIN_SHAPES, DEFAULT_NODE_SIZE } from '../../strata-graph/src/index.js'
 
 /** Shapes for the built-in base types; a manifest's own `shape` wins. */
@@ -349,7 +350,7 @@ export function applyIntent (intent, { strata, system, viewId }) {
   const layoutCommand = set => ({ type: 'view.layout', payload: { viewId, set } })
   const modelIds = list => list.map(parseId).filter(p => p.kind === 'model').map(p => p.id)
   const readOnly = () => {
-    if (system.readOnly) throw Object.assign(new Error(`'${system.name}' is placed by reference and is read-only here`), { code: 'READ_ONLY' })
+    if (system.readOnly) throw new StrataError('READ_ONLY', `'${system.name}' is placed by reference and is read-only here. Open the source system to edit it, or detach this node.`)
   }
 
   switch (intent.type) {

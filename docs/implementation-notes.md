@@ -90,6 +90,38 @@ Tests: headless modules in Node; the renderer in real Chromium through Playwrigh
 
 Known gaps, kept for later: parallel edge segments in the same channel overlap (no nudging yet); ports sit on the bounding box, so on curved shapes such as the cloud they float slightly off the outline; auto-layout (layered, force, tree) is R1.
 
-## Next: M3 Shell
+## M3 Shell: what exists
 
-Web Components UI (§9 workspace layout): library panel, canvas with breadcrumb and mode tabs, inspector (properties, metrics, comments, links), bottom dock (console, problems), command palette, and the view adapter that maps the model to graph data and intents back to commands, including drill-down transitions and context ghosts.
+The workspace from §9, as Web Components in `strata-ui`. Every element reaches the model through the `strata` facade it is handed, and changes it only through facade calls (which are commands), so the console, the op log and undo see exactly what the UI does.
+
+| Area | Module | Notes |
+| --- | --- | --- |
+| View adapter | `adapter.js` (headless) | `toGraphData(system, {viewId})` turns the current system into strata-graph data; `applyIntent(intent, ...)` turns graph intents into facade calls. Node-tested. |
+| Clipboard | `strata/src/clipboard.js` | `strata.copy`, `paste`, `duplicate`: a `strata/clip@1` JSON payload of nodes, their internal edges and positions; pasting is one transaction and reports what it had to skip. |
+| Shell | `elements/shell.js`, `actions.js` | Selection (graph ids), one action registry (id, title, group, shortcut, enabled, run) that the palette, context menu, toolbar and keyboard all read. |
+| App | `elements/app.js` | `<strata-app>`: regions from a JSON config, design tokens, theme (light, dark, or the OS preference), toasts, global shortcuts, the shortcuts overlay. |
+| Canvas | `elements/canvas.js` | Hosts the graph and minimap; breadcrumb, page (view) tabs, zoom level, empty-state hint, error badges; drill-down transitions; a remembered viewport per system and page. |
+| Panels | `library.js`, `tree.js`, `inspector.js`, `dock.js` | Library (search; drag or click to add; library systems by reference, as a copy, or opened), systems tree, inspector (properties by schema type, contracts, derived roll-ups, boundary ports), problems and console docks. |
+| Overlays | `palette.js`, `menu.js` | Command palette (commands, add, find anywhere), context menu per target kind, toolbar with mode tabs. |
+| Entry page | `app/` | Loads D3, creates `strata` with a sample "Checkout" project, mounts the workspace. `window.strata` is the full console API. |
+
+Tests: the adapter in Node; the workspace in Chromium (`packages/strata-ui/test/browser/app.browser.js`), driving the real page with mouse and keyboard: adding from the library, the inspector, drill-down and back, palette, context menu, find, drag and drop, connecting ports, theme, console, problems, tree, swapping a region, the shortcuts overlay.
+
+## Decisions in M3
+
+- **Synthetic diagram items.** Inside a composite the adapter adds a system frame, the system's boundary ports on the frame's edge, the edges mapping each boundary port to its internal port, and context ghosts (the parent's neighbours, faded, outside the frame). Their ids carry prefixes (`frame:`, `bp:`, `map:`, `ghost:`, `ghostedge:`) so intents about them route correctly: connecting to a boundary port maps it, deleting a mapping edge unmaps it, and opening a ghost shows the parent's node in the inspector.
+- **Nodes without a position in the view are placed by the adapter** in a grid below the laid-out ones (reported as `autoPlaced`), so a model built in the console appears on the canvas without a layout step. Those positions are drawn, not stored: the UI never changes the model on its own, and a node's position is recorded (`view.layout`) the first time someone moves it.
+- **Backspace goes up a level** (breadcrumb back) and Delete deletes, so the shell passes `deleteKeys: ['Delete']` to the graph. The spec lists both; binding Backspace to delete made navigation destructive.
+- **Drill-down transitions** zoom into the composite before its system appears, and back out of it on the way up (IcePanel-style). They are skipped under `prefers-reduced-motion`. Each system and page keeps its own viewport.
+- **Reference placements are read-only where they are placed.** The canvas shows a badge in the breadcrumb, the graph goes read-only, and editing actions are disabled; the adapter refuses intents with `READ_ONLY` and says to open the source or detach.
+- **The console dock is a command log plus a JSON command input.** The app runs under a CSP without `unsafe-eval`, so it cannot evaluate JavaScript; the full API is `strata` in DevTools, and the dock dispatches serialised commands (`{"type": ..., "payload": ...}`), which is what the spec's headless-first principle promises anyway.
+- **Mode tabs** for Simulate, Debug, Test, Docs and Plan are shown and announce their release; only Design works in R0.
+- **Swapping regions.** `DEFAULT_CONFIG.regions` lists element names per region (`header`, `left`, `center`, `right`, `bottom`) plus overlays. Any custom element with `strata` and `shell` properties can take a slot; the shell calls nothing else on it.
+- **Shortcuts** are resolved from `KeyboardEvent.code` for digits so Shift+1 works on every layout; they are ignored while typing in a field, and keys the graph handles itself are left to it when the canvas has focus.
+- **Theme** is `data-theme` on the document element with `--st-*` tokens (the graph's `--sg-*` tokens follow), stored per browser under `strata.theme`.
+
+Known gaps, kept for later: the Metrics, Comments and Links inspector tabs are placeholders (M6 fills comments and links; metrics arrive with simulation in R1); patterns in the library are R1; the app needs the dev server until the M4 bundler produces the single-file offline build.
+
+## Next: M4 Plugins
+
+Manifest schema and validation, the in-house bundler (which also produces the offline single-file build), `strata pack` and `strata serve`, and the starter component library built on the same plugin API.
