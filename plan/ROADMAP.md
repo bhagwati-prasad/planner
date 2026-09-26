@@ -24,7 +24,7 @@ Tooling, guardrails and CI first, then the thinnest end-to-end slice (one reques
 
 - [x] [0001 Repository scaffold and npm workspaces](M00-foundation-and-walking-skeleton/0001-repo-scaffold.md)
 - [x] [0002 Formatting, lint and type-check tooling](M00-foundation-and-walking-skeleton/0002-dev-tooling.md) (after 0001)
-- [ ] [0003 Custom lint rules for the non-negotiables](M00-foundation-and-walking-skeleton/0003-custom-lint-rules.md) (after 0002)
+- [x] [0003 Custom lint rules for the non-negotiables](M00-foundation-and-walking-skeleton/0003-custom-lint-rules.md) (after 0002)
 - [ ] [0004 Test harness, fakes and property-test generators](M00-foundation-and-walking-skeleton/0004-test-harness.md) (after 0001)
 - [ ] [0005 In-house zero-dependency bundler](M00-foundation-and-walking-skeleton/0005-bundler.md) (after 0001)
 - [ ] [0006 Vendored D3 and Three.js with integrity pins](M00-foundation-and-walking-skeleton/0006-vendor-libs.md) (after 0005, 0007)

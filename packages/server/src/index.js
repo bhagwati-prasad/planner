@@ -5,3 +5,9 @@
 export { startServer, CSP } from './server.js'
 export { ComponentCatalog } from './catalog.js'
 export { readFolder, packFolder, syntaxProblems, componentFolders } from './folders.js'
+// Node-side plugin tooling the CLI uses; eng §6 lets the CLI reach plugins only through here.
+/**
+ * @typedef {import('../../plugins/src/index.js').ComponentBundle} ComponentBundle
+ * @typedef {import('../../plugins/src/index.js').Problem} Problem
+ */
+export { formatProblem, createModuleRuntime } from '../../plugins/src/index.js'

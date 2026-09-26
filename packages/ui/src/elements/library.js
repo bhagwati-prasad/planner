@@ -66,7 +66,8 @@ li .actions button { width: auto; cursor: pointer; background: transparent; }
             path: file.webkitRelativePath || file.name,
           }))
           e.target.value = ''
-          this.#upload(files)
+          // #upload reports its own failures in the panel.
+          void this.#upload(files)
         },
       })
     )
@@ -103,8 +104,20 @@ li .actions button { width: auto; cursor: pointer; background: transparent; }
       if (!e.dataTransfer?.types.includes('Files')) return
       e.preventDefault()
       this.classList.remove('dropping')
-      droppedFiles(e.dataTransfer).then(files => this.#upload(files))
+      droppedFiles(e.dataTransfer)
+        .then(files => this.#upload(files))
+        .catch(err => this.#failed(err))
     })
+  }
+
+  /** Shows why an upload could not be read. @param {Error} err */
+  #failed(err) {
+    this.#report = {
+      title: 'The component was not added',
+      problems: [{ level: 'error', file: '', message: err.message }],
+      error: true,
+    }
+    this.update()
   }
 
   /** Packs and installs uploaded files, then reports what happened. */
@@ -133,11 +146,8 @@ li .actions button { width: auto; cursor: pointer; background: transparent; }
         this.#report = { title: 'The component was not added', problems, error: true }
       }
     } catch (err) {
-      this.#report = {
-        title: 'The component was not added',
-        problems: [{ level: 'error', file: '', message: err.message }],
-        error: true,
-      }
+      this.#failed(err)
+      return
     }
     this.update()
   }

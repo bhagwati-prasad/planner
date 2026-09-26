@@ -7,36 +7,18 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve, dirname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { boundaries } from '../tools/lint/guidelines.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
 
 /**
- * Allowed package dependencies (directory names under packages/). Every package may import
- * itself. The new packages follow the table in eng §6; the existing ones keep the imports they
- * have until the import-boundary lint rule (task 0003) enforces that table everywhere.
+ * Allowed package dependencies (directory names under packages/), read from the eng §6 table,
+ * the same source the strata/import-boundaries lint rule uses. Every package may import itself.
  */
-const ALLOWED = {
-  core: [],
-  // Plugins build on the core's registry and manifests (spec §4).
-  plugins: ['core'],
-  storage: ['core'],
-  comments: ['core'],
-  docs: ['core'],
-  plan: ['core'],
-  sim: ['core'],
-  debug: ['sim', 'core'],
-  test: ['sim', 'core'],
-  facade: ['core', 'plugins', 'storage', 'sim', 'debug', 'test', 'docs', 'plan', 'comments'],
-  // The diagram libraries know nothing about Strata (spec §4).
-  graph: [],
-  '3d': [],
-  // The UI may not reach past the facade (spec §18): no core.
-  ui: ['facade', 'graph', '3d'],
-  // Node only: the local server and the command line.
-  server: ['core', 'plugins', 'facade', 'storage'],
-  cli: ['core', 'plugins', 'facade', 'storage', 'server'],
-}
+const ALLOWED = Object.fromEntries(
+  [...boundaries().packages].map(([pkg, deps]) => [pkg, [...deps]])
+)
 
 /**
  * Code that must run unchanged in a browser, a worker and Node. graph keeps its DOM

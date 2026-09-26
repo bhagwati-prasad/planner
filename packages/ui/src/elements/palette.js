@@ -36,7 +36,7 @@ export class StrataPalette extends StrataElement {
   static css = `
 :host { position: fixed; inset: 0; z-index: 50; display: none; }
 :host([open]) { display: block; }
-.backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.25); }
+.backdrop { position: absolute; inset: 0; background: var(--st-scrim); }
 .dialog { position: absolute; top: 12vh; left: 50%; transform: translateX(-50%); width: min(560px, 92vw); background: var(--st-panel); border: 1px solid var(--st-line); border-radius: 10px; box-shadow: var(--st-shadow-lg); display: flex; flex-direction: column; max-height: 70vh; }
 input { margin: 10px; padding: 8px 10px; font-size: 15px; }
 ul { list-style: none; margin: 0; padding: 0 6px 6px; overflow: auto; }

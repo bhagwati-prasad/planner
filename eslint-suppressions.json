@@ -1,0 +1,73 @@
+{
+  "packages/core/src/core.js": {
+    "strata/banned-globals": {
+      "count": 1
+    }
+  },
+  "packages/core/src/random.js": {
+    "strata/banned-globals": {
+      "count": 1
+    }
+  },
+  "packages/core/src/ulid.js": {
+    "strata/banned-globals": {
+      "count": 1
+    }
+  },
+  "packages/facade/src/clipboard.js": {
+    "strata/facade-help": {
+      "count": 2
+    }
+  },
+  "packages/facade/src/collection.js": {
+    "strata/facade-help": {
+      "count": 3
+    }
+  },
+  "packages/facade/src/components.js": {
+    "strata/facade-help": {
+      "count": 10
+    }
+  },
+  "packages/facade/src/format.js": {
+    "strata/facade-help": {
+      "count": 3
+    }
+  },
+  "packages/facade/src/handles.js": {
+    "strata/facade-help": {
+      "count": 69
+    }
+  },
+  "packages/facade/src/help.js": {
+    "strata/facade-help": {
+      "count": 1
+    }
+  },
+  "packages/facade/src/navigator.js": {
+    "strata/facade-help": {
+      "count": 6
+    }
+  },
+  "packages/facade/src/projects.js": {
+    "strata/facade-help": {
+      "count": 31
+    }
+  },
+  "packages/facade/src/storage.js": {
+    "strata/facade-help": {
+      "count": 1
+    }
+  },
+  "packages/facade/src/strata.js": {
+    "no-console": {
+      "count": 1
+    },
+    "strata/banned-globals": {
+      "count": 2
+    },
+    "strata/facade-help": {
+      "count": 18
+    }
+  }
+}

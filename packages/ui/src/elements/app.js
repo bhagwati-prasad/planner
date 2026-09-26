@@ -54,6 +54,7 @@ export const TOKENS_CSS = `
   --st-success: #15803d;
   --st-shadow: 0 1px 4px rgba(0,0,0,0.12);
   --st-shadow-lg: 0 10px 30px rgba(0,0,0,0.2);
+  --st-scrim: rgba(0, 0, 0, 0.25);
   color-scheme: light;
 }
 :root[data-theme="dark"] {

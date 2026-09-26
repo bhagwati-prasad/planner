@@ -1,6 +1,8 @@
 // @ts-check
-// Lint rules from eng §4 and §5 (style beyond formatting) and eng §16 (code execution).
-// Formatting itself is Prettier's job; the rules for the non-negotiables arrive in task 0003.
+// Lint rules from eng §4 and §5 (style beyond formatting), eng §16 (code execution) and the
+// lint-marked rules of the guidelines, including the non-negotiables of eng §2 (tools/lint).
+// Formatting itself is Prettier's job.
+import { plugin as strata } from './tools/lint/index.js'
 
 const NAMED_EXPORTS_ONLY = {
   selector: 'ExportDefaultDeclaration',
@@ -46,5 +48,48 @@ export default [
     // Component behaviour entries (the plugin API requires a default export) and tool configs.
     files: ['components/*/index.js', 'eslint.config.js'],
     rules: { 'no-restricted-syntax': 'off' },
+  },
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    plugins: { strata },
+    rules: {
+      // eng §2, §4, §6: dependency table, index-only imports, banned globals in headless code
+      'strata/import-boundaries': 'error',
+      'strata/banned-globals': 'error',
+      // eng §11: no dynamic innerHTML
+      'strata/no-dynamic-html': 'error',
+      // eng §14: no floating promises
+      'strata/no-floating-promises': 'error',
+      // eng §20: help metadata on facade methods
+      'strata/facade-help': 'error',
+      // CLAUDE.md: no committed .only
+      'strata/no-only': 'error',
+    },
+  },
+  {
+    // eng §14: library code logs only through the injected logger. The CLI owns stdout.
+    files: ['packages/*/src/**/*.js'],
+    ignores: ['packages/cli/**'],
+    rules: { 'no-console': 'error' },
+  },
+  {
+    // eng §11: component CSS uses semantic tokens only.
+    files: ['packages/ui/**/*.js', 'components/**/*.js'],
+    rules: { 'strata/no-colour-literals': 'error' },
+  },
+  {
+    // .css files reach the rules through a processor that wraps them as JavaScript.
+    files: ['**/*.css'],
+    plugins: { strata },
+    processor: 'strata/css',
+  },
+  {
+    files: ['**/*.css/*.js'],
+    rules: { 'strata/no-colour-literals': 'error' },
+  },
+  {
+    // eng §16: the sandbox worker bootstrap is the one place that may evaluate code.
+    files: ['packages/sim/src/worker/bootstrap.js'],
+    rules: { 'no-eval': 'off', 'no-new-func': 'off', 'no-implied-eval': 'off' },
   },
 ]
