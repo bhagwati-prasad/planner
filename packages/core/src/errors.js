@@ -1,23 +1,33 @@
 /**
- * Error codes raised by the core. Every error thrown by a command handler or query is a
- * StrataError, so callers (UI, console, CLI) can branch on `code` instead of parsing messages.
- * Codes named E_<AREA>_<REASON> follow eng §5; the older ones move to that form with the error
- * code registry (task 0102).
- * @typedef {'INVALID'|'NOT_FOUND'|'CONFLICT'|'CYCLE'|'UNKNOWN_COMMAND'|'READ_ONLY'|'NO_ROLLUP_RULE'|'AMBIGUOUS'|'UNSUPPORTED'
- *   |'E_BUNDLE_BARE_SPECIFIER'|'E_BUNDLE_CYCLE'|'E_BUNDLE_MISSING_MODULE'|'E_BUNDLE_MISSING_EXPORT'|'E_BUNDLE_SYNTAX'|'E_BUNDLE_OUTSIDE_ROOT'
- *   |'E_PORT_NOT_FOUND'|'E_SIM_NO_EDGE'|'E_SIM_EDGE_NOT_FOUND'|'E_SIM_COMPONENT_NOT_FOUND'|'E_PROTOCOL_VERSION'|'E_PROTOCOL_UNKNOWN_TYPE'} ErrorCode
+ * Errors raised by the core and the packages above it (eng §14). Every thrown error is a
+ * StrataError, so callers (UI, console, CLI) branch on `code` instead of parsing messages. The
+ * codes, with their descriptions and message keys, live in errors/codes.js.
  */
+import { ERROR_CODES, isErrorCode } from './errors/codes.js'
+import { isDevelopment } from './mode.js'
+
+/** @typedef {import('./errors/codes.js').ErrorCode} ErrorCode */
 
 export class StrataError extends Error {
   /**
-   * @param {ErrorCode} code
-   * @param {string} message
-   * @param {unknown} [details]
+   * @param {ErrorCode} code        a registered code; development builds refuse any other
+   * @param {string} message        for developers; the UI shows the text for `userMessageKey`
+   * @param {unknown} [details]     plain data about what failed
+   * @param {{ cause?: unknown }} [options]  the error that caused this one
    */
-  constructor(code, message, details) {
-    super(message)
+  constructor(code, message, details, { cause } = {}) {
+    const registered = isErrorCode(code)
+    if (!registered && isDevelopment())
+      throw new StrataError(
+        'E_ERROR_CODE_UNREGISTERED',
+        `Error code '${code}' is not registered in core/src/errors/codes.js (raised with: ${message})`,
+        { code }
+      )
+    super(message, cause === undefined ? undefined : { cause })
     this.name = 'StrataError'
     this.code = code
+    /** The i18n key for the user-facing text (eng §22). */
+    this.userMessageKey = registered ? ERROR_CODES[code].userMessageKey : `errors.${code}`
     if (details !== undefined) this.details = details
   }
 }
@@ -27,10 +37,11 @@ export class StrataError extends Error {
  * @param {ErrorCode} code
  * @param {string} message
  * @param {unknown} [details]
+ * @param {{ cause?: unknown }} [options]
  * @returns {never}
  */
-export function fail(code, message, details) {
-  throw new StrataError(code, message, details)
+export function fail(code, message, details, options) {
+  throw new StrataError(code, message, details, options)
 }
 
 /**

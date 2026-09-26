@@ -7,6 +7,7 @@
  * accidental mutation throws instead of corrupting undo, the op log or a view.
  */
 import { fail } from './errors.js'
+import { isDevelopment } from './mode.js'
 import { deepFreeze } from './plain.js'
 
 /** @typedef {string|number} Key */
@@ -129,9 +130,9 @@ function removeAt(node, path, depth) {
  * walked again, so freezing costs only what changed.
  * @template T
  * @param {T} state
- * @param {{ development?: boolean }} [options]  development defaults to true
+ * @param {{ development?: boolean }} [options]  defaults to development mode (see mode.js)
  * @returns {T}
  */
-export function commitState(state, { development = true } = {}) {
+export function commitState(state, { development = isDevelopment() } = {}) {
   return development ? deepFreeze(state) : state
 }
