@@ -62,7 +62,7 @@ export class CommandBus {
 
   /**
    * Registers a command handler. Plugins use the same call as the core.
-   * @param {string} type namespaced, e.g. 'node.add'
+   * @param {string} type namespaced, e.g. 'component.add'
    * @param {(payload: any, ctx: HandlerContext) => any} handler
    * @param {{ undoable?: boolean, description?: string, signature?: string, replace?: boolean }} [meta]
    */
@@ -72,7 +72,7 @@ export class CommandBus {
     { undoable = true, description = '', signature = '', replace = false } = {}
   ) {
     if (!TYPE_RE.test(type))
-      fail('INVALID', `Command type '${type}' must be namespaced, e.g. 'node.add'`)
+      fail('INVALID', `Command type '${type}' must be namespaced, e.g. 'component.add'`)
     if (typeof handler !== 'function') fail('INVALID', `Handler for '${type}' must be a function`)
     if (this.#handlers.has(type) && !replace)
       fail('CONFLICT', `Command '${type}' is already registered`)

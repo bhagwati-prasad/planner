@@ -23,7 +23,7 @@ import {
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
 
 export const edgeCommands = {
-  'edge.connect': {
+  'edge.add': {
     description: 'Connects an output port to an input port in the same system',
     signature: '{ fromPort, toPort, connectionType?, props?, label?, id? }',
     /** @param {any} p @param {Ctx} ctx */

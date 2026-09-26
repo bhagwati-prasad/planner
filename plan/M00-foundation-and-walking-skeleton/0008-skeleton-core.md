@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M00 Foundation and walking skeleton](../ROADMAP.md#m00-foundation-and-walking-skeleton) | R0 | todo | [0004](../M00-foundation-and-walking-skeleton/0004-test-harness.md) |
+| [M00 Foundation and walking skeleton](../ROADMAP.md#m00-foundation-and-walking-skeleton) | R0 | done | [0004](../M00-foundation-and-walking-skeleton/0004-test-harness.md) |
 
 ## Read first
 
@@ -17,9 +17,9 @@ The thinnest real core: a project with one system, `component.add` and `edge.add
 
 Write these tests first, in `packages/core/test/skeleton.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] Adding two components and an edge yields a graph with 2 components and 1 edge
-- [ ] Undo removes the edge, then the second component
-- [ ] An edge to a missing port fails with `E_PORT_NOT_FOUND`
+- [x] Adding two components and an edge yields a graph with 2 components and 1 edge
+- [x] Undo removes the edge, then the second component
+- [x] An edge to a missing port fails with `E_PORT_NOT_FOUND`
 
 ## Notes
 
@@ -27,8 +27,8 @@ Write these tests first, in `packages/core/test/skeleton.test.js`. Run them and 
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

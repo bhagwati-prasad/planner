@@ -206,6 +206,16 @@ export function validateProps(manifest, props, label) {
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * The port an edge names, or E_PORT_NOT_FOUND.
+ * @param {any} src
+ * @param {string} id
+ */
+function requirePort(src, id) {
+  if (!src.has('port', id)) fail('E_PORT_NOT_FOUND', `Port '${id}' not found`, { portId: id })
+  return src.get('port', id)
+}
+
+/**
  * Validates an edge between two ports and picks its connection type.
  * @param {import('../model.js').Source} src
  * @param {string} fromPortId
@@ -213,8 +223,8 @@ export function validateProps(manifest, props, label) {
  * @param {string|null|undefined} connectionType
  */
 export function checkConnection(src, fromPortId, toPortId, connectionType) {
-  const from = src.require('port', fromPortId)
-  const to = src.require('port', toPortId)
+  const from = requirePort(src, fromPortId)
+  const to = requirePort(src, toPortId)
   if (from.id === to.id) fail('INVALID', 'An edge cannot connect a port to itself')
   const fromNode = src.require('node', from.nodeId)
   const toNode = src.require('node', to.nodeId)

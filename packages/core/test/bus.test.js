@@ -15,7 +15,7 @@ test('each command becomes one operation with the fields the spec lists', () => 
   const { core, root } = setup()
   const id = add(core, root, 'base:service', 'Orders')
   const op = core.oplog.at(-1)
-  assert.equal(op.command, 'node.add')
+  assert.equal(op.command, 'component.add')
   assert.ok(isUlid(op.id))
   assert.equal(op.actorId, 'tester')
   assert.equal(op.timestamp, '2026-09-25T09:00:00.000Z')
@@ -35,18 +35,18 @@ test('commands must be serialisable and known', () => {
   assert.throws(
     () =>
       core.dispatch({
-        type: 'node.add',
+        type: 'component.add',
         payload: { systemId: root, typeRef: 'service', props: { f: () => 1 } },
       }),
     /not serialisable/
   )
   assert.throws(
-    () => core.dispatch({ type: 'node.ad', payload: {} }),
-    err => err.code === 'UNKNOWN_COMMAND' && /Did you mean 'node.add'/.test(err.message)
+    () => core.dispatch({ type: 'component.ad', payload: {} }),
+    err => err.code === 'UNKNOWN_COMMAND' && /Did you mean 'component.add'/.test(err.message)
   )
-  assert.throws(() => core.dispatch('node.add'), /must be an object/)
+  assert.throws(() => core.dispatch('component.add'), /must be an object/)
   assert.throws(
-    () => core.dispatch({ type: 'node.add', payload: [1] }),
+    () => core.dispatch({ type: 'component.add', payload: [1] }),
     /payload must be an object/
   )
 })
@@ -59,7 +59,7 @@ test('a failing command changes nothing and logs nothing', () => {
   assert.throws(
     () =>
       core.dispatch({
-        type: 'node.add',
+        type: 'component.add',
         payload: { systemId: root, typeRef: 'test.service', props: { maxRps: 'fast' } },
       }),
     /must be a number/
@@ -106,14 +106,14 @@ test('undo and redo walk back and forth through history', () => {
   const kinds = core.oplog.map(o => (o.meta ? Object.keys(o.meta)[0] : o.command))
   assert.deepEqual(kinds, [
     'project.init',
-    'node.add',
+    'component.add',
     'node.update',
     'undoOf',
     'undoOf',
     'redoOf',
     'redoOf',
     'undoOf',
-    'node.add',
+    'component.add',
   ])
 })
 
@@ -146,7 +146,7 @@ test('transactions commit many commands as one undoable batch', () => {
   assert.equal(op.payload.label, 'Add client and service')
   assert.deepEqual(
     op.payload.commands.map(c => c.type),
-    ['node.add', 'node.add', 'edge.connect']
+    ['component.add', 'component.add', 'edge.add']
   )
   assert.equal(core.nodesOf(root).length, 2)
   core.undo()
@@ -226,7 +226,7 @@ test('replay detects divergence', () => {
   const { core, root } = setup()
   add(core, root, 'base:service', 'A')
   const tampered = core.oplog.map(op =>
-    op.command === 'node.add' ? { ...op, ids: op.ids.slice(1) } : op
+    op.command === 'component.add' ? { ...op, ids: op.ids.slice(1) } : op
   )
   const other = createTestCore()
   assert.throws(
@@ -246,7 +246,7 @@ test('events report operations, net changes and history state', () => {
   core.dispatch({ type: 'node.remove', payload: { id } })
   core.undo()
   assert.deepEqual(seen, [
-    ['node.add', ['update:project', 'create:node', 'create:port', 'create:port']],
+    ['component.add', ['update:project', 'create:node', 'create:port', 'create:port']],
     ['history', true, false],
     ['node.remove', ['delete:port', 'delete:port', 'delete:node']],
     ['history', true, false],

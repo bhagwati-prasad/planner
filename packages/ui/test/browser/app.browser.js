@@ -266,7 +266,7 @@ test('theme toggle, the console dock and problems', async () => {
   assert.match(await page.locator('strata-oplog ol').innerText(), /project\.update/)
 
   await input.fill(
-    '{"type": "node.add", "payload": {"systemId": "' +
+    '{"type": "component.add", "payload": {"systemId": "' +
       (await js(() => window.strata.project.root.id)) +
       '", "typeRef": "acme.gone@1.0.0", "name": "Legacy", "ports": []}}'
   )

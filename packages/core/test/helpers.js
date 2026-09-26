@@ -111,7 +111,7 @@ export function setup(options) {
 }
 
 export function add(core, systemId, typeRef, name, extra = {}) {
-  return core.dispatch({ type: 'node.add', payload: { systemId, typeRef, name, ...extra } })
+  return core.dispatch({ type: 'component.add', payload: { systemId, typeRef, name, ...extra } })
 }
 
 export function port(core, nodeId, name) {
@@ -122,7 +122,7 @@ export function port(core, nodeId, name) {
 
 export function connect(core, from, fromPort, to, toPort, extra = {}) {
   return core.dispatch({
-    type: 'edge.connect',
+    type: 'edge.add',
     payload: { fromPort: port(core, from, fromPort), toPort: port(core, to, toPort), ...extra },
   })
 }

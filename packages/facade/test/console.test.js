@@ -399,6 +399,6 @@ test('printing a node shows ports with their connections and props with their so
 test('without an open project, calls explain what to do', () => {
   const { strata } = createTestStrata()
   assert.throws(() => strata.nav, /No project is open/)
-  assert.throws(() => strata.dispatch({ type: 'node.add' }), /projects.create/)
+  assert.throws(() => strata.dispatch({ type: 'component.add' }), /projects.create/)
   assert.match(strata.format(), /No project is open/)
 })

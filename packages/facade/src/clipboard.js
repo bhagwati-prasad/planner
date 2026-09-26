@@ -159,7 +159,7 @@ export function pasteClip(system, clip, { at } = {}) {
             })
           } else {
             id = project.dispatch({
-              type: 'node.add',
+              type: 'component.add',
               payload: {
                 systemId: system.id,
                 typeRef: n.typeRef,
@@ -196,7 +196,7 @@ export function pasteClip(system, clip, { at } = {}) {
         try {
           edgeIds.push(
             project.dispatch({
-              type: 'edge.connect',
+              type: 'edge.add',
               payload: {
                 fromPort: fromPort.id,
                 toPort: toPort.id,

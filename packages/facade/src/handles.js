@@ -138,7 +138,7 @@ export class SystemHandle extends Handle {
     this.#writable()
     const id = this.project.transaction(() => {
       const nodeId = this.project.dispatch({
-        type: 'node.add',
+        type: 'component.add',
         payload: { systemId: this.id, typeRef: type, ...fields },
       })
       if (at) this.#place(nodeId, at)
@@ -185,7 +185,7 @@ export class SystemHandle extends Handle {
     this.#writable()
     const [fromPort, toPort] = pickPorts(this, from, to, type)
     const edgeId = this.project.dispatch({
-      type: 'edge.connect',
+      type: 'edge.add',
       payload: { fromPort, toPort, connectionType: type, props, label, id },
     })
     return new EdgeHandle(this.project, edgeId, { readOnly: this.#readOnly })

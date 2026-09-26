@@ -33,7 +33,7 @@ import {
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
 
 /**
- * Resolves the type named in node.add to a pinned `id@version`. Unversioned names use the
+ * Resolves the type named in component.add to a pinned `id@version`. Unversioned names use the
  * version the project already pins, else the latest registered. A versioned reference that
  * is not installed becomes a placeholder, so projects open without all their components.
  * @param {Ctx} ctx
@@ -108,7 +108,7 @@ function requireAtomic(ctx, id) {
 }
 
 export const nodeCommands = {
-  'node.add': {
+  'component.add': {
     description: 'Adds a component to a system; its ports come from the component manifest',
     signature: '{ systemId, typeRef, name?, props?, tags?, owner?, status?, description?, id? }',
     /** @param {any} p @param {Ctx} ctx */

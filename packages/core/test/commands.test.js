@@ -27,7 +27,7 @@ test('project.init creates the project, root system and a default view; only onc
   )
 })
 
-test('node.add creates ports from the manifest, pins the version and validates props', () => {
+test('component.add creates ports from the manifest, pins the version and validates props', () => {
   const { core, root } = setup()
   const q = add(core, root, 'acme.message-queue', undefined, {
     props: { capacity: 500, retention: '2d' },
