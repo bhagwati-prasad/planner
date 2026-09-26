@@ -18,7 +18,8 @@
     "typecheck": "npx -y -p typescript@5 tsc -p jsconfig.json --noEmit",
     "test:browser": "node scripts/run-browser-tests.js",
     "serve": "node packages/strata-cli/bin/strata.js serve --components starter/components --components starter/connection-types",
-    "strata": "node packages/strata-cli/bin/strata.js"
+    "strata": "node packages/strata-cli/bin/strata.js",
+    "build": "node scripts/build.js"
   },
   "bin": {
     "strata": "packages/strata-cli/bin/strata.js"

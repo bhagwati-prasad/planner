@@ -296,3 +296,42 @@ test('served mode: editing a component folder updates the open app', async () =>
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('upload: a packed .strata.js, a zipped folder, a broken folder and a drop', async () => {
+  const { packComponent } = await import('../../../strata-plugins/src/index.js')
+  const { messageQueueFolder, makeZip } = await import('../../../strata-plugins/test/fixtures.js')
+  const picker = page.locator('strata-library input[type="file"]')
+  const { script } = packComponent(messageQueueFolder(), { name: 'message-queue' })
+
+  await picker.setInputFiles({ name: 'message-queue.strata.js', mimeType: 'text/javascript', buffer: Buffer.from(script ?? '') })
+  await page.locator('strata-app .toast', { hasText: 'Added Message Queue (acme.message-queue@1.2.0)' }).waitFor()
+  assert.equal(await js(() => window.strata.components.list().find(c => c.id === 'acme.message-queue')?.source), 'bundle')
+
+  const manifest = JSON.parse(messageQueueFolder()['manifest.json'])
+  const v2 = { ...messageQueueFolder(), 'manifest.json': JSON.stringify({ ...manifest, version: '1.3.0' }) }
+  const zipped = makeZip(Object.fromEntries(Object.entries(v2).map(([p, c]) => [`message-queue/${p}`, c])))
+  await picker.setInputFiles({ name: 'message-queue.zip', mimeType: 'application/zip', buffer: Buffer.from(zipped) })
+  await page.waitForFunction(() => window.strata.components.versions('acme.message-queue').length === 2)
+  const report = page.locator('strata-library .report[role="status"]')
+  assert.match(await report.innerText(), /1 warning[\s\S]*lib\/unused\.js: Not imported/)
+  await report.locator('button[aria-label="Dismiss"]').click()
+  assert.equal(await report.count(), 0)
+
+  const broken = makeZip({ 'broken/manifest.json': '{ "id": "acme.broken", "name": "Broken", "version": "1.0.0" }' })
+  await picker.setInputFiles({ name: 'broken.zip', mimeType: 'application/zip', buffer: Buffer.from(broken) })
+  const alert = page.locator('strata-library .report[role="alert"]')
+  await alert.waitFor()
+  assert.match(await alert.innerText(), /not added[\s\S]*manifest\.json: strataApi is required/)
+
+  // Dropping a file on the panel goes through the same path.
+  const dropped = packComponent({ ...messageQueueFolder(), 'manifest.json': JSON.stringify({ ...manifest, id: 'acme.dropped-queue', name: 'Dropped queue' }) }).script
+  await page.evaluate(text => {
+    const data = new DataTransfer()
+    data.items.add(new File([text], 'dropped.strata.js', { type: 'text/javascript' }))
+    const target = document.querySelector('strata-app').shadowRoot.querySelector('strata-library')
+    target.dispatchEvent(new DragEvent('dragover', { dataTransfer: data, bubbles: true, cancelable: true }))
+    target.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
+  }, dropped)
+  await page.locator('strata-app .toast', { hasText: 'Added Dropped queue' }).waitFor()
+  assert.equal(await page.locator('strata-library button', { hasText: 'Dropped queue' }).count(), 1)
+})

@@ -19,4 +19,5 @@ export {
   normalizeFiles, asText, jsonErrorOffset, BUNDLE_FORMAT
 } from './pack.js'
 export { readZip, isZip } from './zip.js'
+export { minify } from './minify.js'
 export { packUpload } from './upload.js'
