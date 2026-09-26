@@ -294,7 +294,7 @@ test('the facade bundles into one CommonJS script that works', async () => {
   const module = { exports: {} }
   // eslint-disable-next-line no-new-func
   new Function('module', script)(module)
-  const strata = module.exports.createStrata({ output: () => {} })
+  const strata = module.exports.createStrata({ clock: () => Date.UTC(2026, 8, 26) })
   const p = await strata.projects.create('bundled')
   const svc = p.root.add('base:service', { name: 'Orders' })
   const db = p.root.add('base:store', { name: 'Orders DB' })

@@ -14,10 +14,14 @@ const TIME_MAX = 2 ** 48 - 1
 const ULID_RE = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/
 
 /**
- * @param {{ now?: () => number, random?: (n: number) => Uint8Array }} [options]
- * @returns {() => string}
+ * A ULID generator over the injected clock (eng §6) and random source.
+ * @param {{ now: import('./types.js').Clock, random?: import('./types.js').RandomBytes }} adapters
+ *   `random` defaults to the platform's cryptographic source
+ * @returns {import('./types.js').IdGenerator}
  */
-export function createUlidFactory({ now = Date.now, random = secureRandomBytes } = {}) {
+export function createUlidFactory({ now, random = secureRandomBytes }) {
+  if (typeof now !== 'function')
+    fail('E_ADAPTER_MISSING', 'createUlidFactory needs a clock: { now: () => epoch milliseconds }')
   let lastTime = -1
   /** @type {number[]} */
   let lastRandom = []

@@ -29,7 +29,6 @@ Rules adopted after code was written start with a bulk suppression (`eslint-supp
 
 | Rule | Files | Removed by |
 | --- | --- | --- |
-| `strata/banned-globals`, `no-console` | default clock, PRNG and output in `core` and `facade` | 0103 (injected adapters) |
 | `strata/facade-help` | facade methods without `@example` | 0115 (help metadata) |
 
 A suppressed file still fails on any violation beyond its recorded count, and ESLint reports suppressions that no longer occur, so the list only shrinks: run `npx eslint . --prune-suppressions` after fixing some. `tools/lint/test/config.test.js` keeps the file limited to the table above.

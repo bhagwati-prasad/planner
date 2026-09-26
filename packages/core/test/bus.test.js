@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createCore, isUlid } from '../src/index.js'
+import { createFakeClock } from '../../../tools/testing/index.js'
 import {
   setup,
   add,
@@ -214,8 +215,8 @@ test('replaying the op log on another machine rebuilds the identical model', () 
 test('replay needs no registry: logged payloads carry resolved types and ports', () => {
   const { core, root } = setup()
   buildPayments(core, root)
-  const bare = createCore({ registry: testRegistry() })
-  const noComponents = createCore()
+  const bare = createCore({ registry: testRegistry(), clock: createFakeClock().now })
+  const noComponents = createCore({ clock: createFakeClock().now })
   bare.replay(core.oplog)
   noComponents.replay(core.oplog)
   assert.deepEqual(noComponents.snapshot(), core.snapshot())

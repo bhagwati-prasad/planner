@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createCore } from '../src/index.js'
+import { createFakeClock } from '../../../tools/testing/index.js'
 import { setup, add, port, buildPayments, testRegistry } from './helpers.js'
 
 test('a well-formed model has no problems', () => {
@@ -35,7 +36,11 @@ test('problems cover placeholders, unmapped ports, unused library systems and ba
     rev: 1,
   }
   snap.edges.push(edge)
-  const loaded = createCore({ registry: testRegistry(), snapshot: snap })
+  const loaded = createCore({
+    registry: testRegistry(),
+    snapshot: snap,
+    clock: createFakeClock().now,
+  })
 
   const codes = loaded.problems().map(p => `${p.severity}:${p.code}`)
   assert.deepEqual(codes, [
@@ -55,7 +60,7 @@ test('problems cover placeholders, unmapped ports, unused library systems and ba
 test('a model loaded without its components still opens, with warnings', () => {
   const { core, root } = setup()
   buildPayments(core, root)
-  const bare = createCore({ snapshot: core.snapshot() })
+  const bare = createCore({ snapshot: core.snapshot(), clock: createFakeClock().now })
   const missing = bare.problems().filter(p => p.code === 'MISSING_COMPONENT')
   assert.equal(missing.length, 3, 'test.service, test.db and acme.message-queue are not installed')
   assert.equal(bare.nodes().length, 6)

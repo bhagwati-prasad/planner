@@ -6,10 +6,11 @@ Shared helpers for tests (eng §18). Import them from `tools/testing/index.js`.
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `createFakeClock({ start })`                                                     | Time that moves only when the test moves it: `now()`, `advance(ms)`, `set(ms)`                                            |
 | `createFakeScheduler({ clock })`                                                 | `setTimeout`, `setInterval` and their `clear…` in time order with no real waiting: `advance(ms)`, `runNext()`, `runAll()` |
-| `createRandom(seed)`                                                             | A seeded PRNG (`uint32()`, `float()`) that gives the same sequence on every engine                                        |
+| `createRandom(seed)`                                                             | A seeded PRNG (`uint32()`, `float()`, and the PRNG adapter's `nextU32()`, `next()`, `bytes(n)`), the same on every engine |
 | `gen.int`, `float`, `bool`, `oneOf`, `string`, `array`, `record`, `tuple`, `map` | Generators for property tests; every one shrinks, including composites                                                    |
 | `sample(generator, { seed, count })`                                             | A look at what a generator produces                                                                                       |
 | `property(generators, predicate, { seed, runs })`                                | Checks a predicate on generated cases; on failure it shrinks the case and throws a `PropertyFailure` naming the seed      |
+| `createFakeLogger()`                                                             | A logger that records `{ level, message, data }` in `entries` instead of printing                                        |
 | `fixtures(import.meta.url)`                                                      | Loads `.strata` fixtures by name from the nearest `test/fixtures` folder                                                  |
 
 ```js

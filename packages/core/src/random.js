@@ -1,3 +1,5 @@
+import { fail } from './errors.js'
+
 /**
  * Small seeded PRNG (sfc32 seeded through splitmix32). Deterministic across browsers, workers
  * and Node, which the simulation (R1) and reproducible tests rely on.
@@ -63,11 +65,14 @@ export function hashString(str) {
   return h >>> 0
 }
 
-/** Cryptographically strong random bytes where available. @param {number} n */
+/**
+ * Cryptographically strong random bytes from the platform (Web Crypto, in browsers, workers and
+ * Node). Without it, pass a `random` adapter.
+ * @param {number} n
+ */
 export function secureRandomBytes(n) {
-  const out = new Uint8Array(n)
   const c = /** @type {any} */ (globalThis).crypto
-  if (c && typeof c.getRandomValues === 'function') return c.getRandomValues(out)
-  for (let i = 0; i < n; i++) out[i] = Math.floor(Math.random() * 256)
-  return out
+  if (!c || typeof c.getRandomValues !== 'function')
+    fail('E_ADAPTER_MISSING', 'No Web Crypto here; pass a random adapter: (n) => Uint8Array')
+  return c.getRandomValues(new Uint8Array(n))
 }

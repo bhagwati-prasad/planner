@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createStrata } from '../src/index.js'
+import { createFakeClock } from '../../../tools/testing/index.js'
 import { packComponent, validateManifest } from '../../plugins/src/index.js'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
@@ -33,7 +34,7 @@ function starterFolders() {
 }
 
 function starterStrata() {
-  const strata = createStrata({ output: () => {} })
+  const strata = createStrata({ clock: createFakeClock().now })
   for (const { name, files } of starterFolders()) {
     const result = packComponent(files, { name })
     assert.deepEqual(result.problems, [], `${name} packs cleanly`)
@@ -164,7 +165,7 @@ test('a checkout flow built from starter parts picks sensible connection types',
 })
 
 test('edge properties of a missing connection type are kept and reported', async () => {
-  const strata = createStrata({ output: () => {} })
+  const strata = createStrata({ clock: createFakeClock().now })
   const p = await strata.projects.create('bare')
   const a = p.root.add('base:service', { name: 'A' })
   const b = p.root.add('base:service', { name: 'B' })

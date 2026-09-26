@@ -15,6 +15,9 @@
  * @typedef {object} Random
  * @property {() => number} uint32  a uniform 32-bit unsigned integer
  * @property {() => number} float   a uniform number in [0, 1)
+ * @property {() => number} nextU32  the same as uint32 (the PRNG adapter's name)
+ * @property {() => number} next     the same as float (the PRNG adapter's name)
+ * @property {(n: number) => Uint8Array} bytes  n random bytes
  */
 
 /** @param {number|string} seed */
@@ -53,7 +56,16 @@ export function createRandom(seed) {
     c = (c + t) >>> 0
     return t
   }
-  return { uint32, float: () => uint32() / 4294967296 }
+  const float = () => uint32() / 4294967296
+  return {
+    uint32,
+    float,
+    // The PRNG adapter interface (tools/contracts/prng.contract.js), so a Random is also a fake PRNG.
+    nextU32: uint32,
+    next: float,
+    /** @param {number} n */
+    bytes: n => Uint8Array.from({ length: n }, () => uint32() & 0xff),
+  }
 }
 
 /** @template T @param {T} value @param {() => Iterable<Tree<T>>} [children] @returns {Tree<T>} */
