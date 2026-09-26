@@ -12,8 +12,7 @@
   },
   "scripts": {
     "test": "node scripts/run-tests.js",
-    "check": "node scripts/check-boundaries.js",
-    "verify": "node scripts/check-boundaries.js && node scripts/run-tests.js && node scripts/run-browser-tests.js",
+    "check": "node tools/ci/check.js",
     "demo": "node examples/console-demo.js",
     "typecheck": "node tools/checks.js typecheck",
     "test:browser": "node scripts/run-browser-tests.js",
