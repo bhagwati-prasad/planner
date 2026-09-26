@@ -5,6 +5,8 @@
 //   dist/strata.cjs       CommonJS build of the facade for Node: require('./dist/strata.cjs')
 //   dist/strata.html      the offline app: open it from disk, no server needed
 //   dist/components/      the starter library, packed, one script tag each in strata.html
+//   dist/sim-worker.js    the simulation worker's source as a string (StrataSimWorker.source),
+//                         so a file:// page can start it from a Blob URL
 //   dist/vendor/          D3 as shipped, Three.js bundled to a classic script (THREE), and their
 //                         licences
 //
@@ -21,6 +23,7 @@ import {
 } from '../packages/plugins/src/index.js'
 import { componentFolders, packFolder } from '../packages/server/src/index.js'
 import { BEGIN_MARKER, END_MARKER } from '../packages/cli/src/index.js'
+import { ENGINE_VERSION, PROTOCOL_VERSION } from '../packages/sim/src/index.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const STARTER = [join(ROOT, 'components'), join(ROOT, 'connection-types')]
@@ -86,6 +89,19 @@ async function threeScript(minify) {
   const copyright = /Copyright .+/.exec(await readFile(join(dir, 'LICENSE'), 'utf8'))?.[0]
   const banner = `/*! three.js ${version} · ${copyright} · ${licence} licence: LICENSE-three · bundled by the Strata bundler */`
   return script(files, 'three.module.js', { format: 'iife', globalName: 'THREE', minify, banner })
+}
+
+/** The simulation worker's entry (eng §13), bundled with everything it imports. */
+export const SIM_WORKER_ENTRY = 'packages/sim/src/worker/main.js'
+
+/**
+ * The simulation worker as one classic script. The app starts it from a Blob URL, and Node runs
+ * it in worker_threads.
+ * @param {{ minify?: boolean }} [options]
+ */
+export async function simWorkerSource({ minify = true } = {}) {
+  const banner = '/*! Strata simulation worker · built with the Strata bundler */'
+  return script(await sources(), SIM_WORKER_ENTRY, { format: 'iife', minify, banner }).code
 }
 
 const html = scripts => `<!doctype html>
@@ -158,6 +174,11 @@ export async function build({
 
   await cp(join(ROOT, 'vendor/d3/d3.min.js'), join(outDir, 'vendor/d3.min.js'))
   await cp(join(ROOT, 'vendor/d3/LICENSE'), join(outDir, 'vendor/LICENSE-d3'))
+  const worker = await simWorkerSource({ minify })
+  await writeFile(
+    join(outDir, 'sim-worker.js'),
+    `${banner}\nglobalThis.StrataSimWorker = Object.freeze(${JSON.stringify({ protocol: PROTOCOL_VERSION, engine: ENGINE_VERSION, source: worker })});\n`
+  )
   const three = await threeScript(minify)
   await writeFile(join(outDir, 'vendor/three.js'), three.code)
   await cp(join(ROOT, 'vendor/three/LICENSE'), join(outDir, 'vendor/LICENSE-three'))
@@ -168,6 +189,7 @@ export async function build({
     `strata.js   ${kb(app.code.length)} (${app.modules} modules${minify ? ', minified' : ''})${app.code.length > BUDGET ? ` — over the ${kb(BUDGET)} budget` : ''}`
   )
   log(`strata.cjs  ${kb(cjs.code.length)} (${cjs.modules} modules)`)
+  log(`worker      ${kb(worker.length)} (sim-worker.js)`)
   log(`three.js    ${kb(three.code.length)} (vendor/three.js, loaded lazily)`)
   log(`components  ${scripts.length} packed`)
   log(

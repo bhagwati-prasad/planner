@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { sha256, toHex, toBase64, fromBase64, integrityOf } from '../src/sha256.js'
-import { createPrng } from '../../core/src/index.js'
+import { createPrng } from '../src/index.js'
 
 test('sha256 matches the standard test vectors', () => {
   assert.equal(

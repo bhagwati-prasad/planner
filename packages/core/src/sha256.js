@@ -1,5 +1,6 @@
 /**
- * SHA-256 in plain JavaScript, synchronous, for bundle integrity (spec §7, §19). WebCrypto
+ * SHA-256 in plain JavaScript, synchronous, for bundle integrity (spec §7, §19) and run hashes
+ * (eng §13). WebCrypto
  * would do, but it is asynchronous and absent from insecure contexts; a bundle must hash the
  * same way in a `file://` page, a worker and Node.
  */

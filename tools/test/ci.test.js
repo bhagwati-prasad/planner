@@ -189,6 +189,20 @@ describe('size check', () => {
     assert.equal(worker?.bytes, null)
   })
 
+  it('measures the simulation worker as its bundle, including the modules it imports', () => {
+    const fixture = tree({
+      'packages/sim/src/worker/main.js':
+        "import { data } from '../kernel.js'\nglobalThis.x = data\n",
+      'packages/sim/src/kernel.js': moduleOf(30_000),
+      'packages/sim/src/unused.js': moduleOf(50_000),
+    })
+    const worker = checkSizes({ root: fixture.root, exceptions: {} }).rows.find(r =>
+      r.label.startsWith('Simulation worker')
+    )
+    assert.ok(worker?.bytes, 'the worker bundle is measured')
+    assert.ok(worker.bytes > 30_000 && worker.bytes < 40_000, `${worker.bytes} bytes`)
+  })
+
   it('lets a recorded exception stay over budget but grow no further', () => {
     const fixture = tree({ 'packages/graph/src/index.js': moduleOf(70_000) })
     const graph = 'strata-graph (minified)'

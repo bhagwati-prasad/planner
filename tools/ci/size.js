@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { minify } from '../../packages/plugins/src/index.js'
+import { bundleModules, emitScript, minify } from '../../packages/plugins/src/index.js'
 import { NODE_PACKAGES } from '../lint/guidelines.js'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
@@ -66,6 +66,26 @@ function raw(dirs, ext) {
   return all.reduce((sum, f) => sum + readFileSync(f).length, 0)
 }
 
+/**
+ * Minified bytes of the bundle the build makes from `entry` (a path under root), or null when
+ * the entry does not exist yet.
+ * @param {string} root
+ * @param {string} entry
+ */
+function bundled(root, entry) {
+  if (!existsSync(join(root, entry))) return null
+  /** @type {Record<string, string>} */
+  const sources = {}
+  for (const pkg of packages(root))
+    for (const file of files(src(root, pkg), '.js'))
+      sources[file.slice(root.length).replace(/\\/g, '/').replace(/^\//, '')] = readFileSync(
+        file,
+        'utf8'
+      )
+  const bundle = bundleModules(sources, [entry])
+  return Buffer.byteLength(minify(emitScript(bundle, { entry, format: 'iife' })))
+}
+
 /** @param {string} root */
 const packages = root => {
   const dir = join(root, 'packages')
@@ -88,7 +108,7 @@ export const MEASURES = {
     ),
   'strata-graph (minified)': root => minified([src(root, 'graph')]),
   'strata-ui (minified)': root => minified([src(root, 'ui')]),
-  'Simulation worker bundle (minified)': root => minified([join(src(root, 'sim'), 'worker')]),
+  'Simulation worker bundle (minified)': root => bundled(root, 'packages/sim/src/worker/main.js'),
   'Bundled fonts (woff2, Latin subset)': root =>
     raw([join(root, 'packages', 'ui'), join(root, 'vendor')], '.woff2'),
 }
