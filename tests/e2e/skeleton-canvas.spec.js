@@ -54,15 +54,22 @@ test("the page works with Playwright's offline mode enabled", async ({
   /** @type {string[]} */
   const network = []
   page.on('request', request => {
-    if (!/^(file|blob|data):/.test(request.url())) network.push(request.url())
+    const url = request.url()
+    // Served, the app keeps a live-reload channel to the server, which reconnects on its own.
+    if (!/^(file|blob|data):/.test(url) && !url.endsWith('/api/events')) network.push(url)
   })
-  // From file:// nothing needs the network at all; served, the page itself comes from the local
-  // server, so the network goes away once it has loaded.
-  if (mode === 'file') await context.setOffline(true)
   await openSkeleton(page, urlFor)
+  // From file:// the page loads without touching the network. Served, it comes from the local
+  // server. Offline mode goes on once the page has loaded: WebKit's emulation also refuses
+  // file:// and blob: loads, which no real network outage does.
+  if (mode === 'file') expect(network).toEqual([])
+  network.length = 0
   await context.setOffline(true)
-  if (mode === 'served') network.length = 0 // the page and its scripts came from the server
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
-  await expect(page.getByText('Response in 22 ms')).toBeVisible()
-  expect(network).toEqual([])
+  try {
+    await page.getByRole('button', { name: 'Run', exact: true }).click()
+    await expect(page.getByText('Response in 22 ms')).toBeVisible()
+    expect(network).toEqual([])
+  } finally {
+    await context.setOffline(false)
+  }
 })
