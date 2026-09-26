@@ -1,0 +1,108 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.worker-pool",
+  "name": "Worker pool",
+  "version": "1.0.0",
+  "category": "Compute",
+  "description": "Consumers that pull messages from a queue or topic in batches.",
+  "icon": "icon.svg",
+  "extends": "base:service",
+  "shape": "component",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "async-message"
+      ]
+    },
+    {
+      "name": "out",
+      "direction": "out"
+    }
+  ],
+  "properties": {
+    "consumers": {
+      "type": "integer",
+      "unit": "workers",
+      "default": 8,
+      "min": 0,
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "batchSize": {
+      "type": "integer",
+      "unit": "messages",
+      "default": 10,
+      "min": 1,
+      "group": "Processing"
+    },
+    "pollInterval": {
+      "type": "duration",
+      "default": "100ms",
+      "group": "Processing"
+    },
+    "prefetch": {
+      "type": "integer",
+      "unit": "messages",
+      "default": 20,
+      "min": 0,
+      "group": "Processing"
+    },
+    "processingTime": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 50,
+        "p99": 400
+      },
+      "group": "Processing",
+      "description": "Per message"
+    },
+    "maxRetries": {
+      "type": "integer",
+      "unit": "retries",
+      "default": 3,
+      "min": 0,
+      "group": "Reliability"
+    },
+    "backoff": {
+      "type": "duration",
+      "default": "1s",
+      "group": "Reliability",
+      "description": "First retry delay; doubles each attempt"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "processingTime.p50"
+    },
+    "latency.p95": {
+      "estimate": "processingTime.p95"
+    },
+    "latency.p99": {
+      "estimate": "processingTime.p99"
+    },
+    "throughput": {
+      "unit": "msg/s",
+      "rollup": "sum"
+    },
+    "idle": {
+      "unit": "%",
+      "rollup": "min"
+    },
+    "batchLatency": {
+      "unit": "ms",
+      "rollup": "max"
+    },
+    "retries": {
+      "unit": "retries/s",
+      "rollup": "sum"
+    },
+    "poisonMessages": {
+      "unit": "messages",
+      "rollup": "sum"
+    }
+  }
+}

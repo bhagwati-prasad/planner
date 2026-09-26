@@ -6,7 +6,7 @@ import { fail } from '../../strata-core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE, INSPECT } from './internal.js'
 import { Navigator } from './navigator.js'
-import { NodeHandle, SystemHandle, resolveSystemId } from './handles.js'
+import { EdgeHandle, NodeHandle, SystemHandle, resolveSystemId } from './handles.js'
 
 /** @typedef {import('../../strata-core/src/index.js').Core} Core */
 
@@ -77,6 +77,18 @@ export class ProjectHandle {
     if (matches.length === 1) return new NodeHandle(this, matches[0].id)
     if (matches.length > 1) fail('AMBIGUOUS', `Several nodes are named '${idOrName}'; use an id or system.node(name)`, matches.map(n => n.id))
     return fail('NOT_FOUND', `No node '${idOrName}' in project '${this.name}'`)
+  }
+
+  /**
+   * An edge by id, or by label when exactly one edge has it.
+   * @param {string} idOrLabel
+   */
+  edge (idOrLabel) {
+    if (this.#core.get('edge', idOrLabel)) return new EdgeHandle(this, idOrLabel)
+    const matches = this.#core.all('edge').filter(e => e.label === idOrLabel)
+    if (matches.length === 1) return new EdgeHandle(this, matches[0].id)
+    if (matches.length > 1) fail('AMBIGUOUS', `Several edges are labelled '${idOrLabel}'; use an id or port.edges()`, matches.map(e => e.id))
+    return fail('NOT_FOUND', `No edge '${idOrLabel}' in project '${this.name}'`)
   }
 
   /**

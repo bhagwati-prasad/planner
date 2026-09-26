@@ -3,7 +3,8 @@
  * mutates only through `ctx.tx`, allocating ids only through `ctx.newId()` and iterating in id
  * order, so the same command on the same model always produces the same result (replay).
  */
-import { fail } from '../errors.js'
+import { didYouMean, fail, suggest } from '../errors.js'
+import { validateValue } from '../props.js'
 import { isPlainObject } from '../plain.js'
 import { PORT_DIRECTIONS } from '../registry.js'
 import { acceptsOf, boundaryPortsOf, edgesAtPort, edgesOf, nodesOf, portsOf, viewsOf } from '../model.js'
@@ -156,6 +157,27 @@ export function createMirrorPort (ctx, nodeId, bp) {
     boundaryPortId: bp.id
   })
   return id
+}
+
+// ---------------------------------------------------------------------------------------------
+// Properties
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Checks property values against a manifest (a component or connection type). Without a
+ * manifest (not installed) values are kept unchecked.
+ * @param {import('../registry.js').EffectiveManifest|null} manifest
+ * @param {Record<string, unknown>} props
+ * @param {string} label
+ */
+export function validateProps (manifest, props, label) {
+  if (!manifest) return
+  const known = Object.keys(manifest.properties)
+  for (const [key, value] of Object.entries(props)) {
+    const schema = manifest.properties[key]
+    if (!schema) fail('INVALID', `Unknown property '${key}' for ${label} (${manifest.typeRef}).${didYouMean(suggest(key, known))}`)
+    validateValue(schema, value, `${label}.${key}`)
+  }
 }
 
 // ---------------------------------------------------------------------------------------------

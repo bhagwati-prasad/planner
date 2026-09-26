@@ -13,7 +13,7 @@ import { registerCoreCommands } from './commands/index.js'
 import { rollup, checkContracts } from './rollup.js'
 import { findProblems } from './validate.js'
 import {
-  acceptsOf, boundaryPortsOf, childSystemIds, containsSystem, edgesAtPort, edgesOf, effectiveProps,
+  acceptsOf, boundaryPortsOf, childSystemIds, connectionTypeOf, containsSystem, edgesAtPort, edgesOf, effectiveProps,
   explainProps, manifestOf, nodesOf, pathsTo, portsOf, projectOf, referencingNodes, resolvePort,
   subtreeSystemIds, viewsOf, wouldCycle
 } from './model.js'
@@ -145,9 +145,16 @@ export class Core {
     return typeof nodeOrId === 'string' ? this.#store.require('node', nodeOrId) : nodeOrId
   }
 
+  /** A node or an edge, by id or entity. */
+  #propsArg (idOrEntity) {
+    if (typeof idOrEntity !== 'string') return idOrEntity
+    return this.#store.get('node', idOrEntity) ?? this.#store.require('edge', idOrEntity)
+  }
+
   /** @param {string|object} node */ manifestOf (node) { return manifestOf(this.#registry, this.#nodeArg(node)) }
-  /** @param {string|object} node */ effectiveProps (node) { return effectiveProps(this.#registry, this.#nodeArg(node)) }
-  /** @param {string|object} node */ explainProps (node) { return explainProps(this.#registry, this.#nodeArg(node)) }
+  /** @param {string|object} edge */ connectionTypeOf (edge) { return connectionTypeOf(this.#registry, typeof edge === 'string' ? this.#store.require('edge', edge) : edge) }
+  /** @param {string|object} entity a node or an edge */ effectiveProps (entity) { return effectiveProps(this.#registry, this.#propsArg(entity)) }
+  /** @param {string|object} entity a node or an edge */ explainProps (entity) { return explainProps(this.#registry, this.#propsArg(entity)) }
   /** @param {string|object} port */
   acceptsOf (port) {
     return acceptsOf(this.#store, typeof port === 'string' ? this.#store.require('port', port) : port)

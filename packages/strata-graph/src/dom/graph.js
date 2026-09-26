@@ -1374,14 +1374,16 @@ export class Graph {
     if (d.icon) {
       const icon = this.#icon(d.icon)
       if (icon) {
+        // Inside the label box, so it stays within curved and slanted outlines too.
+        const size = Math.max(10, Math.min(18, box.h - 4))
         const el = /** @type {SVGSVGElement} */ (icon.cloneNode(true))
         el.setAttribute('class', 'sg-icon')
-        el.setAttribute('x', '6')
-        el.setAttribute('y', '6')
-        el.setAttribute('width', '18')
-        el.setAttribute('height', '18')
+        el.setAttribute('x', String(box.x))
+        el.setAttribute('y', String(box.h > 40 ? box.y + 2 : box.y + (box.h - size) / 2))
+        el.setAttribute('width', String(size))
+        el.setAttribute('height', String(size))
         body.node().appendChild(el)
-        box = { ...box, x: box.x + 20, w: Math.max(10, box.w - 20) }
+        box = { ...box, x: box.x + size + 2, w: Math.max(10, box.w - size - 2) }
       }
     }
     if (shape.label === false || !d.label) return

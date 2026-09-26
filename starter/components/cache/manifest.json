@@ -1,0 +1,123 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.cache",
+  "name": "Cache",
+  "version": "1.0.0",
+  "category": "Data",
+  "description": "An in-memory cache in front of an origin (Redis, Memcached).",
+  "icon": "icon.svg",
+  "extends": "base:cache",
+  "shape": "component",
+  "properties": {
+    "capacityMemory": {
+      "type": "bytes",
+      "default": "4GB",
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "capacityItems": {
+      "type": "integer",
+      "unit": "items",
+      "default": 1000000,
+      "min": 1,
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "nodes": {
+      "type": "integer",
+      "unit": "nodes",
+      "default": 3,
+      "min": 1,
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "replication": {
+      "type": "integer",
+      "unit": "replicas",
+      "default": 1,
+      "min": 0,
+      "group": "Capacity"
+    },
+    "eviction": {
+      "type": "enum",
+      "values": [
+        "lru",
+        "lfu",
+        "ttl",
+        "random"
+      ],
+      "default": "lru",
+      "group": "Behaviour"
+    },
+    "ttl": {
+      "type": "duration",
+      "default": "5m",
+      "group": "Behaviour"
+    },
+    "writePolicy": {
+      "type": "enum",
+      "values": [
+        "write-through",
+        "write-back",
+        "write-around"
+      ],
+      "default": "write-through",
+      "group": "Behaviour"
+    },
+    "hitLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 0.5,
+        "p99": 3
+      },
+      "group": "Performance"
+    },
+    "keyspaceSize": {
+      "type": "integer",
+      "unit": "keys",
+      "default": 10000000,
+      "min": 1,
+      "group": "Workload"
+    },
+    "accessSkew": {
+      "type": "number",
+      "unit": "Zipf s",
+      "default": 1,
+      "min": 0,
+      "group": "Workload"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "hitLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "hitLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "hitLatency.p99"
+    },
+    "hitRatio": {
+      "unit": "%",
+      "rollup": "min"
+    },
+    "fill": {
+      "unit": "%",
+      "rollup": "max"
+    },
+    "evictions": {
+      "unit": "evictions/s",
+      "rollup": "sum"
+    },
+    "memoryUsed": {
+      "unit": "bytes",
+      "rollup": "sum"
+    },
+    "keys": {
+      "unit": "keys",
+      "rollup": "sum"
+    }
+  }
+}

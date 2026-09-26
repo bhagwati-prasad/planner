@@ -1,0 +1,91 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.identity-provider",
+  "name": "Auth / identity provider",
+  "version": "1.0.0",
+  "category": "Security",
+  "description": "Issues and validates tokens (Auth0, Cognito, Keycloak, Entra ID).",
+  "icon": "icon.svg",
+  "extends": "base:service",
+  "shape": "box",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http",
+        "grpc"
+      ]
+    },
+    {
+      "name": "out",
+      "direction": "out"
+    }
+  ],
+  "properties": {
+    "tokenIssueLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 30,
+        "p99": 200
+      },
+      "group": "Tokens"
+    },
+    "tokenTtl": {
+      "type": "duration",
+      "default": "1h",
+      "group": "Tokens"
+    },
+    "validationMode": {
+      "type": "enum",
+      "values": [
+        "local-jwt",
+        "introspection"
+      ],
+      "default": "local-jwt",
+      "group": "Validation"
+    },
+    "validationLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 1,
+        "p99": 5
+      },
+      "group": "Validation"
+    },
+    "rateLimit": {
+      "type": "rate",
+      "default": "500/s",
+      "group": "Limits"
+    },
+    "mfaStepUpProbability": {
+      "type": "percent",
+      "unit": "%",
+      "default": 2,
+      "group": "Limits"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "validationLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "validationLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "validationLatency.p99"
+    },
+    "authRequests": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "failures": {
+      "unit": "req/s",
+      "rollup": "sum"
+    }
+  }
+}

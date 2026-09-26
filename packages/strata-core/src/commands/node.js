@@ -1,8 +1,7 @@
 /**
  * Node and port commands.
  */
-import { didYouMean, fail, suggest } from '../errors.js'
-import { validateValue } from '../props.js'
+import { fail } from '../errors.js'
 import { compareSemver } from '../semver.js'
 import { parseTypeRef, typeRefOf } from '../registry.js'
 import {
@@ -10,7 +9,7 @@ import {
 } from '../model.js'
 import {
   cloneSystem, createMirrorPorts, nullableString, oneOf, onlyKeys, optionalString, plainObject,
-  removeNode, removePort, requireDirection, requireString, stringList, uniqueName
+  removeNode, removePort, requireDirection, requireString, stringList, uniqueName, validateProps
 } from './ops.js'
 
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
@@ -31,6 +30,9 @@ function resolveType (ctx, ref) {
     if (registry) registry.require(ref)
     fail('NOT_FOUND', `Unknown component type '${ref}' (no registry available)`)
   }
+  if (found.kind === 'connection-type') {
+    fail('INVALID', `'${found.id}' is a connection type, not a component; use it to connect nodes, e.g. system.connect(a, b, { type: '${found.id}' })`)
+  }
   let typeRef = typeRefOf(found)
   if (!version) {
     const pinned = Object.keys(requireProject(ctx.tx).components)
@@ -42,21 +44,6 @@ function resolveType (ctx, ref) {
   const manifest = registry?.resolve(typeRef) ?? null
   if (manifest?.abstract) fail('INVALID', `'${manifest.id}' is an abstract base type; use a component that extends it`)
   return { typeRef, manifest }
-}
-
-/**
- * @param {import('../registry.js').EffectiveManifest|null} manifest
- * @param {Record<string, unknown>} props
- * @param {string} label
- */
-function validateProps (manifest, props, label) {
-  if (!manifest) return
-  const known = Object.keys(manifest.properties)
-  for (const [key, value] of Object.entries(props)) {
-    const schema = manifest.properties[key]
-    if (!schema) fail('INVALID', `Unknown property '${key}' for ${label} (${manifest.typeRef}).${didYouMean(suggest(key, known))}`)
-    validateValue(schema, value, `${label}.${key}`)
-  }
 }
 
 /** @param {unknown} specs */

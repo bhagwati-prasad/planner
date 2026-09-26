@@ -1,0 +1,28 @@
+{
+  "strataApi": "^1.0",
+  "kind": "connection-type",
+  "id": "grpc",
+  "name": "gRPC",
+  "version": "1.0.0",
+  "category": "Connections",
+  "description": "Remote procedure calls over HTTP/2 with protocol buffers.",
+  "extends": "base:connection",
+  "properties": {
+    "streaming": {
+      "type": "enum",
+      "values": [
+        "unary",
+        "server",
+        "client",
+        "bidirectional"
+      ],
+      "default": "unary",
+      "group": "gRPC"
+    },
+    "deadlinePropagation": {
+      "type": "boolean",
+      "default": true,
+      "group": "gRPC"
+    }
+  }
+}

@@ -63,7 +63,7 @@ test('clicking a library item adds it; the inspector renames it and edits its pr
   await settle()
   assert.equal((await graphNodes()).length, 6)
   const inspector = page.locator('strata-inspector')
-  assert.match(await textOf('strata-inspector'), /Relational DB · sample\.relational-db@0\.1\.0/)
+  assert.match(await textOf('strata-inspector'), /Relational DB · starter\.relational-db@1\.0\.0/)
   const name = inspector.locator('input[data-field="name"]')
   await name.fill('Reporting DB')
   await name.press('Enter')
@@ -79,12 +79,12 @@ test('clicking a library item adds it; the inspector renames it and edits its pr
   assert.equal(await js(() => window.strata.project.node('Reporting DB').props.readReplicas), 2)
   assert.match(await textOf('strata-inspector'), /readReplicas[\s\S]*override/)
 
-  const storage = inspector.locator('input[data-field="prop:storage"]')
+  const storage = inspector.locator('input[data-field="prop:storageUsed"]')
   await storage.fill('lots')
   await storage.press('Enter')
   await settle()
   assert.match(await inspector.locator('[role="alert"]').innerText(), /Invalid size/)
-  assert.equal(await js(() => window.strata.project.node('Reporting DB').props.storage), '100GB', 'the invalid value is refused')
+  assert.equal(await js(() => window.strata.project.node('Reporting DB').props.storageUsed), '50GB', 'the invalid value is refused')
 })
 
 test('double-clicking a composite drills down; Backspace goes back up', async () => {
@@ -248,4 +248,51 @@ test('keyboard shortcuts overlay lists the shortcuts', async () => {
   await help.waitFor()
   const text = await help.innerText()
   for (const expected of ['Undo', 'Command palette', 'Extract selection as system', 'Space + drag']) assert.ok(text.includes(expected), expected)
+})
+
+test('edges show their connection type’s properties, and the type offers what both ports accept', async () => {
+  const edge = await js(() => {
+    const p = window.strata.project
+    return p.root.edges().find(e => e.from.node.name === 'Web shop').id
+  })
+  await js(id => window.strataApp.shell.select([id]), edge)
+  await settle()
+  const text = await textOf('strata-inspector')
+  assert.match(text, /Connection · HTTP \/ REST/)
+  assert.match(text, /Reliability[\s\S]*timeout[\s\S]*retries/i)
+  const options = await page.locator('strata-inspector select[data-field="connectionType"] option').allTextContents()
+  assert.deepEqual(options, ['—', 'grpc', 'http', 'websocket'])
+  const retries = page.locator('strata-inspector input[data-field="prop:retries"]')
+  await retries.fill('3')
+  await retries.press('Enter')
+  await settle()
+  assert.equal(await js(id => window.strata.project.edge(id).props.retries, edge), 3)
+  await page.locator('strata-inspector select[data-field="connectionType"]').selectOption('grpc')
+  await settle()
+  assert.match(await textOf('strata-inspector'), /Connection · gRPC[\s\S]*streaming/i)
+})
+
+test('served mode: editing a component folder updates the open app', async () => {
+  const { mkdtempSync, cpSync, readFileSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { STARTER_DIRS } = await import('../../../../scripts/dev-server.js')
+  const dir = mkdtempSync(join(tmpdir(), 'strata-live-'))
+  cpSync(STARTER_DIRS[0], join(dir, 'components'), { recursive: true })
+  const live = await startServer({ components: [join(dir, 'components'), STARTER_DIRS[1]], watch: true })
+  try {
+    await page.goto(`${live.url}/app/`)
+    await page.waitForFunction(() => window.strataApp?.shell?.canvas?.graph)
+    await page.waitForFunction(() => window.strata.components.get('starter.cache')?.name === 'Cache')
+    const manifestPath = join(dir, 'components', 'cache', 'manifest.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    writeFileSync(manifestPath, JSON.stringify({ ...manifest, name: 'Redis cache' }, null, 2))
+    await page.waitForFunction(() => window.strata.components.get('starter.cache')?.name === 'Redis cache', null, { timeout: 5000 })
+    await settle()
+    assert.equal(await page.locator('strata-library button', { hasText: 'Redis cache' }).count(), 1)
+    await page.locator('strata-app .toast', { hasText: 'starter.cache@1.0.0 changed' }).waitFor()
+  } finally {
+    await live.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

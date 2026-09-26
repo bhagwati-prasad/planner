@@ -164,29 +164,58 @@ export function manifestOf (registry, node) {
 }
 
 /**
- * Property values after defaults: manifest defaults overlaid with the node's own values.
+ * The connection type of an edge, with inheritance applied, or null when the edge has none or
+ * it is not installed. Connection types resolve by id (latest version).
  * @param {import('./registry.js').Registry|undefined} registry
- * @param {{ kind: string, typeRef: string|null, props: Record<string, unknown> }} node
+ * @param {{ connectionType: string|null }} edge
  */
-export function effectiveProps (registry, node) {
-  const manifest = manifestOf(registry, node)
-  return { ...defaultProps(manifest?.properties), ...node.props }
+export function connectionTypeOf (registry, edge) {
+  if (!edge.connectionType || !registry) return null
+  let found = null
+  try {
+    found = registry.find(edge.connectionType, { kind: 'connection-type' })
+  } catch {
+    return null
+  }
+  return found ? registry.resolve(`${found.id}@${found.version}`) : null
 }
 
 /**
- * Every property value with where it came from: 'default' (manifest) or 'override' (node).
+ * The manifest that describes an entity's properties: a node's component type or an edge's
+ * connection type.
+ * @param {import('./registry.js').Registry|undefined} registry
+ * @param {any} entity
+ */
+function describedBy (registry, entity) {
+  return 'fromPort' in entity ? connectionTypeOf(registry, entity) : manifestOf(registry, entity)
+}
+
+/**
+ * Property values after defaults: manifest defaults overlaid with the entity's own values.
+ * Works for nodes (component type) and edges (connection type).
+ * @param {import('./registry.js').Registry|undefined} registry
+ * @param {{ props: Record<string, unknown> }} entity
+ * @returns {Record<string, any>}
+ */
+export function effectiveProps (registry, entity) {
+  const manifest = describedBy(registry, entity)
+  return { ...defaultProps(manifest?.properties), ...entity.props }
+}
+
+/**
+ * Every property value with where it came from: 'default' (manifest) or 'override' (entity).
  * Roll-up values for composites are added by the roll-up engine.
  * @param {import('./registry.js').Registry|undefined} registry
- * @param {{ kind: string, typeRef: string|null, props: Record<string, unknown> }} node
+ * @param {{ props: Record<string, unknown> }} entity  a node or an edge
  */
-export function explainProps (registry, node) {
-  const manifest = manifestOf(registry, node)
+export function explainProps (registry, entity) {
+  const manifest = describedBy(registry, entity)
   /** @type {Record<string, {value: unknown, source: 'default'|'override', unit?: string, group?: string}>} */
   const out = {}
   for (const [key, schema] of Object.entries(manifest?.properties ?? {})) {
     if (schema.default !== undefined) out[key] = { value: schema.default, source: 'default', unit: schema.unit, group: schema.group }
   }
-  for (const [key, value] of Object.entries(node.props ?? {})) {
+  for (const [key, value] of Object.entries(entity.props ?? {})) {
     const schema = manifest?.properties?.[key]
     out[key] = { value, source: 'override', unit: schema?.unit, group: schema?.group }
   }

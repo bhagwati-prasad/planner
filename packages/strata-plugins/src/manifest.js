@@ -50,8 +50,9 @@ export function validateManifest (manifest, { files, file = 'manifest.json' } = 
 
   if (m.strataApi === undefined) error('strataApi is required: the range of plugin API versions this plugin works with, e.g. "^1.0"')
   if (typeof m.id === 'string' && m.id.startsWith('base:')) error("ids starting with 'base:' are reserved for the built-in base types; use your own prefix, e.g. 'acme.queue'")
-  if (typeof m.id === 'string' && !m.id.includes('.') && !m.id.startsWith('base:')) warn(`id '${m.id}' has no namespace; prefix it with your organisation, e.g. 'acme.${m.id}', so it cannot clash with other plugins`)
   const kind = m.kind ?? 'component'
+  // Connection types are named in port `accepts` lists, so the standard ones use plain names ('http').
+  if (kind === 'component' && typeof m.id === 'string' && !m.id.includes('.') && !m.id.startsWith('base:')) warn(`id '${m.id}' has no namespace; prefix it with your organisation, e.g. 'acme.${m.id}', so it cannot clash with other plugins`)
 
   for (const key of Object.keys(m)) {
     if (MANIFEST_KEYS.includes(key)) continue
@@ -70,7 +71,11 @@ export function validateManifest (manifest, { files, file = 'manifest.json' } = 
 
   if (m.metrics && typeof m.metrics === 'object') {
     for (const [key, metric] of Object.entries(m.metrics)) {
-      if (metric && typeof metric === 'object' && !metric.unit) warn(`metrics.${key}: add a unit, e.g. "unit": "req/s"`)
+      if (!metric || typeof metric !== 'object') continue
+      if (metric.estimate !== undefined) {
+        if (typeof metric.estimate !== 'string' || !metric.estimate) error(`metrics.${key}.estimate must name a property, e.g. "serviceTime.p99"`)
+        else if (m.properties && !(metric.estimate.split('.')[0] in m.properties)) warn(`metrics.${key}.estimate names '${metric.estimate.split('.')[0]}', which this manifest does not declare; it must come from the base type`)
+      } else if (!metric.unit) warn(`metrics.${key}: add a unit, e.g. "unit": "req/s"`)
     }
   }
 
@@ -90,7 +95,7 @@ export function validateManifest (manifest, { files, file = 'manifest.json' } = 
     if (m.icon !== undefined && m.icon !== null) {
       need(m.icon, 'icon')
       if (typeof m.icon === 'string' && !m.icon.endsWith('.svg')) error('icon must be an SVG file')
-    } else warn('No icon; the library shows the base shape. Add "icon": "icon.svg"')
+    } else if (kind === 'component') warn('No icon; the library shows the base shape. Add "icon": "icon.svg"')
     if (m.entry !== undefined && m.entry !== null) {
       need(m.entry, 'entry')
       if (typeof m.entry === 'string' && !m.entry.endsWith('.js')) error('entry must be a JavaScript module (.js)')

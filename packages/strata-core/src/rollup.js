@@ -7,6 +7,7 @@
  *   sum, min, max, count, union, worst  aggregate over the nodes of a system;
  *   critical-path  longest total along any in → out path (latency);
  *   min-path       bottleneck (lowest value) along the in → out paths (throughput);
+ *                  (path rules follow synchronous edges only)
  *   product        product along each in → out path, worst path wins (availability).
  *
  * Paths start at the internal ports of `in` boundary ports (or at nodes with no inbound edges)
@@ -111,14 +112,19 @@ export function resolveRule (src, registry, systemId, key, explicit) {
  * @param {string} key
  * @param {RollupOptions['values']} [values]
  */
-export function nodeValue (registry, node, key, values) {
+export function nodeValue (registry, node, key, values, depth = 0) {
   if (values) {
     const v = values(node, key)
     if (v !== undefined) return v
   }
   const props = effectiveProps(registry, node)
   const [head, ...rest] = key.split('.')
-  if (!(head in props)) return undefined
+  if (!(head in props)) {
+    // A metric may name the property that estimates it until the simulation measures it,
+    // e.g. "latency.p99": { "estimate": "serviceTime.p99" }.
+    const estimate = manifestOf(registry, node)?.metrics?.[key]?.estimate
+    return typeof estimate === 'string' && estimate !== key && depth < 4 ? nodeValue(registry, node, estimate, undefined, depth + 1) : undefined
+  }
   const schema = manifestOf(registry, node)?.properties?.[head]
   let value = props[head]
   if (rest.length === 0) return schema ? normalizeValue(schema, value) : value
@@ -205,7 +211,7 @@ function aggregate (src, registry, system, key, spec, options, stack) {
   stack.delete(system.id)
 
   const result = { systemId: system.id, key, rule: rule.rule, value: undefined, unit: rule.unit, contributors, missing }
-  if (PATH_RULES.has(rule.rule)) return Object.assign(result, pathAggregate(src, system, values, rule))
+  if (PATH_RULES.has(rule.rule)) return Object.assign(result, pathAggregate(src, registry, system, values, rule))
 
   const numbers = contributors.map(c => c.value).filter(v => typeof v === 'number')
   switch (rule.rule) {
@@ -241,23 +247,31 @@ function aggregate (src, registry, system, key, spec, options, stack) {
 }
 
 /**
+ * Path rules describe a synchronous request: they follow edges whose connection mode is
+ * 'sync' and stop at asynchronous hand-offs (a message on a queue does not add to the
+ * caller's latency, lower its throughput or its availability).
  * @param {import('./model.js').Source} src
+ * @param {import('./registry.js').Registry|undefined} registry
  * @param {any} system
  * @param {Map<string, unknown>} values
  * @param {RuleSpec} rule
  */
-function pathAggregate (src, system, values, rule) {
+function pathAggregate (src, registry, system, values, rule) {
   const nodes = nodesOf(src, system.id)
   const portOwner = new Map()
   for (const node of nodes) for (const port of portsOf(src, node.id)) portOwner.set(port.id, node.id)
   /** @type {Map<string, Set<string>>} */
   const succ = new Map(nodes.map(n => [n.id, new Set()]))
+  // Entry points are nodes nothing calls, synchronously or not; a consumer fed by a queue is
+  // not an entry point, so it is simply off the request path.
+  const hasPred = new Set()
   for (const edge of edgesOf(src, system.id)) {
     const a = portOwner.get(edge.fromPort)
     const b = portOwner.get(edge.toPort)
-    if (a && b && a !== b) succ.get(a)?.add(b)
+    if (!a || !b || a === b) continue
+    hasPred.add(b)
+    if (effectiveProps(registry, edge).mode !== 'async') succ.get(a)?.add(b)
   }
-  const hasPred = new Set([...succ.values()].flatMap(s => [...s]))
   const bps = boundaryPortsOf(src, system.id)
   const endpoints = dirs => [...new Set(bps.filter(bp => dirs.includes(bp.direction) && bp.internalPortId).map(bp => portOwner.get(bp.internalPortId)).filter(Boolean))]
   let sources = endpoints(['in', 'both'])

@@ -28,8 +28,18 @@ export const SHAPE_BY_BASE = Object.freeze({
 /** Where a port sits when its manifest does not say. */
 export const SIDE_BY_DIRECTION = Object.freeze({ in: 'left', out: 'right', both: 'bottom' })
 
-/** Connection types drawn dashed (asynchronous traffic). */
+/** Connection types drawn dashed when they are not installed (their manifest says `mode`). */
 const DASHED_TYPES = new Set(['async-message'])
+
+/**
+ * Asynchronous connections are drawn dashed: an edge whose effective `mode` is 'async'
+ * (from its connection type), or a well-known async type that is not installed.
+ * @param {any} edge an EdgeHandle
+ */
+function isAsync (edge) {
+  const mode = edge.props.mode
+  return mode === undefined ? DASHED_TYPES.has(edge.type) : mode === 'async'
+}
 
 const FRAME_PADDING = 60
 const MIN_FRAME = { w: 480, h: 320 }
@@ -165,7 +175,7 @@ export function toGraphData (system, { viewId } = {}) {
       target: { node: toNode, port: e.toPort },
       label: e.label || undefined,
       waypoints: layout[e.id]?.waypoints,
-      style: { ...(DASHED_TYPES.has(e.connectionType) ? { dash: '6 4' } : {}), ...(view?.styles?.[e.id] ?? {}) },
+      style: { ...(isAsync(edge) ? { dash: '6 4' } : {}), ...(view?.styles?.[e.id] ?? {}) },
       layer: layout[e.id]?.layer
     })
   }

@@ -1,0 +1,128 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.function",
+  "name": "Serverless function",
+  "version": "1.0.0",
+  "category": "Compute",
+  "description": "Code that runs per invocation with cold starts and concurrency limits (Lambda, Cloud Functions).",
+  "icon": "icon.svg",
+  "extends": "base:service",
+  "shape": "box",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http",
+        "async-message"
+      ]
+    },
+    {
+      "name": "out",
+      "direction": "out"
+    }
+  ],
+  "properties": {
+    "memory": {
+      "type": "bytes",
+      "default": "512MB",
+      "group": "Resources"
+    },
+    "timeout": {
+      "type": "duration",
+      "default": "30s",
+      "group": "Resources"
+    },
+    "maxConcurrency": {
+      "type": "integer",
+      "unit": "executions",
+      "default": 1000,
+      "min": 1,
+      "group": "Concurrency"
+    },
+    "reservedConcurrency": {
+      "type": "integer",
+      "unit": "executions",
+      "default": 0,
+      "min": 0,
+      "group": "Concurrency"
+    },
+    "executionTime": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 40,
+        "p99": 300
+      },
+      "group": "Performance"
+    },
+    "coldStartProbability": {
+      "type": "percent",
+      "unit": "%",
+      "default": 5,
+      "group": "Cold starts"
+    },
+    "coldStartLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 300,
+        "p99": 1500
+      },
+      "group": "Cold starts"
+    },
+    "keepWarmIdle": {
+      "type": "duration",
+      "default": "10m",
+      "group": "Cold starts",
+      "description": "Idle time before an instance is reclaimed"
+    },
+    "pricePerGbSecond": {
+      "type": "number",
+      "unit": "USD/GB-s",
+      "default": 0.0000166667,
+      "min": 0,
+      "group": "Cost"
+    },
+    "pricePerInvocation": {
+      "type": "number",
+      "unit": "USD",
+      "default": 2e-7,
+      "min": 0,
+      "group": "Cost"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "executionTime.p50"
+    },
+    "latency.p95": {
+      "estimate": "executionTime.p95"
+    },
+    "latency.p99": {
+      "estimate": "executionTime.p99"
+    },
+    "invocations": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "concurrentExecutions": {
+      "unit": "executions",
+      "rollup": "sum"
+    },
+    "coldStarts": {
+      "unit": "starts/s",
+      "rollup": "sum"
+    },
+    "throttles": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "cost": {
+      "unit": "USD",
+      "rollup": "sum"
+    }
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.service",
+  "name": "Service",
+  "version": "1.0.0",
+  "category": "Compute",
+  "description": "An API or backend service: instances with limited concurrency that call downstream dependencies.",
+  "icon": "icon.svg",
+  "extends": "base:service",
+  "shape": "box",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http",
+        "grpc",
+        "websocket"
+      ]
+    },
+    {
+      "name": "out",
+      "direction": "out"
+    }
+  ],
+  "properties": {
+    "concurrency": {
+      "type": "integer",
+      "unit": "requests",
+      "default": 64,
+      "min": 1,
+      "group": "Capacity",
+      "description": "Per instance"
+    },
+    "maxBacklog": {
+      "type": "integer",
+      "unit": "requests",
+      "default": 1000,
+      "min": 0,
+      "group": "Capacity"
+    },
+    "serviceTime": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 20,
+        "p99": 150
+      },
+      "group": "Performance",
+      "description": "Default for endpoints that do not set their own"
+    },
+    "endpoints": {
+      "type": "list",
+      "items": {
+        "type": "map"
+      },
+      "default": [],
+      "group": "Performance",
+      "description": "Each: { \"name\": \"GET /orders\", \"serviceTime\": {...}, \"calls\": [\"out\"] }"
+    },
+    "cpuPerRequest": {
+      "type": "number",
+      "unit": "ms",
+      "default": 5,
+      "min": 0,
+      "group": "Resources"
+    },
+    "memoryPerRequest": {
+      "type": "number",
+      "unit": "MB",
+      "default": 2,
+      "min": 0,
+      "group": "Resources"
+    },
+    "timeout": {
+      "type": "duration",
+      "default": "5s",
+      "group": "Reliability"
+    },
+    "retries": {
+      "type": "integer",
+      "unit": "retries",
+      "default": 2,
+      "min": 0,
+      "group": "Reliability"
+    },
+    "retryBackoff": {
+      "type": "duration",
+      "default": "100ms",
+      "group": "Reliability"
+    },
+    "circuitBreaker": {
+      "type": "boolean",
+      "default": false,
+      "group": "Circuit breaker"
+    },
+    "breakerErrorThreshold": {
+      "type": "percent",
+      "unit": "%",
+      "default": 50,
+      "group": "Circuit breaker"
+    },
+    "breakerOpenDuration": {
+      "type": "duration",
+      "default": "30s",
+      "group": "Circuit breaker"
+    },
+    "autoscaling": {
+      "type": "boolean",
+      "default": false,
+      "group": "Autoscaling"
+    },
+    "minInstances": {
+      "type": "integer",
+      "unit": "instances",
+      "default": 1,
+      "min": 0,
+      "group": "Autoscaling"
+    },
+    "maxInstances": {
+      "type": "integer",
+      "unit": "instances",
+      "default": 10,
+      "min": 1,
+      "group": "Autoscaling"
+    },
+    "targetUtilisation": {
+      "type": "percent",
+      "unit": "%",
+      "default": 70,
+      "group": "Autoscaling"
+    },
+    "scaleUpDelay": {
+      "type": "duration",
+      "default": "60s",
+      "group": "Autoscaling"
+    },
+    "cooldown": {
+      "type": "duration",
+      "default": "5m",
+      "group": "Autoscaling"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "serviceTime.p50"
+    },
+    "latency.p95": {
+      "estimate": "serviceTime.p95"
+    },
+    "latency.p99": {
+      "estimate": "serviceTime.p99"
+    },
+    "backlog": {
+      "unit": "requests",
+      "rollup": "sum"
+    },
+    "liveInstances": {
+      "unit": "instances",
+      "rollup": "sum"
+    },
+    "circuitState": {
+      "unit": "state",
+      "rollup": {
+        "rule": "worst",
+        "order": [
+          "closed",
+          "half-open",
+          "open"
+        ]
+      }
+    },
+    "errors": {
+      "unit": "errors/s",
+      "rollup": "sum"
+    }
+  }
+}

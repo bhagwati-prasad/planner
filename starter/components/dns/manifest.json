@@ -1,0 +1,63 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.dns",
+  "name": "DNS",
+  "version": "1.0.0",
+  "category": "Edge",
+  "description": "Name resolution with routing policies and health-checked failover (Route 53, Cloud DNS).",
+  "icon": "icon.svg",
+  "extends": "base:proxy",
+  "shape": "hexagon",
+  "properties": {
+    "recordTtl": {
+      "type": "duration",
+      "default": "300s",
+      "group": "Records"
+    },
+    "resolutionLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 5,
+        "p99": 50
+      },
+      "group": "Records"
+    },
+    "routingPolicy": {
+      "type": "enum",
+      "values": [
+        "simple",
+        "weighted",
+        "geo",
+        "failover"
+      ],
+      "default": "simple",
+      "group": "Routing"
+    },
+    "healthCheckInterval": {
+      "type": "duration",
+      "default": "30s",
+      "group": "Routing"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "resolutionLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "resolutionLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "resolutionLatency.p99"
+    },
+    "queries": {
+      "unit": "queries/s",
+      "rollup": "sum"
+    },
+    "failoverEvents": {
+      "unit": "events",
+      "rollup": "sum"
+    }
+  }
+}

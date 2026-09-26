@@ -3,10 +3,10 @@
  * boundary ports are a system's public interface when it is used as a component (spec §6).
  */
 import { fail } from '../errors.js'
-import { boundaryPortsOf, referencingNodes } from '../model.js'
+import { boundaryPortsOf, connectionTypeOf, referencingNodes } from '../model.js'
 import {
   checkBoundaryMapping, checkConnection, createMirrorPort, nullableString, onlyKeys, optionalString,
-  plainObject, removeBoundaryPort, removeEdge, requireDirection, requireString, stringList
+  plainObject, removeBoundaryPort, removeEdge, requireDirection, requireString, stringList, validateProps
 } from './ops.js'
 
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
@@ -24,6 +24,8 @@ export const edgeCommands = {
         p.connectionType === undefined ? undefined : nullableString(p.connectionType, 'connectionType')
       )
       p.connectionType = connectionType
+      const props = plainObject(p.props, 'props') ?? {}
+      validateProps(connectionTypeOf(ctx.registry, { connectionType }), props, 'the edge')
       const id = optionalString(p.id, 'id') ?? ctx.newId()
       ctx.tx.create('edge', {
         id,
@@ -31,7 +33,7 @@ export const edgeCommands = {
         fromPort: p.fromPort,
         toPort: p.toPort,
         connectionType,
-        props: plainObject(p.props, 'props') ?? {},
+        props,
         label: optionalString(p.label, 'label') ?? ''
       })
       return id
@@ -60,7 +62,9 @@ export const edgeCommands = {
     /** @param {any} p @param {Ctx} ctx */
     handler (p, ctx) {
       const edge = ctx.tx.require('edge', requireString(p.id, 'id'))
-      const next = { ...edge.props, ...(plainObject(p.props, 'props') ?? {}) }
+      const props = plainObject(p.props, 'props') ?? {}
+      validateProps(connectionTypeOf(ctx.registry, edge), props, edge.label || 'the edge')
+      const next = { ...edge.props, ...props }
       for (const key of stringList(p.unset, 'unset') ?? []) delete next[key]
       ctx.tx.update('edge', edge.id, { props: next })
     }

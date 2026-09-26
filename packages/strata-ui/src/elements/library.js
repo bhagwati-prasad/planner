@@ -45,7 +45,7 @@ li .actions button { width: auto; cursor: pointer; background: transparent; }
   update () {
     const strata = /** @type {any} */ (this.strata)
     const match = (...texts) => !this.#query || texts.some(t => String(t ?? '').toLowerCase().includes(this.#query))
-    const components = strata.components.list().filter(c => !c.abstract && match(c.name, c.id, c.category))
+    const components = strata.components.list({ kind: 'component' }).filter(c => !c.abstract && match(c.name, c.id, c.category))
     const groups = new Map()
     for (const c of components) {
       const key = c.category || 'Other'

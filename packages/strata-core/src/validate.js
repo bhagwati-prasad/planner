@@ -7,7 +7,7 @@
 import { validateValue } from './props.js'
 import { checkConnection } from './commands/ops.js'
 import { checkContracts } from './rollup.js'
-import { isLibrarySystem, manifestOf, referencingNodes, requireProject } from './model.js'
+import { connectionTypeOf, isLibrarySystem, manifestOf, referencingNodes, requireProject } from './model.js'
 
 const SEVERITY_RANK = { error: 0, warning: 1, info: 2 }
 
@@ -74,6 +74,27 @@ export function findProblems (src, registry, { contracts = true } = {}) {
       checkConnection(src, edge.fromPort, edge.toPort, edge.connectionType)
     } catch (err) {
       add('error', 'INVALID_EDGE', /** @type {Error} */ (err).message, 'edge', edge.id, edge.systemId)
+      continue
+    }
+    const keys = Object.keys(edge.props)
+    if (!registry || !edge.connectionType || !keys.length) continue
+    const name = edge.label || `${src.get('node', src.get('port', edge.fromPort).nodeId)?.name} → ${src.get('node', src.get('port', edge.toPort).nodeId)?.name}`
+    const type = connectionTypeOf(registry, edge)
+    if (!type) {
+      add('warning', 'MISSING_CONNECTION_TYPE', `Edge '${name}' uses the connection type '${edge.connectionType}', which is not installed; its properties are kept but not checked`, 'edge', edge.id, edge.systemId)
+      continue
+    }
+    for (const key of keys) {
+      const schema = type.properties[key]
+      if (!schema) {
+        add('warning', 'UNKNOWN_PROPERTY', `Edge '${name}' has a value for '${key}', which ${type.typeRef} does not declare`, 'edge', edge.id, edge.systemId)
+        continue
+      }
+      try {
+        validateValue(schema, edge.props[key], `${name}.${key}`)
+      } catch (err) {
+        add('error', 'INVALID_PROPERTY', /** @type {Error} */ (err).message, 'edge', edge.id, edge.systemId)
+      }
     }
   }
 

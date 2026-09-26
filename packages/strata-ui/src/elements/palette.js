@@ -118,7 +118,7 @@ li kbd { font: var(--st-mono); font-size: 11px; color: var(--st-muted); border: 
     }
     if (this.#mode === 'add') {
       if (!project) return []
-      const components = strata.components.list().filter(c => !c.abstract).map(c => ({
+      const components = strata.components.list({ kind: 'component' }).filter(c => !c.abstract).map(c => ({
         key: c.id, group: c.category || 'Component', title: c.name, detail: c.id, run: () => this.#add({ typeRef: c.id })
       }))
       const systems = project.library().map(s => ({

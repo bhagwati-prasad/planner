@@ -1,0 +1,38 @@
+{
+  "strataApi": "^1.0",
+  "kind": "connection-type",
+  "id": "async-message",
+  "name": "Async message",
+  "version": "1.0.0",
+  "category": "Connections",
+  "description": "Fire-and-forget messages through a queue or topic.",
+  "extends": "base:connection",
+  "properties": {
+    "mode": {
+      "type": "enum",
+      "values": [
+        "sync",
+        "async"
+      ],
+      "default": "async",
+      "group": "Connection"
+    },
+    "producerBatching": {
+      "type": "integer",
+      "unit": "messages",
+      "default": 1,
+      "min": 1,
+      "group": "Messaging"
+    },
+    "ackMode": {
+      "type": "enum",
+      "values": [
+        "auto",
+        "manual",
+        "none"
+      ],
+      "default": "auto",
+      "group": "Messaging"
+    }
+  }
+}

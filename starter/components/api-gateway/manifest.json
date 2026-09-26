@@ -1,0 +1,111 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.api-gateway",
+  "name": "API gateway",
+  "version": "1.0.0",
+  "category": "Edge",
+  "description": "The front door for APIs: routing, authentication, rate limits and caching.",
+  "icon": "icon.svg",
+  "extends": "base:proxy",
+  "shape": "hexagon",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http",
+        "grpc",
+        "websocket"
+      ]
+    },
+    {
+      "name": "out",
+      "direction": "out"
+    }
+  ],
+  "properties": {
+    "routes": {
+      "type": "list",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "group": "Routing",
+      "description": "e.g. \"GET /orders/*\""
+    },
+    "authMode": {
+      "type": "enum",
+      "values": [
+        "none",
+        "api-key",
+        "jwt",
+        "oauth2",
+        "mtls"
+      ],
+      "default": "jwt",
+      "group": "Security"
+    },
+    "rateLimit": {
+      "type": "rate",
+      "default": "100/s",
+      "group": "Limits",
+      "description": "Per API key"
+    },
+    "burst": {
+      "type": "integer",
+      "unit": "requests",
+      "default": 200,
+      "min": 0,
+      "group": "Limits"
+    },
+    "maxPayload": {
+      "type": "bytes",
+      "default": "10MB",
+      "group": "Limits"
+    },
+    "requestTimeout": {
+      "type": "duration",
+      "default": "29s",
+      "group": "Limits"
+    },
+    "transformLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 1,
+        "p99": 5
+      },
+      "group": "Performance"
+    },
+    "responseCacheTtl": {
+      "type": "duration",
+      "default": "0s",
+      "group": "Performance",
+      "description": "0 turns the response cache off"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "transformLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "transformLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "transformLatency.p99"
+    },
+    "throttled": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "authFailures": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "cacheHitRatio": {
+      "unit": "%",
+      "rollup": "min"
+    }
+  }
+}

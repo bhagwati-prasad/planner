@@ -23,5 +23,5 @@ export { rollup, resolveRule, nodeValue, contractValue, checkContracts } from '.
 export { findProblems } from './validate.js'
 export {
   NODE_STATUSES, LEVEL_TAGS, VIEW_KINDS, PLACEMENTS, childLevel, containsSystem, wouldCycle, pathsTo,
-  subtreeSystemIds, resolvePort, acceptsOf, effectiveProps, explainProps, manifestOf
+  subtreeSystemIds, resolvePort, acceptsOf, effectiveProps, explainProps, manifestOf, connectionTypeOf
 } from './model.js'

@@ -202,6 +202,20 @@ th { color: var(--st-muted); font-weight: 500; }
       out.push(h('p', { class: 'muted' }, 'Install this component to edit its properties; the values it holds are kept.'))
       return out
     }
+    out.push(...this.#propertyGroups(manifest, explained, node, readOnly))
+    out.push(h('h2', null, 'Ports'), this.#portsTable(node))
+    return out
+  }
+
+  /**
+   * Property fields grouped as the manifest groups them, for a node or an edge handle.
+   * @param {any} manifest  effective manifest (component or connection type)
+   * @param {Record<string, { value: unknown, source: string }>} explained
+   * @param {{ set: (props: object) => any, unset: (...keys: string[]) => any }} target
+   * @param {boolean} readOnly
+   */
+  #propertyGroups (manifest, explained, target, readOnly) {
+    const out = []
     const groups = new Map()
     for (const [key, schema] of Object.entries(manifest.properties)) {
       const group = schema.group ?? 'Properties'
@@ -213,15 +227,14 @@ th { color: var(--st-muted); font-weight: 500; }
       for (const [key, schema] of entries) {
         const info = explained[key]
         const field = `prop:${key}`
-        out.push(this.#field(field, key, this.#propInput(field, schema, info?.value, v => node.set({ [key]: v })), {
+        out.push(this.#field(field, key, this.#propInput(field, schema, info?.value, v => target.set({ [key]: v })), {
           unit: schema.unit,
           source: info ? info.source : null,
-          onReset: () => this.#commit(field, () => node.unset(key)),
+          onReset: () => this.#commit(field, () => target.unset(key)),
           readOnly
         }))
       }
     }
-    out.push(h('h2', null, 'Ports'), this.#portsTable(node))
     return out
   }
 
@@ -319,22 +332,37 @@ th { color: var(--st-muted); font-weight: 500; }
   }
 
   #edge (edge) {
-    const readOnly = /** @type {any} */ (this.strata).project.nav.current.readOnly
+    const strata = /** @type {any} */ (this.strata)
+    const readOnly = strata.project.nav.current.readOnly
     const e = edge.entity
-    const types = [...new Set([...edge.from.accepts, ...edge.to.accepts])]
-    const options = types.length ? ['', ...types] : ['', 'http', 'grpc', 'websocket', 'async-message', 'db-protocol', 'file-batch']
-    return [
-      ...this.#header(`${edge.from.node.name}.${edge.from.name} → ${edge.to.node.name}.${edge.to.name}`, 'Connection'),
+    // Offer the types both ends accept (a port that accepts nothing listed accepts anything).
+    const accepts = [edge.from.accepts, edge.to.accepts].filter(list => list.length)
+    const fits = id => accepts.every(list => list.includes(id))
+    const installed = strata.components.connectionTypes().map(t => t.id)
+    const options = [...new Set(['', ...installed.filter(fits), ...accepts.flat().filter(fits), ...(e.connectionType ? [e.connectionType] : [])])]
+    const manifest = edge.manifest
+    const out = [
+      ...this.#header(`${edge.from.node.name}.${edge.from.name} → ${edge.to.node.name}.${edge.to.name}`, manifest ? `Connection · ${manifest.name}` : 'Connection'),
       this.#field('label', 'Label', this.#text('label', e.label, v => edge.update({ label: v })), { readOnly }),
-      this.#field('connectionType', 'Type', this.#select('connectionType', e.connectionType ?? '', options, v => edge.update({ type: v || null })), { readOnly }),
-      this.#field('edgeProps', 'Properties', this.#text('edgeProps', Object.keys(e.props).length ? JSON.stringify(e.props) : '', v => {
-        const next = v.trim() ? JSON.parse(v) : {}
-        const removed = Object.keys(e.props).filter(k => !(k in next))
-        if (removed.length) edge.unset(...removed)
-        if (Object.keys(next).length) edge.set(next)
-      }, { placeholder: '{"timeout": "2s", "retries": 2}' }), { readOnly }),
-      h('div', { class: 'actions' }, readOnly ? null : h('button', { onclick: () => this.attempt(() => edge.remove()) }, 'Delete connection'))
+      this.#field('connectionType', 'Type', this.#select('connectionType', e.connectionType ?? '', options, v => edge.update({ type: v || null })), { readOnly })
     ]
+    if (manifest) {
+      out.push(...this.#propertyGroups(manifest, edge.explain(), edge, readOnly))
+    } else if (e.connectionType || Object.keys(e.props).length) {
+      out.push(
+        h('p', { class: 'muted' }, e.connectionType ? `The connection type '${e.connectionType}' is not installed; its values are kept as JSON.` : 'Values without a connection type, as JSON.'),
+        this.#field('edgeProps', 'Properties', this.#text('edgeProps', Object.keys(e.props).length ? JSON.stringify(e.props) : '', v => {
+          const next = v.trim() ? JSON.parse(v) : {}
+          const removed = Object.keys(e.props).filter(k => !(k in next))
+          if (removed.length) edge.unset(...removed)
+          if (Object.keys(next).length) edge.set(next)
+        }, { placeholder: '{"timeout": "2s", "retries": 2}' }), { readOnly })
+      )
+    } else {
+      out.push(h('p', { class: 'muted' }, 'Choose a connection type to set its latency, timeouts and retries.'))
+    }
+    if (!readOnly) out.push(h('div', { class: 'actions' }, h('button', { onclick: () => this.attempt(() => edge.remove()) }, 'Delete connection')))
+    return out
   }
 
   #boundaryPort (bp) {

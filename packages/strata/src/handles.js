@@ -573,7 +573,12 @@ export class EdgeHandle extends Handle {
   /** Connection type, e.g. 'http'. */
   get type () { return this.entity.connectionType }
   get label () { return this.entity.label }
-  get props () { return this.entity.props }
+  /** The connection type's manifest (inheritance applied), or null when it is not installed. */
+  get manifest () { return this[CORE].connectionTypeOf(this.id) }
+  /** Property values after the connection type's defaults. */
+  get props () { return Object.freeze(this[CORE].effectiveProps(this.id)) }
+  /** Every property value with its source ('default' or 'override'). */
+  explain () { return this[CORE].explainProps(this.id) }
 
   #writable () {
     if (this.#readOnly) fail('READ_ONLY', 'This edge is inside a system placed by reference and is read-only here')

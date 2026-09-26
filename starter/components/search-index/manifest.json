@@ -1,0 +1,95 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.search-index",
+  "name": "Search index",
+  "version": "1.0.0",
+  "category": "Data",
+  "description": "A full-text or vector search cluster (Elasticsearch, OpenSearch, Solr).",
+  "icon": "icon.svg",
+  "extends": "base:store",
+  "shape": "cylinder",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http"
+      ]
+    }
+  ],
+  "properties": {
+    "shards": {
+      "type": "integer",
+      "unit": "shards",
+      "default": 5,
+      "min": 1,
+      "group": "Capacity"
+    },
+    "replicas": {
+      "type": "integer",
+      "unit": "replicas",
+      "default": 1,
+      "min": 0,
+      "group": "Capacity"
+    },
+    "heap": {
+      "type": "bytes",
+      "default": "8GB",
+      "group": "Capacity"
+    },
+    "queryLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 15,
+        "p99": 120
+      },
+      "group": "Performance"
+    },
+    "indexingThroughput": {
+      "type": "rate",
+      "default": "2000/s",
+      "group": "Performance",
+      "description": "Documents per second"
+    },
+    "refreshInterval": {
+      "type": "duration",
+      "default": "1s",
+      "group": "Performance"
+    },
+    "indexSize": {
+      "type": "bytes",
+      "default": "20GB",
+      "group": "Data",
+      "rollup": "sum"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "queryLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "queryLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "queryLatency.p99"
+    },
+    "queries": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "indexingLag": {
+      "unit": "s",
+      "rollup": "max"
+    },
+    "rejections": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "indexSize": {
+      "unit": "bytes",
+      "rollup": "sum"
+    }
+  }
+}

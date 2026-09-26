@@ -1,0 +1,68 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.scheduler",
+  "name": "Scheduler (cron)",
+  "version": "1.0.0",
+  "category": "Compute",
+  "description": "Starts jobs on a cron schedule.",
+  "icon": "icon.svg",
+  "extends": "base:timer",
+  "shape": "ellipse",
+  "properties": {
+    "cron": {
+      "type": "string",
+      "default": "*/5 * * * *",
+      "group": "Schedule",
+      "description": "Five-field cron expression"
+    },
+    "jitter": {
+      "type": "duration",
+      "default": "0s",
+      "group": "Schedule"
+    },
+    "catchUp": {
+      "type": "boolean",
+      "default": false,
+      "group": "Schedule",
+      "description": "Run missed schedules after downtime"
+    },
+    "jobDuration": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 2000,
+        "p99": 20000
+      },
+      "group": "Jobs"
+    },
+    "concurrencyPolicy": {
+      "type": "enum",
+      "values": [
+        "allow",
+        "forbid",
+        "replace"
+      ],
+      "default": "forbid",
+      "group": "Jobs"
+    }
+  },
+  "metrics": {
+    "runs": {
+      "unit": "runs",
+      "rollup": "sum"
+    },
+    "overlaps": {
+      "unit": "runs",
+      "rollup": "sum"
+    },
+    "missedRuns": {
+      "unit": "runs",
+      "rollup": "sum"
+    },
+    "duration": {
+      "unit": "ms",
+      "rollup": "max"
+    }
+  }
+}

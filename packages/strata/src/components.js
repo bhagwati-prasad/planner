@@ -125,9 +125,19 @@ export class ComponentsApi {
     return this.#registry.versions(id)
   }
 
-  /** The latest version of every registered type. */
-  list () {
-    return Collection.from(this.#registry.list().map(m => ({
+  /**
+   * Connection types (http, grpc, async-message, ...) with inheritance applied, latest versions.
+   */
+  connectionTypes () {
+    return Collection.from(this.#registry.list({ kind: 'connection-type' }).filter(m => !m.abstract).map(m => this.#registry.resolve(typeRefOf(m))))
+  }
+
+  /**
+   * The latest version of every registered type.
+   * @param {{ kind?: 'component'|'connection-type' }} [options]  only types of this kind
+   */
+  list ({ kind } = {}) {
+    return Collection.from(this.#registry.list({ kind }).map(m => ({
       id: m.id,
       name: m.name,
       version: m.version,

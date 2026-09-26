@@ -183,13 +183,15 @@ export class Registry {
    * components shadow the built-in base types, so 'queue' finds 'base:queue' only when no
    * other '…queue' is registered. Returns null when nothing matches.
    * @param {string} name
+   * @param {{ kind?: 'component'|'connection-type' }} [options]  only types of this kind
    * @returns {Manifest|null}
    */
-  find (name) {
+  find (name, { kind } = {}) {
     const direct = this.get(name)
-    if (direct) return direct
+    if (direct) return !kind || direct.kind === kind ? direct : null
     const { id, version } = parseTypeRef(name)
     let matches = [...this.#byId.keys()].filter(k => /[.:/]/.test(k) && [...'.:/'].some(sep => k.endsWith(sep + id)))
+    if (kind) matches = matches.filter(k => latest(/** @type {Map<string, Manifest>} */ (this.#byId.get(k)))?.kind === kind)
     if (matches.length > 1 && matches.some(k => !k.startsWith('base:'))) matches = matches.filter(k => !k.startsWith('base:'))
     if (matches.length > 1) fail('AMBIGUOUS', `'${id}' matches several component types: ${matches.sort().join(', ')}. Use the full id.`, matches)
     if (matches.length === 0) return null
@@ -199,11 +201,12 @@ export class Registry {
   /**
    * Like `find`, but throws NOT_FOUND with suggestions.
    * @param {string} name
+   * @param {{ kind?: 'component'|'connection-type' }} [options]
    */
-  require (name) {
-    const m = this.find(name)
+  require (name, options = {}) {
+    const m = this.find(name, options)
     if (m) return m
-    const ids = [...this.#byId.keys()]
+    const ids = [...this.#byId.keys()].filter(k => !options.kind || this.get(k)?.kind === options.kind)
     const shortNames = ids.map(k => k.split(/[.:/]/).pop())
     return fail('NOT_FOUND', `Unknown component type '${name}'.${didYouMean(suggest(name, [...ids, ...shortNames]))}`)
   }
@@ -218,9 +221,13 @@ export class Registry {
     return !!eff && eff.lineage.includes(parseTypeRef(baseId).id)
   }
 
-  /** Latest version of every registered type, sorted by id. */
-  list () {
-    return [...this.#byId.keys()].sort().map(id => latest(/** @type {Map<string, Manifest>} */ (this.#byId.get(id))))
+  /**
+   * Latest version of every registered type, sorted by id.
+   * @param {{ kind?: 'component'|'connection-type' }} [options]
+   */
+  list ({ kind } = {}) {
+    const all = [...this.#byId.keys()].sort().map(id => /** @type {Manifest} */ (latest(/** @type {Map<string, Manifest>} */ (this.#byId.get(id)))))
+    return kind ? all.filter(m => m.kind === kind) : all
   }
 
   /** @param {Manifest} m @returns {EffectiveManifest} */
@@ -296,7 +303,7 @@ export function createRegistry ({ builtins = true } = {}) {
  * @property {boolean} abstract
  * @property {PortSpec[]} ports
  * @property {Record<string, import('./props.js').PropertySchema>} properties
- * @property {Record<string, {unit?: string, rollup?: string, description?: string}>} metrics
+ * @property {Record<string, {unit?: string, rollup?: string, description?: string, estimate?: string}>} metrics  `estimate` names the property that estimates the metric until simulation measures it
  * @property {string} [shape]    diagram shape name (strata-graph); defaults by base type
  * @property {string} [iconSvg]  icon markup, attached when a packed bundle is registered (M4)
  *

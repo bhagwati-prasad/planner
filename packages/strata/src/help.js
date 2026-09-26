@@ -27,6 +27,7 @@ const TOPICS = {
       ['p.system(idOrName) / p.systems()', 'Any system, editable; all systems'],
       ['p.createSystem(name, { levelTag, contract })', 'A library system to place by reference or by value'],
       ['p.node(idOrName) / p.nodes({ extends: "base:queue" })', 'Find nodes anywhere in the project'],
+      ['p.edge(idOrLabel)', 'Find an edge by id or label'],
       ['p.problems()', 'Everything the Problems panel would show'],
       ['await p.save()', 'Write the project to storage']
     ]
@@ -94,7 +95,8 @@ const TOPICS = {
   components: {
     summary: 'Component types. Built-in base types use the same API as plugins.',
     entries: [
-      ['strata.components.list()', 'Registered component types'],
+      ['strata.components.list({ kind })', "Registered types; kind 'component' or 'connection-type'"],
+      ['strata.components.connectionTypes()', 'Connection types for edges (http, grpc, async-message, ...)'],
       ['strata.components.get(name)', 'A manifest with inheritance applied'],
       ['strata.components.install(bundle)', 'Install a packed component (a bundle or the text of a .strata.js)'],
       ['await strata.components.upload(files)', 'Pack and install a .strata.js, a zip or a folder’s files', "await strata.components.upload([{ path: 'queue.strata.js', content: text }])"],
