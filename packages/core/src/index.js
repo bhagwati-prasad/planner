@@ -10,6 +10,7 @@ export { createUlidFactory, isUlid, ulidTime } from './ulid.js'
 export { createPrng, hashString, secureRandomBytes } from './random.js'
 export { toPlain, deepFreeze, deepEqual, thaw, isPlainObject, canonicalJson } from './plain.js'
 export { sha256, toHex, toBase64, fromBase64, integrityOf } from './sha256.js'
+export { setIn, updateIn, removeIn, getIn, commitState } from './state.js'
 export { compareSemver, isSemver, parseSemver, satisfies } from './semver.js'
 export {
   PROPERTY_TYPES,
