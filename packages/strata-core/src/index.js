@@ -15,7 +15,7 @@ export {
   normalizeDistribution, normalizeValue, validateValue, checkSchema, defaultProps, quantile, mean, statistic, probit
 } from './props.js'
 export {
-  Registry, createRegistry, normalizeManifest, parseTypeRef, typeRefOf, CORE_API_VERSION, PORT_DIRECTIONS
+  Registry, createRegistry, normalizeManifest, parseTypeRef, typeRefOf, CORE_API_VERSION, PORT_DIRECTIONS, PLUGIN_KINDS
 } from './registry.js'
 export { BUILTIN_MANIFESTS } from './builtins.js'
 export { CORE_COMMANDS, registerCoreCommands } from './commands/index.js'

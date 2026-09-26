@@ -14,6 +14,8 @@ import { BUILTIN_MANIFESTS } from './builtins.js'
 export const CORE_API_VERSION = '1.0.0'
 
 export const PORT_DIRECTIONS = Object.freeze(['in', 'out', 'both'])
+/** What a manifest describes: a component, or a connection type for edges (spec §7). */
+export const PLUGIN_KINDS = Object.freeze(['component', 'connection-type'])
 const ID_RE = /^[a-z0-9]+(?:[-_.:/][a-z0-9]+)*$/
 
 /**
@@ -52,6 +54,8 @@ export function normalizeManifest (input) {
       errors.push(`strataApi: ${err.message}`)
     }
   }
+  if (m.kind !== undefined && !PLUGIN_KINDS.includes(m.kind)) errors.push(`kind must be one of ${PLUGIN_KINDS.join(', ')}`)
+  if (m.kind === 'connection-type' && Array.isArray(m.ports) && m.ports.length) errors.push('a connection type has no ports')
   if (m.extends !== undefined && m.extends !== null) {
     try { parseTypeRef(m.extends) } catch (err) { errors.push(`extends: ${err.message}`) }
   }
@@ -86,6 +90,7 @@ export function normalizeManifest (input) {
 
   return deepFreeze({
     ...m,
+    kind: m.kind ?? 'component',
     id: m.id,
     name: m.name.trim(),
     version: m.version,
@@ -279,6 +284,7 @@ export function createRegistry ({ builtins = true } = {}) {
  * @property {string[]} accepts   connection types; empty means any
  *
  * @typedef {object} Manifest
+ * @property {'component'|'connection-type'} kind
  * @property {string} id
  * @property {string} name
  * @property {string} version

@@ -14,7 +14,9 @@ const packagesDir = join(root, 'packages')
 /** Allowed package dependencies. Every package may import itself. */
 const ALLOWED = {
   'strata-core': [],
-  strata: ['strata-core'],
+  // Plugins build on the core's registry and manifests (spec §4).
+  'strata-plugins': ['strata-core'],
+  strata: ['strata-core', 'strata-plugins'],
   // The diagram library knows nothing about Strata (spec §4).
   'strata-graph': [],
   // The UI may not reach past the facade (spec §16): no strata-core.
@@ -28,13 +30,14 @@ const ALLOWED = {
  */
 const HEADLESS = {
   'strata-core': () => true,
+  'strata-plugins': () => true,
   strata: () => true,
   'strata-graph': rel => !rel.split(sep).includes('dom'),
   'strata-ui': rel => !rel.split(sep).includes('elements')
 }
 
 /** Packages whose sources load in browsers: relative imports only. */
-const BROWSER = new Set(['strata-core', 'strata', 'strata-graph', 'strata-ui'])
+const BROWSER = new Set(['strata-core', 'strata-plugins', 'strata', 'strata-graph', 'strata-ui'])
 
 const DOM_GLOBALS = [
   'document', 'window', 'localStorage', 'sessionStorage', 'indexedDB',

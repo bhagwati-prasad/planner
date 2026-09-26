@@ -4,7 +4,7 @@
  * the active project, navigation and selection, and forwards every change to the core as a
  * command. Replacing the UI means writing new components against this object.
  */
-import { Emitter, createCore, createRegistry, createUlidFactory, fail, typeRefOf } from '../../strata-core/src/index.js'
+import { Emitter, createCore, createRegistry, createUlidFactory, fail } from '../../strata-core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE, INSPECT } from './internal.js'
 import { createMemoryStorage } from './storage.js'
@@ -13,6 +13,7 @@ import { EdgeHandle, NodeHandle, SystemHandle } from './handles.js'
 import { formatTarget } from './format.js'
 import { helpText, PLANNED } from './help.js'
 import { copyNodes } from './clipboard.js'
+import { ComponentsApi } from './components.js'
 
 /**
  * @typedef {object} Identity  local identity that signs operations (becomes an account in R4)
@@ -71,16 +72,8 @@ export class Strata {
       active: () => this.#active
     })
 
-    /** Component types (built-in and plugins share this registry). */
-    this.components = Object.freeze({
-      /** @param {unknown} manifest @param {{ replace?: boolean }} [options] */
-      register: (manifest, options) => this.#registry.register(manifest, options),
-      /** A manifest with inheritance applied. @param {string} name id, id@version or short name */
-      get: name => this.#registry.resolve(typeRefOf(this.#registry.require(name))),
-      list: () => Collection.from(this.#registry.list().map(m => ({
-        id: m.id, name: m.name, version: m.version, category: m.category ?? '', extends: m.extends ?? '', abstract: m.abstract
-      })))
-    })
+    /** Component types (built-in types, manifests and packed plugins share one registry). */
+    this.components = new ComponentsApi(this.#registry, emit)
 
     for (const [name, info] of Object.entries(PLANNED)) this[name] = planned(name, info.release, info.what)
   }

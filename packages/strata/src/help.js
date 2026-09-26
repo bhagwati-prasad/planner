@@ -87,7 +87,8 @@ const TOPICS = {
       ["strata.on('navigate', ({ breadcrumb, current }) => …)", 'After drill-down'],
       ["strata.on('select', ({ ids }) => …)", 'Selection changed'],
       ["strata.on('project', ({ action, project }) => …)", 'create, open, activate, close, delete'],
-      ["strata.on('history', ({ canUndo, canRedo }) => …)", 'Undo availability changed']
+      ["strata.on('history', ({ canUndo, canRedo }) => …)", 'Undo availability changed'],
+      ["strata.on('components', ({ action, typeRef }) => …)", 'A component type was installed or removed']
     ]
   },
   components: {
@@ -95,7 +96,11 @@ const TOPICS = {
     entries: [
       ['strata.components.list()', 'Registered component types'],
       ['strata.components.get(name)', 'A manifest with inheritance applied'],
-      ['strata.components.register(manifest)', 'Register a manifest (strata pack does this for bundles in M4)']
+      ['strata.components.install(bundle)', 'Install a packed component (a bundle or the text of a .strata.js)'],
+      ['await strata.components.upload(files)', 'Pack and install a .strata.js, a zip or a folder’s files', "await strata.components.upload([{ path: 'queue.strata.js', content: text }])"],
+      ['strata.components.uninstall(ref)', 'Remove a plugin; its nodes become placeholders'],
+      ['strata.components.bundle(name)', 'The packed bundle of an installed plugin'],
+      ['strata.components.register(manifest)', 'Register a bare manifest (no behaviour code)']
     ]
   },
   output: {

@@ -39,7 +39,7 @@ li .actions button { width: auto; cursor: pointer; background: transparent; }
   }
 
   subscribe (strata) {
-    return [strata.on('change', () => this.invalidate()), strata.on('project', () => this.invalidate()), strata.on('navigate', () => this.invalidate())]
+    return ['change', 'project', 'navigate', 'components'].map(event => strata.on(event, () => this.invalidate()))
   }
 
   update () {
