@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { tokenize } from '../src/tokenize.js'
 import { transformModule, ModuleError } from '../src/modules.js'
 import { bundleModules, emitScript, formatProblem } from '../src/bundle.js'
+import { minify } from '../src/minify.js'
 import { loadModules } from './fixtures.js'
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url))
@@ -149,6 +150,30 @@ test('the tokenizer reads every JavaScript file in this repository', () => {
   for (const file of files) assert.doesNotThrow(() => tokenize(readFileSync(file, 'utf8')), relative(repo, file))
 })
 
+test('minify keeps every token and every line break of every file in this repository', () => {
+  const walk = (dir, out = []) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name.startsWith('.') || name === 'vendor' || name === 'dist') continue
+      const path = join(dir, name)
+      if (statSync(path).isDirectory()) walk(path, out)
+      else if (name.endsWith('.js')) out.push(path)
+    }
+    return out
+  }
+  let before = 0
+  let after = 0
+  for (const file of walk(repo)) {
+    const src = readFileSync(file, 'utf8')
+    const out = minify(src)
+    before += src.length
+    after += out.length
+    // A line break before the first token (after a leading comment) carries no meaning.
+    const shape = code => tokenize(code).map((t, i) => `${i && t.nl ? '\n' : ''}${t.value}`)
+    assert.deepEqual(shape(out), shape(src), relative(repo, file))
+  }
+  assert.ok(after < before * 0.8, `minified to ${Math.round(after / before * 100)}%`)
+})
+
 test('the facade bundles into one CommonJS script that works', async () => {
   const files = {}
   const walk = dir => {
@@ -163,7 +188,7 @@ test('the facade bundles into one CommonJS script that works', async () => {
   const bundle = bundleModules(files, [entry])
   assert.deepEqual(bundle.problems, [])
   assert.ok(bundle.order.indexOf('packages/strata-core/src/errors.js') < bundle.order.indexOf(entry), 'dependencies come first')
-  const script = emitScript(bundle, { entry, format: 'cjs', banner: '/* strata */' })
+  const script = minify(emitScript(bundle, { entry, format: 'cjs', banner: '/* strata */' }))
   const module = { exports: {} }
   // eslint-disable-next-line no-new-func
   new Function('module', script)(module)

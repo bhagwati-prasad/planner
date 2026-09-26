@@ -86,7 +86,7 @@ Tests: headless modules in Node; the renderer in real Chromium through Playwrigh
 - **Icons from plugins are sanitised** by an allowlist (drawing elements and presentation attributes only; no scripts, handlers, links, styles or external URLs; ids prefixed).
 - **Culling** replaces the spec's Canvas 2D switch for now: above 600 items only what is near the view is in the DOM (2,000 nodes: first render under 1.5 s, drag frames under 60 ms in tests). A Canvas 2D node layer can follow if profiling on real diagrams asks for it.
 - **D3 is vendored** as the unmodified 7.9.0 UMD bundle (`vendor/d3`), loaded as a classic script so it works from `file://`, and reached through `globalThis.d3` or the `d3` option, never imported.
-- **Dev server:** browsers refuse ES modules from `file://`, so until the M4 bundler produces the offline build, development and browser tests use `scripts/dev-server.js`. It serves with a strict CSP (no inline scripts), matching the spec's served mode.
+- **Dev server:** browsers refuse ES modules from `file://`, so development and browser tests serve the sources (`scripts/dev-server.js`, since M4 a thin wrapper over the `strata serve` server) with a strict CSP (no inline scripts), matching the spec's served mode. The offline `file://` app is the bundled build (M4).
 
 Known gaps, kept for later: parallel edge segments in the same channel overlap (no nudging yet); ports sit on the bounding box, so on curved shapes such as the cloud they float slightly off the outline; auto-layout (layered, force, tree) is R1.
 
@@ -120,8 +120,57 @@ Tests: the adapter in Node; the workspace in Chromium (`packages/strata-ui/test/
 - **Shortcuts** are resolved from `KeyboardEvent.code` for digits so Shift+1 works on every layout; they are ignored while typing in a field, and keys the graph handles itself are left to it when the canvas has focus.
 - **Theme** is `data-theme` on the document element with `--st-*` tokens (the graph's `--sg-*` tokens follow), stored per browser under `strata.theme`.
 
-Known gaps, kept for later: the Metrics, Comments and Links inspector tabs are placeholders (M6 fills comments and links; metrics arrive with simulation in R1); patterns in the library are R1; the app needs the dev server until the M4 bundler produces the single-file offline build.
+Known gaps, kept for later: the Metrics, Comments and Links inspector tabs are placeholders (M6 fills comments and links; metrics arrive with simulation in R1); patterns in the library are R1.
 
-## Next: M4 Plugins
+## M4 Plugins: what exists
 
-Manifest schema and validation, the in-house bundler (which also produces the offline single-file build), `strata pack` and `strata serve`, and the starter component library built on the same plugin API.
+The plugin model of §7 and the starter library of §8, with the build, the CLI and the local server that carry them.
+
+| Area | Where | Notes |
+| --- | --- | --- |
+| Module transform | `strata-plugins/src/tokenize.js`, `modules.js` | Turns one ES module into a plain function for a small runtime. Every import and export form, `import.meta`, dynamic `import()` and JSON modules; strings, template literals, regexes and comments are tokenised so their contents are never mistaken for syntax. Line numbers are preserved. |
+| Bundler | `bundle.js` | Resolves the graph from entries (relative imports only), rejects cycles and missing exports with the file and line, emits IIFE or CommonJS scripts. The same code packs components and builds the app. |
+| Minifier | `minify.js` | Drops comments and indentation but keeps every line break, so semicolon insertion and meaning are unchanged (tested over every file in the repository). |
+| Packer | `pack.js` | A component folder becomes a bundle `{ format, manifest, icon, modules, entry, assets, integrity }` and its `.strata.js`. Deterministic: the same folder gives the same bytes in any file order. `readBundle` reads a script back without evaluating it and refuses a changed bundle. |
+| Validation | `manifest.js` | On top of the core's checks: an API range, reserved `base:` ids, namespaces, files the manifest names, explicit units, known keys with suggestions, icon hygiene, metric estimates. Every problem at once, as errors and warnings with file and line. |
+| Integrity | `sha256.js` | Synchronous SHA-256 in plain JavaScript, `sha256-<base64>` over a sorted-key JSON of the bundle. |
+| Upload | `zip.js`, `upload.js` | Reads a dropped `.strata.js`, a zip (stored or deflated; encrypted, ZIP64 and oversized archives refused) or a folder's files, and packs them like `strata pack`. |
+| Facade | `strata/src/components.js` | `strata.components.install`, `upload`, `pack`, `uninstall`, `bundle`, `versions`, `connectionTypes`, `list({ kind })`; a `components` event. Bundles are kept whole for the simulation worker (R1) and `.strata` exports (M5). |
+| Local server | `strata-server` | `strata serve`: static files with a strict CSP, `/api/components`, each packed script, and server-sent events when folders change. Loopback only, local Host headers only, GET and HEAD only, no dotfiles. |
+| CLI | `strata-cli` | `new component`, `pack` (`--out`, `--watch`, `--install`, `--all`), `validate`, `test-component`, `serve`, `repl`. Later commands say which release brings them. |
+| Build | `scripts/build.js` | `npm run build`: `dist/strata.js` (global `Strata`, 449 KB minified against the 600 KB budget of §19), `dist/strata.cjs`, the packed starter library and `dist/strata.html`, which runs from `file://`. |
+| Starter library (§8) | `starter/` | 19 components and 6 connection types as plugin folders (manifest, icon, README), all declarative for now. |
+
+Registration paths (§7): script tags in the offline page (`Strata.registerComponent`), the local server (`/api/components`, live reload), upload in the library panel (button or drop), and Node (`packFolder`, `strata repl`).
+
+Tests: the packer, bundler and validation in Node (including bundling and running the whole facade from one CommonJS script); the server and CLI in process with temporary folders; in Chromium, the app with components from the server and live reload, every upload form, and the built `strata.html` opened from `file://` with a component scaffolded and installed by the CLI.
+
+## Decisions in M4
+
+**Bundling**
+- **Imports are captured when a module starts, not live.** The runtime is a few lines and works in a page, a worker and Node. Native modules differ only for import cycles and for reassigned exported `let`s; the bundler rejects both with a message, and none of our code needs them.
+- **Line numbers survive.** Removed import and export statements leave their line breaks and the generated header shares the first line, so errors in packed components point at the author's lines. The V8 syntax check in `strata validate` reports the author's line too.
+- **Top-level await is not supported** in bundled modules (so `app/main.js` starts from a function).
+- **The minifier does not rename.** Mangling would save more but needs scope analysis; keeping line breaks makes the transform provably safe, and the budget is met without it.
+
+**Components**
+- **Bundles carry a `format` field** (`strata-component@1`) so later formats can be told apart.
+- **What goes into a bundle:** modules reachable from the entry and the migrations (unreached `.js` files are reported and left out), text assets, the icon. `tests/`, `package.json`, dotfiles and binary files stay out; binaries are reported.
+- **Installing the same id and version again** does nothing when the bundle is identical and needs `{ replace: true }` otherwise (the local server and uploads replace; the console does not by default).
+- **Connection types are plugins of kind `connection-type`** with a built-in abstract `base:connection` holding the common properties of §8. Their ids are plain (`http`, `db-protocol`) because port `accepts` lists and edges name them. Edge properties are validated against them, get their defaults, and are checked by the problems pass; values on an edge whose type is not installed are kept and reported once there are any.
+- **Metric estimates.** Until simulation measures a metric, a manifest may name the property that estimates it: `"latency.p99": { "estimate": "serviceTime.p99" }`. Every starter component with a time distribution declares one, so latency roll-ups and contracts work at design time.
+- **Path roll-ups follow synchronous edges only.** Critical path (latency), min path (throughput) and product (availability) describe a request; an asynchronous hand-off (an edge whose `mode` is `async`, e.g. `async-message`) ends it. Entry points are nodes nothing calls, so a consumer fed by a queue is off the request path rather than a path of its own.
+- **Starter ids** are `starter.<folder>`; short names still work (`root.add('service')` prefers `starter.service` over `base:service`).
+- **Migrations and behaviour code are not run on the page.** `strata test-component` loads them in a Node `vm` context without network, storage or Node APIs, with no string code generation, seeded randomness, a fixed clock and a time limit; the simulation worker (R1) uses the same runtime.
+
+**Serving and the CLI**
+- `strata serve` serves the repository (the development app at `/app/`) and redirects `/` there; its component directories default to `./components` and `./connection-types`, and `npm run serve` points them at the starter library.
+- Uploads last for the session; M5 stores them in IndexedDB (and, when served, may write them to `components/`).
+- `strata new project`, `script` and the R1/R2 commands answer with the milestone or release that brings them.
+- The typecheck covers the browser and headless packages; the Node-only packages (`strata-server`, `strata-cli`) would need `@types/node`, which the zero-dependency rule keeps out, so tests cover them.
+
+Known gaps, kept for later: behaviour hooks run only in tests until the simulation worker (R1); migrations are loaded and checked by `strata test-component` but nothing runs them yet, because upgrading a node to a newer component version (with the property diff of §7) is still to come; binary assets are not bundled; the offline page does not persist anything yet (M5).
+
+## Next: M5 Persistence
+
+IndexedDB for projects, the op log and uploaded bundles; sessionStorage for per-tab state and crash recovery; `.strata` import and export (with pinned component bundles); File System Access save; the first-run storage checks of §17.
