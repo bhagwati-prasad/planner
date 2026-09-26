@@ -11,7 +11,7 @@
 import { StrataError } from '../../core/src/index.js'
 import { bundleModules, formatProblem } from './bundle.js'
 import { validateManifest, checkIcon } from './manifest.js'
-import { integrityOf } from './sha256.js'
+import { canonicalJson, integrityOf } from '../../core/src/index.js'
 
 export const BUNDLE_FORMAT = 'strata-component@1'
 const SCRIPT_CALL = 'Strata.registerComponent('
@@ -89,22 +89,6 @@ export function normalizeFiles(files) {
     }
   }
   return out
-}
-
-/**
- * Sorted-key JSON, so the integrity does not depend on property order.
- * @param {unknown} value
- */
-export function canonicalJson(value) {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value)
-      .sort()
-      .filter(k => value[k] !== undefined)
-      .map(k => `${JSON.stringify(k)}:${canonicalJson(value[k])}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value ?? null)
 }
 
 /** @param {Omit<ComponentBundle, 'integrity'>} bundle */

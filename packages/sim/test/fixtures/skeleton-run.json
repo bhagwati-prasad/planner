@@ -1,0 +1,11 @@
+{
+  "seed": 42,
+  "model": {
+    "components": [
+      { "id": "client", "name": "Client" },
+      { "id": "orders", "name": "Orders", "serviceTimeUs": 20000 }
+    ],
+    "edges": [{ "id": "e1", "from": "client", "to": "orders", "latencyUs": 1000 }]
+  },
+  "request": { "edge": "e1", "method": "GET /orders" }
+}

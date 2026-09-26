@@ -106,3 +106,20 @@ export function isPlainObject(value) {
   const proto = Object.getPrototypeOf(value)
   return proto === Object.prototype || proto === null
 }
+
+/**
+ * Sorted-key JSON, so a hash of plain data does not depend on property order (bundle integrity,
+ * run hashes). Undefined properties are left out, as JSON.stringify does.
+ * @param {unknown} value
+ */
+export function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .filter(k => value[k] !== undefined)
+      .map(k => `${JSON.stringify(k)}:${canonicalJson(value[k])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value ?? null)
+}

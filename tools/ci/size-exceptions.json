@@ -2,5 +2,9 @@
   "strata-graph (minified)": {
     "bytes": 98482,
     "owner": "0207"
+  },
+  "Simulation worker bundle (minified)": {
+    "bytes": 150263,
+    "owner": "0402"
   }
 }

@@ -9,7 +9,14 @@
  * @typedef {import('./bundle.js').Problem} Problem
  * @typedef {import('./zip.js').InflateRaw} InflateRaw
  */
-export { sha256, toHex, toBase64, fromBase64, integrityOf } from './sha256.js'
+export {
+  sha256,
+  toHex,
+  toBase64,
+  fromBase64,
+  integrityOf,
+  canonicalJson,
+} from '../../core/src/index.js'
 export { tokenize, SyntaxProblem } from './tokenize.js'
 export { transformModule, transformJson, ModuleError, MODULE_PARAMS } from './modules.js'
 export {
@@ -29,7 +36,6 @@ export {
   manifestOfBundle,
   requireBundle,
   bundleIntegrity,
-  canonicalJson,
   normalizeFiles,
   asText,
   jsonErrorOffset,
