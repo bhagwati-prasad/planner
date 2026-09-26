@@ -34,6 +34,7 @@ const RESERVED = new Set([...MODULE_PARAMS, '__default'])
  * @property {string} code        `function (__require, __export, __meta, __import) { ... }`
  * @property {ModuleImport[]} imports
  * @property {string[]} exports   names the module exports (not counting `export *`)
+ * @property {string[]} [functionExports]  exports that are hoisted function declarations
  * @property {{ specifier: string|null, line: number }[]} dynamic  dynamic import() calls
  */
 
@@ -366,7 +367,17 @@ export function transformModule(source) {
   body += source.slice(pos)
   if (body.startsWith('#!')) body = body.replace(/^#![^\n]*/, '')
 
-  const header = []
+  // The module's own getters are registered before its imports run, so a module that imports
+  // it back through a cycle can already reach its (hoisted) functions, as with native modules.
+  const getterList = map =>
+    [...map].map(([name, local]) => `${JSON.stringify(name)}: () => ${local}`).join(', ')
+  const header = [`__export({ ${getterList(getters)} });`]
+  const hoisted = hoistedFunctions(tokens)
+  const functionExports = [...getters]
+    .filter(([, local]) => hoisted.has(local))
+    .map(([name]) => name)
+  /** @type {Map<string, string>} */
+  const reexported = new Map()
   const stars = []
   imports.forEach((imp, i) => {
     const m = `__m${i}`
@@ -374,23 +385,55 @@ export function transformModule(source) {
     for (const b of imp.bindings)
       header.push(`const ${b.local} = ${b.imported === '*' ? m : `${m}${access(b.imported)}`};`)
     for (const r of imp.reexports) {
-      if (getters.has(r.exported))
+      if (getters.has(r.exported) || reexported.has(r.exported))
         throw new ModuleError(`Duplicate export '${r.exported}'`, imp.line)
-      getters.set(r.exported, r.imported === '*' ? m : `${m}${access(r.imported)}`)
+      reexported.set(r.exported, r.imported === '*' ? m : `${m}${access(r.imported)}`)
     }
     if (imp.star) stars.push(m)
   })
-  const entries = [...getters].map(([name, local]) => `${JSON.stringify(name)}: () => ${local}`)
-  header.push(
-    `__export({ ${entries.join(', ')} }${stars.length ? `, [${stars.join(', ')}]` : ''});`
-  )
+  if (reexported.size || stars.length) {
+    header.push(
+      `__export({ ${getterList(reexported)} }${stars.length ? `, [${stars.join(', ')}]` : ''});`
+    )
+  }
 
   return {
     code: `function (${MODULE_PARAMS.join(', ')}) { "use strict"; ${header.join(' ')} ${body}\n}`,
     imports,
-    exports: [...getters.keys()],
+    exports: [...getters.keys(), ...reexported.keys()],
+    functionExports,
     dynamic,
   }
+}
+
+/** Tokens after which a `function` keyword starts an expression, not a declaration. */
+const EXPRESSION_BEFORE =
+  /^(=|\(|,|:|\?|\[|\+|-|\*|\/|%|&&|\|\||\?\?|!|~|=>|return|typeof|void|new|delete|await|yield|in|of|instanceof|&|\||\^|<|>|<=|>=|==|===|!=|!==)$/
+
+/**
+ * Names of the function declarations at the top level of a module: they are hoisted, so they
+ * exist before the module body runs.
+ * @param {import('./tokenize.js').Token[]} tokens
+ */
+function hoistedFunctions(tokens) {
+  const names = new Set()
+  for (let k = 0; k < tokens.length; k++) {
+    const t = tokens[k]
+    if (t.type !== 'name' || t.value !== 'function' || t.depth !== 0) continue
+    let before = k - 1
+    if (tokens[before]?.value === 'async' && !t.nl) before--
+    const prev = tokens[before]
+    const statement =
+      !prev ||
+      [';', '}', '{', 'export', 'default'].includes(prev.value) ||
+      (tokens[before + 1].nl && !EXPRESSION_BEFORE.test(prev.value))
+    if (!statement) continue
+    const name = tokens[k + 1]?.value === '*' ? tokens[k + 2] : tokens[k + 1]
+    if (name?.type === 'name') names.add(name.value)
+    // `export default function () {}` is declared as __default by the transform.
+    else if (prev?.value === 'default') names.add('__default')
+  }
+  return names
 }
 
 /**

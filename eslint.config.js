@@ -45,8 +45,9 @@ export default [
     },
   },
   {
-    // Component behaviour entries (the plugin API requires a default export) and tool configs.
-    files: ['components/*/index.js', 'eslint.config.js'],
+    // Component behaviour entries (the plugin API requires a default export), tool configs, and
+    // test fixtures that stand in for any code a user might bundle.
+    files: ['components/*/index.js', 'eslint.config.js', '**/test/fixtures/**/*.js'],
     rules: { 'no-restricted-syntax': 'off' },
   },
   {

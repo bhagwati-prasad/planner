@@ -167,7 +167,12 @@ test('problems name the file, the line and what to do', () => {
     errorsOf({ 'main.js': "import { x } from './lib/x'", 'lib/x.js': 'export const x = 1' })[0],
     /main\.js:1: error: imports 'lib\/x', which does not exist\. Did you mean 'lib\/x\.js'\?/
   )
-  assert.match(errorsOf({ 'main.js': "import d3 from 'd3'" })[0], /npm packages/)
+  assert.match(errorsOf({ 'main.js': "import merge from 'lodash/merge'" })[0], /npm packages/)
+  assert.deepEqual(
+    errorsOf({ 'main.js': "import * as d3 from 'd3'\nimport * as THREE from 'three'" }),
+    [],
+    'the vendored libraries (task 0005)'
+  )
   assert.match(
     errorsOf({ 'main.js': "import x from 'https://cdn.example/x.js'" })[0],
     /only relative imports/
@@ -187,13 +192,23 @@ test('problems name the file, the line and what to do', () => {
     })[0],
     /Did you mean 'backoff'\?/
   )
-  assert.match(
+  // Cycles behave like native modules where bindings stay live (task 0005): side-effect
+  // imports and functions cross them; other bindings are reported.
+  assert.deepEqual(
     errorsOf({
       'main.js': "import './a.js'",
       'a.js': "import './b.js'",
       'b.js': "import './a.js'",
+    }),
+    []
+  )
+  assert.match(
+    errorsOf({
+      'main.js': "import './a.js'",
+      'a.js': "import { n } from './b.js'\nexport function f () { return n }",
+      'b.js': "import { f } from './a.js'\nexport const n = 1",
     })[0],
-    /import cycle: a\.js → b\.js → a\.js/
+    /a\.js:1: error: 'n' from '\.\/b\.js' crosses an import cycle \(a\.js, b\.js\)/
   )
   assert.match(errorsOf({ 'main.js': 'const __require = 1' })[0], /reserved/)
   assert.match(errorsOf({ 'main.js': 'await Promise.resolve()' })[0], /Top-level await/)

@@ -1,7 +1,10 @@
 /**
  * Error codes raised by the core. Every error thrown by a command handler or query is a
  * StrataError, so callers (UI, console, CLI) can branch on `code` instead of parsing messages.
- * @typedef {'INVALID'|'NOT_FOUND'|'CONFLICT'|'CYCLE'|'UNKNOWN_COMMAND'|'READ_ONLY'|'NO_ROLLUP_RULE'|'AMBIGUOUS'|'UNSUPPORTED'} ErrorCode
+ * Codes named E_<AREA>_<REASON> follow eng §5; the older ones move to that form with the error
+ * code registry (task 0102).
+ * @typedef {'INVALID'|'NOT_FOUND'|'CONFLICT'|'CYCLE'|'UNKNOWN_COMMAND'|'READ_ONLY'|'NO_ROLLUP_RULE'|'AMBIGUOUS'|'UNSUPPORTED'
+ *   |'E_BUNDLE_BARE_SPECIFIER'|'E_BUNDLE_CYCLE'|'E_BUNDLE_MISSING_MODULE'|'E_BUNDLE_MISSING_EXPORT'|'E_BUNDLE_SYNTAX'|'E_BUNDLE_OUTSIDE_ROOT'} ErrorCode
  */
 
 export class StrataError extends Error {
