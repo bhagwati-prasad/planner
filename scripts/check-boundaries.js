@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Enforces the architecture rules from the spec (§4, §16):
 //   - dependencies point downward only (each package may import only the packages listed below);
-//   - headless packages never touch the DOM or browser storage directly;
-//   - browser-capable packages never import Node built-ins or npm packages (zero runtime dependencies).
+//   - headless code never touches the DOM or browser storage directly;
+//   - code that runs in browsers never imports Node built-ins or npm packages (zero runtime
+//     dependencies; vendored libraries such as D3 arrive as globals or are injected).
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve, dirname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,11 +14,24 @@ const packagesDir = join(root, 'packages')
 /** Allowed package dependencies. Every package may import itself. */
 const ALLOWED = {
   'strata-core': [],
-  strata: ['strata-core']
+  strata: ['strata-core'],
+  // The diagram library knows nothing about Strata (spec §4).
+  'strata-graph': []
 }
 
-/** Packages that must run unchanged in a browser, a worker and Node. */
-const HEADLESS = new Set(['strata-core', 'strata'])
+/**
+ * Code that must run unchanged in a browser, a worker and Node. strata-graph keeps its DOM
+ * rendering under src/dom/; everything else in it is headless and tested in Node.
+ * @type {Record<string, (relPath: string) => boolean>}
+ */
+const HEADLESS = {
+  'strata-core': () => true,
+  strata: () => true,
+  'strata-graph': rel => !rel.split(sep).includes('dom')
+}
+
+/** Packages whose sources load in browsers: relative imports only. */
+const BROWSER = new Set(['strata-core', 'strata', 'strata-graph'])
 
 const DOM_GLOBALS = [
   'document', 'window', 'localStorage', 'sessionStorage', 'indexedDB',
@@ -70,15 +84,15 @@ for (const pkg of packages) {
         } else if (targetPkg !== pkg && !ALLOWED[pkg].includes(targetPkg)) {
           problems.push(`${rel}: '${pkg}' may not depend on '${targetPkg}' (imports '${spec}')`)
         }
-      } else if (HEADLESS.has(pkg)) {
-        problems.push(`${rel}: headless package imports '${spec}'; only relative imports are allowed`)
+      } else if (BROWSER.has(pkg)) {
+        problems.push(`${rel}: '${pkg}' runs in browsers and imports '${spec}'; only relative imports are allowed`)
       }
     }
-    if (HEADLESS.has(pkg)) {
+    if (HEADLESS[pkg]?.(relative(srcDir, file))) {
       const code = stripCode(src)
       for (const name of DOM_GLOBALS) {
         const re = new RegExp(`(?<![.\\w$])${name}(?![\\w$])`, 'g')
-        if (re.test(code)) problems.push(`${rel}: headless package references the browser global '${name}'`)
+        if (re.test(code)) problems.push(`${rel}: headless code references the browser global '${name}'`)
       }
     }
   }

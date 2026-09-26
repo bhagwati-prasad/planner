@@ -1,0 +1,14 @@
+{
+  "name": "strata-graph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A small D3 diagramming library: renders nodes, ports, edges, frames and annotations and turns gestures into intents. It never owns state and knows nothing about Strata.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
