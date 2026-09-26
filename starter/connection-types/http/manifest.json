@@ -1,0 +1,42 @@
+{
+  "strataApi": "^1.0",
+  "kind": "connection-type",
+  "id": "http",
+  "name": "HTTP / REST",
+  "version": "1.0.0",
+  "category": "Connections",
+  "description": "Request and response over HTTP.",
+  "extends": "base:connection",
+  "properties": {
+    "methodRules": {
+      "type": "list",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "group": "HTTP",
+      "description": "e.g. \"GET /orders/*\""
+    },
+    "httpVersion": {
+      "type": "enum",
+      "values": [
+        "1.1",
+        "2",
+        "3"
+      ],
+      "default": "2",
+      "group": "HTTP"
+    },
+    "keepAlive": {
+      "type": "boolean",
+      "default": true,
+      "group": "HTTP"
+    },
+    "idempotent": {
+      "type": "boolean",
+      "default": true,
+      "group": "HTTP",
+      "description": "Safe to retry"
+    }
+  }
+}

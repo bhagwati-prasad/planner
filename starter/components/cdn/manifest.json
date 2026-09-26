@@ -1,0 +1,122 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.cdn",
+  "name": "CDN",
+  "version": "1.0.0",
+  "category": "Edge",
+  "description": "Edge caches close to users in front of an origin (CloudFront, Fastly, Cloudflare).",
+  "icon": "icon.svg",
+  "extends": "base:proxy",
+  "shape": "cloud",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http"
+      ]
+    },
+    {
+      "name": "out",
+      "direction": "out",
+      "accepts": [
+        "http"
+      ]
+    }
+  ],
+  "properties": {
+    "edgeLocations": {
+      "type": "integer",
+      "unit": "locations",
+      "default": 200,
+      "min": 1,
+      "group": "Network"
+    },
+    "edgeLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 10,
+        "p99": 60
+      },
+      "group": "Network"
+    },
+    "bandwidth": {
+      "type": "number",
+      "unit": "Gbps",
+      "default": 100,
+      "min": 0,
+      "group": "Network"
+    },
+    "cacheTtl": {
+      "type": "duration",
+      "default": "1h",
+      "group": "Caching"
+    },
+    "keyspaceSize": {
+      "type": "integer",
+      "unit": "objects",
+      "default": 100000,
+      "min": 1,
+      "group": "Caching"
+    },
+    "popularitySkew": {
+      "type": "number",
+      "unit": "Zipf s",
+      "default": 1.1,
+      "min": 0,
+      "group": "Caching"
+    },
+    "fixedHitRatio": {
+      "type": "percent",
+      "unit": "%",
+      "group": "Caching",
+      "description": "Overrides the keyspace model when set"
+    },
+    "originShield": {
+      "type": "boolean",
+      "default": true,
+      "group": "Caching"
+    },
+    "originTimeout": {
+      "type": "duration",
+      "default": "30s",
+      "group": "Origin"
+    },
+    "pricePerGb": {
+      "type": "number",
+      "unit": "USD/GB",
+      "default": 0.085,
+      "min": 0,
+      "group": "Cost"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "edgeLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "edgeLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "edgeLatency.p99"
+    },
+    "hitRatio": {
+      "unit": "%",
+      "rollup": "min"
+    },
+    "originRequests": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "egress": {
+      "unit": "GB",
+      "rollup": "sum"
+    },
+    "edgeLatency": {
+      "unit": "ms",
+      "rollup": "max"
+    }
+  }
+}

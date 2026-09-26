@@ -1,0 +1,14 @@
+{
+  "name": "strata",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Strata facade: the one public API every client (web UI, browser console, Node CLI) talks to.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

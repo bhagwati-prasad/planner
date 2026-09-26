@@ -1,0 +1,29 @@
+{
+  "strataApi": "^1.0",
+  "kind": "connection-type",
+  "id": "db-protocol",
+  "name": "DB protocol",
+  "version": "1.0.0",
+  "category": "Connections",
+  "description": "A database wire protocol through a connection pool.",
+  "extends": "base:connection",
+  "properties": {
+    "poolSize": {
+      "type": "integer",
+      "unit": "connections",
+      "default": 10,
+      "min": 1,
+      "group": "Pool"
+    },
+    "acquireTimeout": {
+      "type": "duration",
+      "default": "1s",
+      "group": "Pool"
+    },
+    "preparedStatements": {
+      "type": "boolean",
+      "default": true,
+      "group": "Pool"
+    }
+  }
+}

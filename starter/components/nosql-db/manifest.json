@@ -1,0 +1,99 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.nosql-db",
+  "name": "NoSQL / key-value DB",
+  "version": "1.0.0",
+  "category": "Data",
+  "description": "A partitioned key-value or document store (DynamoDB, Cassandra, MongoDB).",
+  "icon": "icon.svg",
+  "extends": "base:store",
+  "shape": "cylinder",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "db-protocol",
+        "http"
+      ]
+    }
+  ],
+  "properties": {
+    "partitions": {
+      "type": "integer",
+      "unit": "partitions",
+      "default": 10,
+      "min": 1,
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "opsPerPartition": {
+      "type": "rate",
+      "default": "1000/s",
+      "group": "Capacity"
+    },
+    "replicationFactor": {
+      "type": "integer",
+      "unit": "replicas",
+      "default": 3,
+      "min": 1,
+      "group": "Durability"
+    },
+    "consistency": {
+      "type": "enum",
+      "values": [
+        "eventual",
+        "strong"
+      ],
+      "default": "eventual",
+      "group": "Durability"
+    },
+    "itemSize": {
+      "type": "bytes",
+      "default": "4KB",
+      "group": "Data"
+    },
+    "hotKeySkew": {
+      "type": "number",
+      "unit": "Zipf s",
+      "default": 0.8,
+      "min": 0,
+      "group": "Data",
+      "description": "0 is uniform; above 1 a few keys take most traffic"
+    },
+    "itemTtl": {
+      "type": "duration",
+      "group": "Data",
+      "description": "Leave empty to keep items forever"
+    },
+    "latency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 3,
+        "p99": 20
+      },
+      "group": "Performance"
+    }
+  },
+  "metrics": {
+    "partitionOps": {
+      "unit": "ops/s",
+      "rollup": "max",
+      "description": "Busiest partition"
+    },
+    "throttledOps": {
+      "unit": "ops/s",
+      "rollup": "sum"
+    },
+    "hotPartition": {
+      "unit": "%",
+      "rollup": "max"
+    },
+    "storage": {
+      "unit": "bytes",
+      "rollup": "sum"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "strataApi": "^1.0",
+  "kind": "connection-type",
+  "id": "file-batch",
+  "name": "File / batch",
+  "version": "1.0.0",
+  "category": "Connections",
+  "description": "Scheduled transfers of files or batches.",
+  "extends": "base:connection",
+  "properties": {
+    "mode": {
+      "type": "enum",
+      "values": [
+        "sync",
+        "async"
+      ],
+      "default": "async",
+      "group": "Connection"
+    },
+    "transferSize": {
+      "type": "bytes",
+      "default": "100MB",
+      "group": "Batch"
+    },
+    "schedule": {
+      "type": "string",
+      "default": "0 * * * *",
+      "group": "Batch",
+      "description": "Cron expression"
+    },
+    "compressionRatio": {
+      "type": "number",
+      "unit": "ratio",
+      "default": 3,
+      "min": 1,
+      "group": "Batch"
+    }
+  }
+}

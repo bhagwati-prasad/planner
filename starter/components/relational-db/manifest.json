@@ -1,0 +1,166 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.relational-db",
+  "name": "Relational DB",
+  "version": "1.0.0",
+  "category": "Data",
+  "description": "A SQL database with connections, replicas and locks (PostgreSQL, MySQL, SQL Server).",
+  "icon": "icon.svg",
+  "extends": "base:store",
+  "shape": "cylinder",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "db-protocol"
+      ]
+    }
+  ],
+  "properties": {
+    "vcpu": {
+      "type": "integer",
+      "unit": "vCPU",
+      "default": 4,
+      "min": 1,
+      "group": "Instance"
+    },
+    "ram": {
+      "type": "bytes",
+      "default": "16GB",
+      "group": "Instance"
+    },
+    "maxConnections": {
+      "type": "integer",
+      "unit": "connections",
+      "default": 200,
+      "min": 1,
+      "group": "Instance"
+    },
+    "readLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 2,
+        "p99": 15
+      },
+      "group": "Performance"
+    },
+    "writeLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 5,
+        "p99": 40
+      },
+      "group": "Performance"
+    },
+    "iopsLimit": {
+      "type": "integer",
+      "unit": "IOPS",
+      "default": 3000,
+      "min": 1,
+      "group": "Performance"
+    },
+    "lockContention": {
+      "type": "number",
+      "unit": "factor",
+      "default": 0.05,
+      "min": 0,
+      "max": 1,
+      "group": "Performance",
+      "description": "Share of writes that wait on a lock"
+    },
+    "isolationLevel": {
+      "type": "enum",
+      "values": [
+        "read-uncommitted",
+        "read-committed",
+        "repeatable-read",
+        "serializable"
+      ],
+      "default": "read-committed",
+      "group": "Performance"
+    },
+    "readReplicas": {
+      "type": "integer",
+      "unit": "replicas",
+      "default": 0,
+      "min": 0,
+      "group": "Replication",
+      "rollup": "sum"
+    },
+    "replicationLag": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 20,
+        "p99": 200
+      },
+      "group": "Replication"
+    },
+    "failoverTime": {
+      "type": "duration",
+      "default": "30s",
+      "group": "Replication"
+    },
+    "storageUsed": {
+      "type": "bytes",
+      "default": "50GB",
+      "group": "Storage",
+      "rollup": "sum"
+    },
+    "storageCapacity": {
+      "type": "bytes",
+      "default": "500GB",
+      "group": "Storage",
+      "rollup": "sum"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "readLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "readLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "readLatency.p99"
+    },
+    "activeConnections": {
+      "unit": "connections",
+      "rollup": "sum"
+    },
+    "waitingConnections": {
+      "unit": "connections",
+      "rollup": "sum"
+    },
+    "readQps": {
+      "unit": "queries/s",
+      "rollup": "sum"
+    },
+    "writeQps": {
+      "unit": "queries/s",
+      "rollup": "sum"
+    },
+    "iopsUsed": {
+      "unit": "IOPS",
+      "rollup": "sum"
+    },
+    "storageUse": {
+      "unit": "%",
+      "rollup": "max"
+    },
+    "replicaLag": {
+      "unit": "ms",
+      "rollup": "max"
+    },
+    "deadlocks": {
+      "unit": "deadlocks",
+      "rollup": "sum"
+    }
+  }
+}

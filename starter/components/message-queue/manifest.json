@@ -1,0 +1,178 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.message-queue",
+  "name": "Message queue",
+  "version": "1.0.0",
+  "category": "Messaging",
+  "description": "Buffers messages between producers and consumers (SQS, RabbitMQ, Azure Service Bus queues).",
+  "icon": "icon.svg",
+  "extends": "base:queue",
+  "shape": "queue",
+  "properties": {
+    "ingressMode": {
+      "type": "enum",
+      "values": [
+        "producer-driven",
+        "fixed"
+      ],
+      "default": "producer-driven",
+      "group": "Throughput",
+      "description": "Messages arrive as producers send them, or at a fixed rate"
+    },
+    "ingressRate": {
+      "type": "rate",
+      "default": "500/s",
+      "group": "Throughput",
+      "description": "Used when the ingress mode is fixed"
+    },
+    "consumers": {
+      "type": "integer",
+      "unit": "consumers",
+      "default": 4,
+      "min": 0,
+      "group": "Throughput",
+      "rollup": "sum"
+    },
+    "perConsumerRate": {
+      "type": "rate",
+      "default": "100/s",
+      "group": "Throughput",
+      "description": "Egress rate = consumers × per-consumer rate"
+    },
+    "capacityMessages": {
+      "type": "integer",
+      "unit": "messages",
+      "default": 100000,
+      "min": 1,
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "capacityBytes": {
+      "type": "bytes",
+      "default": "1GB",
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "maxMessageSize": {
+      "type": "bytes",
+      "default": "256KB",
+      "group": "Capacity"
+    },
+    "overflowPolicy": {
+      "type": "enum",
+      "values": [
+        "reject",
+        "drop-oldest",
+        "block-producer"
+      ],
+      "default": "reject",
+      "group": "Capacity"
+    },
+    "deliveryDelay": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 5,
+        "p99": 40
+      },
+      "group": "Delivery"
+    },
+    "ordering": {
+      "type": "enum",
+      "values": [
+        "none",
+        "fifo",
+        "per-key"
+      ],
+      "default": "none",
+      "group": "Delivery"
+    },
+    "deliveryGuarantee": {
+      "type": "enum",
+      "values": [
+        "at-most-once",
+        "at-least-once",
+        "exactly-once"
+      ],
+      "default": "at-least-once",
+      "group": "Delivery"
+    },
+    "visibilityTimeout": {
+      "type": "duration",
+      "default": "30s",
+      "group": "Delivery"
+    },
+    "maxReceives": {
+      "type": "integer",
+      "unit": "receives",
+      "default": 5,
+      "min": 1,
+      "group": "Delivery",
+      "description": "Receives before a message goes to the dead-letter queue"
+    },
+    "dlqTarget": {
+      "type": "ref",
+      "group": "Delivery",
+      "description": "The node that receives dead letters (or connect the dlq port)"
+    },
+    "retention": {
+      "type": "duration",
+      "default": "4d",
+      "group": "Durability"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "deliveryDelay.p50"
+    },
+    "latency.p95": {
+      "estimate": "deliveryDelay.p95"
+    },
+    "latency.p99": {
+      "estimate": "deliveryDelay.p99"
+    },
+    "depth": {
+      "unit": "messages",
+      "rollup": "sum",
+      "description": "Current size"
+    },
+    "fill": {
+      "unit": "%",
+      "rollup": "max"
+    },
+    "ingress": {
+      "unit": "msg/s",
+      "rollup": "sum"
+    },
+    "egress": {
+      "unit": "msg/s",
+      "rollup": "sum"
+    },
+    "oldestAge": {
+      "unit": "s",
+      "rollup": "max"
+    },
+    "timeInQueue.p50": {
+      "unit": "ms",
+      "rollup": "max"
+    },
+    "timeInQueue.p99": {
+      "unit": "ms",
+      "rollup": "max"
+    },
+    "expired": {
+      "unit": "messages",
+      "rollup": "sum",
+      "description": "Dropped by retention"
+    },
+    "sentToDlq": {
+      "unit": "messages",
+      "rollup": "sum"
+    },
+    "rejected": {
+      "unit": "messages",
+      "rollup": "sum"
+    }
+  }
+}

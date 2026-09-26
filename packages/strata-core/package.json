@@ -1,0 +1,14 @@
+{
+  "name": "strata-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Strata headless core: entity store, command bus, undo/redo, op log, events, queries, validation, recursion resolver and roll-up engine.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

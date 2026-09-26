@@ -1,0 +1,99 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.topic",
+  "name": "Pub/sub topic",
+  "version": "1.0.0",
+  "category": "Messaging",
+  "description": "A partitioned stream that every consumer group reads (Kafka, Kinesis, Pub/Sub, SNS).",
+  "icon": "icon.svg",
+  "extends": "base:topic",
+  "shape": "queue",
+  "properties": {
+    "partitions": {
+      "type": "integer",
+      "unit": "partitions",
+      "default": 6,
+      "min": 1,
+      "group": "Capacity",
+      "rollup": "sum"
+    },
+    "throughputPerPartition": {
+      "type": "number",
+      "unit": "MB/s",
+      "default": 10,
+      "min": 0,
+      "group": "Capacity"
+    },
+    "replicationFactor": {
+      "type": "integer",
+      "unit": "replicas",
+      "default": 3,
+      "min": 1,
+      "group": "Durability"
+    },
+    "retentionTime": {
+      "type": "duration",
+      "default": "7d",
+      "group": "Durability"
+    },
+    "retentionSize": {
+      "type": "bytes",
+      "default": "100GB",
+      "group": "Durability",
+      "rollup": "sum"
+    },
+    "compaction": {
+      "type": "boolean",
+      "default": false,
+      "group": "Durability",
+      "description": "Keep only the latest message per key"
+    },
+    "consumerGroups": {
+      "type": "list",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "group": "Consumers"
+    },
+    "orderingKey": {
+      "type": "string",
+      "default": "",
+      "group": "Delivery",
+      "description": "Message field that picks the partition"
+    },
+    "deliverySemantics": {
+      "type": "enum",
+      "values": [
+        "at-most-once",
+        "at-least-once",
+        "exactly-once"
+      ],
+      "default": "at-least-once",
+      "group": "Delivery"
+    }
+  },
+  "metrics": {
+    "publishRate": {
+      "unit": "msg/s",
+      "rollup": "sum"
+    },
+    "consumerLag": {
+      "unit": "messages",
+      "rollup": "sum",
+      "description": "Per consumer group"
+    },
+    "consumerLagTime": {
+      "unit": "s",
+      "rollup": "max"
+    },
+    "partitionSkew": {
+      "unit": "%",
+      "rollup": "max"
+    },
+    "retainedBytes": {
+      "unit": "bytes",
+      "rollup": "sum"
+    }
+  }
+}

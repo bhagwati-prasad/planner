@@ -1,0 +1,35 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.external-system",
+  "name": "External system (stub)",
+  "version": "1.0.0",
+  "category": "External",
+  "description": "A stand-in for anything outside the model: fixed latency, capacity and error rate.",
+  "icon": "icon.svg",
+  "extends": "base:external",
+  "shape": "cloud",
+  "properties": {
+    "latency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 50,
+        "p99": 300
+      },
+      "group": "Behaviour"
+    },
+    "capacity": {
+      "type": "rate",
+      "default": "1000/s",
+      "group": "Behaviour"
+    },
+    "errorRate": {
+      "type": "percent",
+      "unit": "%",
+      "default": 0,
+      "group": "Behaviour"
+    }
+  },
+  "metrics": {}
+}

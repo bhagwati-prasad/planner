@@ -1,0 +1,127 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.object-storage",
+  "name": "Object storage",
+  "version": "1.0.0",
+  "category": "Data",
+  "description": "Durable blob storage addressed by key (S3, GCS, Azure Blob).",
+  "icon": "icon.svg",
+  "extends": "base:store",
+  "shape": "cylinder",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http",
+        "file-batch"
+      ]
+    }
+  ],
+  "properties": {
+    "firstByteLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 20,
+        "p99": 120
+      },
+      "group": "Performance"
+    },
+    "throughput": {
+      "type": "number",
+      "unit": "MB/s",
+      "default": 100,
+      "min": 0,
+      "group": "Performance"
+    },
+    "requestRateLimit": {
+      "type": "rate",
+      "default": "3500/s",
+      "group": "Performance",
+      "description": "Per key prefix"
+    },
+    "objectSize": {
+      "type": "bytes",
+      "default": "1MB",
+      "group": "Data"
+    },
+    "storageClass": {
+      "type": "enum",
+      "values": [
+        "standard",
+        "infrequent-access",
+        "archive"
+      ],
+      "default": "standard",
+      "group": "Data"
+    },
+    "lifecycleRules": {
+      "type": "list",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "group": "Data",
+      "description": "e.g. \"archive after 30d\""
+    },
+    "durability": {
+      "type": "percent",
+      "unit": "%",
+      "default": 99.999999999,
+      "group": "Durability"
+    },
+    "availability": {
+      "type": "percent",
+      "unit": "%",
+      "default": 99.99,
+      "group": "Durability"
+    },
+    "pricePerGb": {
+      "type": "number",
+      "unit": "USD/GB-month",
+      "default": 0.023,
+      "min": 0,
+      "group": "Cost"
+    },
+    "pricePerThousandRequests": {
+      "type": "number",
+      "unit": "USD",
+      "default": 0.0004,
+      "min": 0,
+      "group": "Cost"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "firstByteLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "firstByteLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "firstByteLatency.p99"
+    },
+    "gets": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "puts": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "bytesStored": {
+      "unit": "bytes",
+      "rollup": "sum"
+    },
+    "egress": {
+      "unit": "GB",
+      "rollup": "sum"
+    },
+    "throttles": {
+      "unit": "req/s",
+      "rollup": "sum"
+    }
+  }
+}

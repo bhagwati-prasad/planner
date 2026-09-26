@@ -1,0 +1,97 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.third-party-api",
+  "name": "Third-party API",
+  "version": "1.0.0",
+  "category": "External",
+  "description": "A service run by someone else, with its own limits, errors and price (payments, maps, email).",
+  "icon": "icon.svg",
+  "extends": "base:external",
+  "shape": "cloud",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http",
+        "grpc"
+      ]
+    }
+  ],
+  "properties": {
+    "latency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 120,
+        "p99": 900
+      },
+      "group": "Performance"
+    },
+    "errorRate": {
+      "type": "percent",
+      "unit": "%",
+      "default": 0.5,
+      "group": "Reliability"
+    },
+    "timeout": {
+      "type": "duration",
+      "default": "10s",
+      "group": "Reliability"
+    },
+    "slaAvailability": {
+      "type": "percent",
+      "unit": "%",
+      "default": 99.9,
+      "group": "Reliability"
+    },
+    "outageWindows": {
+      "type": "list",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "group": "Reliability",
+      "description": "e.g. \"Sun 02:00-03:00 UTC\""
+    },
+    "rateLimit": {
+      "type": "rate",
+      "default": "100/s",
+      "group": "Limits"
+    },
+    "dailyQuota": {
+      "type": "integer",
+      "unit": "calls",
+      "min": 0,
+      "group": "Limits",
+      "description": "Leave empty for no quota"
+    },
+    "pricePerCall": {
+      "type": "number",
+      "unit": "USD",
+      "default": 0.001,
+      "min": 0,
+      "group": "Cost"
+    }
+  },
+  "metrics": {
+    "calls": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "tooManyRequests": {
+      "unit": "req/s",
+      "rollup": "sum",
+      "description": "429 responses"
+    },
+    "errors": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "cost": {
+      "unit": "USD",
+      "rollup": "sum"
+    }
+  }
+}

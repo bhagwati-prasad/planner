@@ -1,0 +1,38 @@
+{
+  "strataApi": "^1.0",
+  "kind": "connection-type",
+  "id": "websocket",
+  "name": "WebSocket",
+  "version": "1.0.0",
+  "category": "Connections",
+  "description": "A long-lived, two-way connection.",
+  "extends": "base:connection",
+  "properties": {
+    "mode": {
+      "type": "enum",
+      "values": [
+        "sync",
+        "async"
+      ],
+      "default": "async",
+      "group": "Connection"
+    },
+    "connectionLifetime": {
+      "type": "duration",
+      "default": "1h",
+      "group": "WebSocket"
+    },
+    "messagesPerConnection": {
+      "type": "integer",
+      "unit": "messages",
+      "default": 100,
+      "min": 0,
+      "group": "WebSocket"
+    },
+    "reconnectBackoff": {
+      "type": "duration",
+      "default": "1s",
+      "group": "WebSocket"
+    }
+  }
+}

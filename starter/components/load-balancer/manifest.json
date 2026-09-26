@@ -1,0 +1,127 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.load-balancer",
+  "name": "Load balancer",
+  "version": "1.0.0",
+  "category": "Edge",
+  "description": "Spreads connections or requests across healthy targets (ALB, NLB, HAProxy, nginx).",
+  "icon": "icon.svg",
+  "extends": "base:proxy",
+  "shape": "hexagon",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [
+        "http",
+        "grpc",
+        "websocket"
+      ]
+    },
+    {
+      "name": "out",
+      "direction": "out"
+    }
+  ],
+  "properties": {
+    "layer": {
+      "type": "enum",
+      "values": [
+        "l4",
+        "l7"
+      ],
+      "default": "l7",
+      "group": "Routing"
+    },
+    "algorithm": {
+      "type": "enum",
+      "values": [
+        "round-robin",
+        "least-connections",
+        "weighted",
+        "ip-hash",
+        "consistent-hash"
+      ],
+      "default": "round-robin",
+      "group": "Routing"
+    },
+    "stickySessions": {
+      "type": "boolean",
+      "default": false,
+      "group": "Routing"
+    },
+    "tlsTermination": {
+      "type": "boolean",
+      "default": true,
+      "group": "Routing"
+    },
+    "processingLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 0.5,
+        "p99": 3
+      },
+      "group": "Performance"
+    },
+    "maxConnections": {
+      "type": "integer",
+      "unit": "connections",
+      "default": 10000,
+      "min": 1,
+      "group": "Capacity"
+    },
+    "idleTimeout": {
+      "type": "duration",
+      "default": "60s",
+      "group": "Capacity"
+    },
+    "healthCheckInterval": {
+      "type": "duration",
+      "default": "10s",
+      "group": "Health checks"
+    },
+    "healthyThreshold": {
+      "type": "integer",
+      "unit": "checks",
+      "default": 3,
+      "min": 1,
+      "group": "Health checks"
+    },
+    "unhealthyThreshold": {
+      "type": "integer",
+      "unit": "checks",
+      "default": 2,
+      "min": 1,
+      "group": "Health checks"
+    }
+  },
+  "metrics": {
+    "latency.p50": {
+      "estimate": "processingLatency.p50"
+    },
+    "latency.p95": {
+      "estimate": "processingLatency.p95"
+    },
+    "latency.p99": {
+      "estimate": "processingLatency.p99"
+    },
+    "activeConnections": {
+      "unit": "connections",
+      "rollup": "sum"
+    },
+    "requestsPerTarget": {
+      "unit": "req/s",
+      "rollup": "max"
+    },
+    "unhealthyTargets": {
+      "unit": "targets",
+      "rollup": "sum"
+    },
+    "rejectedConnections": {
+      "unit": "connections/s",
+      "rollup": "sum"
+    }
+  }
+}

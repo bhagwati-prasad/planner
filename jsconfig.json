@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "checkJs": true,
+    "strict": false,
+    "noEmit": true
+  },
+  "include": [
+    "packages/*/src/**/*.js"
+  ],
+  "exclude": [
+    "packages/strata-cli/**",
+    "packages/strata-server/**"
+  ]
+}

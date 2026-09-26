@@ -1,0 +1,105 @@
+{
+  "strataApi": "^1.0",
+  "id": "starter.client",
+  "name": "Client (web / mobile)",
+  "version": "1.0.0",
+  "category": "Clients",
+  "description": "A population of users on web or mobile clients that start the traffic.",
+  "icon": "icon.svg",
+  "extends": "base:client",
+  "shape": "person",
+  "properties": {
+    "population": {
+      "type": "integer",
+      "unit": "users",
+      "default": 10000,
+      "min": 0,
+      "group": "Load",
+      "rollup": "sum"
+    },
+    "concurrency": {
+      "type": "integer",
+      "unit": "sessions",
+      "default": 100,
+      "min": 0,
+      "group": "Load",
+      "rollup": "sum"
+    },
+    "scenarioMix": {
+      "type": "map",
+      "values": {
+        "type": "percent"
+      },
+      "default": {},
+      "group": "Load",
+      "description": "Share of each scenario, e.g. { \"browse\": 70, \"checkout\": 30 }"
+    },
+    "thinkTime": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "exponential",
+        "mean": 5000
+      },
+      "group": "Load"
+    },
+    "clientTimeout": {
+      "type": "duration",
+      "default": "10s",
+      "group": "Retries"
+    },
+    "retries": {
+      "type": "integer",
+      "unit": "retries",
+      "default": 1,
+      "min": 0,
+      "group": "Retries"
+    },
+    "retryBackoff": {
+      "type": "duration",
+      "default": "500ms",
+      "group": "Retries"
+    },
+    "networkLatency": {
+      "type": "distribution",
+      "unit": "ms",
+      "default": {
+        "kind": "lognormal",
+        "median": 40,
+        "p99": 200
+      },
+      "group": "Network"
+    },
+    "networkBandwidth": {
+      "type": "number",
+      "unit": "Mbps",
+      "default": 20,
+      "min": 0,
+      "group": "Network"
+    },
+    "packetLoss": {
+      "type": "percent",
+      "unit": "%",
+      "default": 0.1,
+      "group": "Network"
+    }
+  },
+  "metrics": {
+    "requestsSent": {
+      "unit": "req/s",
+      "rollup": "sum"
+    },
+    "success": {
+      "unit": "%",
+      "rollup": "min"
+    },
+    "endToEnd.p99": {
+      "unit": "ms",
+      "rollup": "max"
+    },
+    "timeouts": {
+      "unit": "req/s",
+      "rollup": "sum"
+    }
+  }
+}
