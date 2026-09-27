@@ -246,6 +246,124 @@ export function manifestOf(registry, node) {
 }
 
 /**
+ * The public methods a port exposes (spec §6): those its component's manifest lists for it, or,
+ * on a System component, the methods bound on the boundary port it mirrors (ADR 0010).
+ * @param {Source} src
+ * @param {import('./registry.js').Registry|undefined} registry
+ * @param {{ nodeId: string, name: string, boundaryPortId?: string|null }} port
+ * @returns {string[]}
+ */
+export function exposedMethods(src, registry, port) {
+  const node = src.require('node', port.nodeId)
+  if (node.typeRef === SYSTEM_TYPE_REF) {
+    const bp = port.boundaryPortId ? src.get('boundaryPort', port.boundaryPortId) : null
+    return bp ? Object.keys(bp.bindings ?? {}) : []
+  }
+  const spec = manifestOf(registry, node)?.ports?.find(p => p.name === port.name)
+  return spec?.exposes ?? []
+}
+
+/**
+ * The names of a component's public methods: from its manifest, or, for a System component,
+ * the methods bound on its boundary ports (ADR 0010).
+ * @param {Source} src
+ * @param {import('./registry.js').Registry|undefined} registry
+ * @param {{ typeRef: string|null, innerSystemRef?: string|null }} node
+ * @returns {string[]}
+ */
+export function publicMethods(src, registry, node) {
+  if (node.typeRef === SYSTEM_TYPE_REF && node.innerSystemRef) {
+    const bound = boundaryPortsOf(src, node.innerSystemRef).flatMap(bp =>
+      Object.keys(bp.bindings ?? {})
+    )
+    return [...new Set(bound)]
+  }
+  return Object.keys(manifestOf(registry, node)?.methods?.public ?? {})
+}
+
+/**
+ * The components a boundary port reaches (ADR 0010): the one that owns its internal port, and
+ * every component reached from there along edges in their direction, or back along an edge
+ * whose two ports both go both ways.
+ * @param {Source} src
+ * @param {{ systemId: string, internalPortId: string|null }} bp
+ * @returns {Set<string>}
+ */
+export function reachableFrom(src, bp) {
+  const seen = new Set()
+  const start = bp.internalPortId ? src.get('port', bp.internalPortId) : null
+  if (!start) return seen
+  const links = edgesOf(src, bp.systemId).map(edge => ({
+    from: src.get('port', edge.fromPort),
+    to: src.get('port', edge.toPort),
+  }))
+  const queue = [start.nodeId]
+  while (queue.length) {
+    const id = /** @type {string} */ (queue.shift())
+    if (seen.has(id)) continue
+    seen.add(id)
+    for (const { from, to } of links) {
+      if (!from || !to) continue
+      if (from.nodeId === id) queue.push(to.nodeId)
+      else if (to.nodeId === id && from.direction === 'both' && to.direction === 'both')
+        queue.push(from.nodeId)
+    }
+  }
+  return seen
+}
+
+/**
+ * Follows a public method's bindings down through every level to the component that
+ * implements it (spec §7, eng §9). A component without an inner system implements its own.
+ * @param {Source} src
+ * @param {import('./registry.js').Registry|undefined} registry
+ * @param {string} nodeId
+ * @param {string} method
+ * @param {{ port?: string }} [options]  the name of the exposing port, when there are several
+ * @returns {{ nodeId: string, method: string, path: { nodeId: string, method: string }[] }}
+ */
+export function resolveBinding(src, registry, nodeId, method, { port } = {}) {
+  const path = []
+  let node = src.require('node', nodeId)
+  let name = method
+  let portName = port
+  for (;;) {
+    path.push({ nodeId: node.id, method: name })
+    if (!node.innerSystemRef) return { nodeId: node.id, method: name, path }
+    if (path.length > MAX_SYSTEM_DEPTH)
+      fail('E_SYSTEM_TOO_DEEP', `Bindings of '${method}' go deeper than ${MAX_SYSTEM_DEPTH} levels`)
+    const ports = portsOf(src, node.id).filter(
+      p =>
+        (portName === undefined || p.name === portName) &&
+        exposedMethods(src, registry, p).includes(name)
+    )
+    if (!ports.length) {
+      const known = publicMethods(src, registry, node).includes(name)
+      fail(
+        known ? 'E_METHOD_NOT_EXPOSED' : 'E_METHOD_UNKNOWN',
+        known
+          ? `No port of '${node.name}' exposes '${name}'${portName ? ` as '${portName}'` : ''}`
+          : `'${node.name}' has no public method '${name}'`,
+        { nodeId: node.id, method: name }
+      )
+    }
+    const binding = ports
+      .map(p => (p.boundaryPortId ? src.get('boundaryPort', p.boundaryPortId) : null))
+      .map(bp => bp?.bindings?.[name])
+      .find(Boolean)
+    if (!binding)
+      fail(
+        'E_METHOD_UNBOUND',
+        `Public method '${name}' of '${node.name}' is not bound to a component inside`,
+        { nodeId: node.id, method: name }
+      )
+    node = src.require('node', binding.nodeId)
+    name = binding.method
+    portName = undefined
+  }
+}
+
+/**
  * The connection type of an edge, with inheritance applied, or null when the edge has none or
  * it is not installed. Connection types resolve by id (latest version).
  * @param {import('./registry.js').Registry|undefined} registry

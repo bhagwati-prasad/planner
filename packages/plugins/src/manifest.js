@@ -23,6 +23,7 @@ export const MANIFEST_KEYS = Object.freeze([
   'shape',
   'ports',
   'properties',
+  'methods',
   'metrics',
   'templates',
   'migrations',

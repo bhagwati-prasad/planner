@@ -203,6 +203,28 @@ test('manifest validation reports every problem with a way forward', () => {
   )
 })
 
+test('manifests declare methods and the ports that expose them, as spec §8 shows', () => {
+  const manifest = {
+    strataApi: '^1.0',
+    id: 'acme.queue',
+    name: 'Queue',
+    version: '1.0.0',
+    extends: 'base:queue',
+    ports: [{ name: 'in', direction: 'in', exposes: ['publish'] }],
+    methods: { public: { publish: { input: 'message' } }, private: { expire: {} } },
+  }
+  assert.deepEqual(messages(validateManifest(manifest)), [])
+  assert.match(
+    messages(
+      validateManifest({
+        ...manifest,
+        ports: [{ name: 'in', direction: 'in', exposes: ['expire'] }],
+      })
+    ).join(),
+    /error .*port 'in' exposes 'expire', which is not a public method/
+  )
+})
+
 test('packing stops at errors and says where they are', () => {
   const broken = {
     ...messageQueueFolder(),

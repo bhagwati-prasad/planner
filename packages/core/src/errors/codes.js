@@ -44,6 +44,12 @@ const DESCRIPTIONS = {
   E_SYSTEM_NONE: 'The component has no inner system',
   E_SYSTEM_REQUIRED: 'A System component cannot lose its inner system; it is what the component is',
   E_SYSTEM_PATH: 'A path to a system names a node that is not a composite in the system before it',
+  E_METHOD_NOT_EXPOSED: 'The port does not expose that public method',
+  E_METHOD_UNBOUND:
+    'A public method of a composite is not bound to a public method of a component inside',
+  E_METHOD_UNREACHABLE:
+    'A binding targets a component that the matching boundary port does not reach',
+  E_METHOD_UNKNOWN: 'The component has no public method of that name',
   E_EDGE_DIRECTION: 'An edge starts at an input-only port or ends at an output-only one',
   E_EDGE_SELF_LOOP: 'An edge starts and ends on the same component; that is a private method call',
   E_EDGE_CROSS_LEVEL:

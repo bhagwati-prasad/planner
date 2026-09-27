@@ -62,10 +62,11 @@ export const FIXTURE_MANIFESTS = [
     version: '1.0.0',
     extends: 'base:service',
     ports: [
-      { name: 'in', direction: 'in', accepts: ['http', 'grpc'] },
+      { name: 'in', direction: 'in', accepts: ['http', 'grpc'], exposes: ['handle'] },
       { name: 'out', direction: 'out', accepts: ['http', 'grpc'] },
       { name: 'db', direction: 'out', accepts: ['db-protocol'] },
     ],
+    methods: { public: { handle: {} } },
     properties: {
       serviceTime: { type: 'distribution', unit: 'ms', default: 10, rollup: 'critical-path' },
       maxRps: { type: 'number', unit: 'req/s', default: 1000, rollup: 'min-path' },
@@ -89,6 +90,35 @@ export const FIXTURE_MANIFESTS = [
 export function testRegistry() {
   const registry = createRegistry()
   for (const m of FIXTURE_MANIFESTS) registry.register(m)
+  return registry
+}
+
+/** An API whose `in` port exposes two public methods, and a worker that exposes one. */
+export const API = {
+  id: 'test.api',
+  name: 'Test API',
+  version: '1.0.0',
+  extends: 'base:service',
+  ports: [
+    { name: 'in', direction: 'in', accepts: ['http'], exposes: ['checkout', 'refund'] },
+    { name: 'out', direction: 'out', accepts: ['http'] },
+  ],
+  methods: { public: { checkout: {}, refund: {} }, private: { audit: {} } },
+}
+export const WORKER = {
+  id: 'test.worker',
+  name: 'Test Worker',
+  version: '1.0.0',
+  extends: 'base:service',
+  ports: [{ name: 'in', direction: 'in', accepts: ['http'], exposes: ['record'] }],
+  methods: { public: { record: {} } },
+}
+
+/** The test registry, plus the API and the worker. */
+export function bindingRegistry() {
+  const registry = testRegistry()
+  registry.register(API)
+  registry.register(WORKER)
   return registry
 }
 
