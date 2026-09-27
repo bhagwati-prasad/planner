@@ -1,6 +1,6 @@
 # 0011 Edges name the method they call
 
-Status: Proposed
+Status: Accepted
 Date: 2026-09-27
 
 ## Context and problem
@@ -28,9 +28,9 @@ Edges store no method today, so extract cannot know which methods cross a bounda
 
 ## Decision outcome
 
-Proposed: option 1. For the "default method" of spec §6, an edge that names none may call any method the target port exposes, which is why extract binds them all. The kernel (M04) decides which one runs.
+Chosen option: 1, decided by the human on 2026-09-27, together with shipping 0111 and 0112 in one pull request. For the "default method" of spec §6, an edge that names none may call any method the target port exposes, which is why extract binds them all. The kernel (M04) decides which one runs.
 
-Snapshots gain `method: null` on every edge. Schema version 4 (ADR 0010) has not shipped yet, so its migration, `migrations/v3-to-v4.js`, also adds the field, and there is no version 5. This holds only if 0111 and 0112 ship in the same pull request. Otherwise 0112 adds `v4-to-v5.js`.
+Snapshots gain `method: null` on every edge. Schema version 4 (ADR 0010) has not shipped yet, so its migration, `migrations/v3-to-v4.js`, also adds the field, and there is no version 5. 0111 and 0112 ship in the same pull request, so that holds.
 
 ## Consequences
 
