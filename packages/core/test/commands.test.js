@@ -142,7 +142,7 @@ test('edges connect compatible ports in one system and pick a connection type', 
   assert.equal(core.edge(e).connectionType, 'db-protocol')
   assert.equal(core.edge(e).systemId, root)
   assert.throws(() => connect(core, db, 'in', svc, 'in'), /is an input and cannot start/)
-  assert.throws(() => connect(core, svc, 'out', svc, 'db'), /is an output and cannot end/)
+  assert.throws(() => connect(core, q, 'out', svc, 'db'), /is an output and cannot end/)
   assert.throws(() => connect(core, svc, 'out', q, 'in'), /share no connection type/)
   assert.throws(
     () => connect(core, svc, 'db', db, 'in', { connectionType: 'http' }),

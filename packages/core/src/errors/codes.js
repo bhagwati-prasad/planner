@@ -37,6 +37,10 @@ const DESCRIPTIONS = {
   E_BUNDLE_SYNTAX: 'A bundle module is not valid JavaScript',
 
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',
+  E_EDGE_DIRECTION: 'An edge starts at an input-only port or ends at an output-only one',
+  E_EDGE_SELF_LOOP: 'An edge starts and ends on the same component; that is a private method call',
+  E_EDGE_CROSS_LEVEL:
+    'An edge joins components in different systems; traffic crosses levels through boundary ports',
 
   E_UNIT_PARSE: 'A quantity is not written in a form its unit understands',
   E_UNIT_VALUE:

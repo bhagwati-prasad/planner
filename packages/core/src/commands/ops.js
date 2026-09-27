@@ -229,19 +229,34 @@ function requirePort(src, id) {
 export function checkConnection(src, fromPortId, toPortId, connectionType) {
   const from = requirePort(src, fromPortId)
   const to = requirePort(src, toPortId)
-  if (from.id === to.id) fail('INVALID', 'An edge cannot connect a port to itself')
   const fromNode = src.require('node', from.nodeId)
   const toNode = src.require('node', to.nodeId)
+  // Spec §5 graph invariants: two different components, one level, output into input.
+  if (fromNode.id === toNode.id)
+    fail(
+      'E_EDGE_SELF_LOOP',
+      `An edge cannot start and end on '${fromNode.name}': a component calling itself is a private method call`,
+      { nodeId: fromNode.id }
+    )
   if (fromNode.systemId !== toNode.systemId) {
     fail(
-      'INVALID',
-      `'${fromNode.name}' and '${toNode.name}' are in different systems; connect through boundary ports instead`
+      'E_EDGE_CROSS_LEVEL',
+      `'${fromNode.name}' and '${toNode.name}' are in different systems; connect through boundary ports instead`,
+      { fromNodeId: fromNode.id, toNodeId: toNode.id }
     )
   }
   if (from.direction === 'in')
-    fail('INVALID', `Port '${fromNode.name}.${from.name}' is an input and cannot start an edge`)
+    fail(
+      'E_EDGE_DIRECTION',
+      `Port '${fromNode.name}.${from.name}' is an input and cannot start an edge`,
+      { portId: from.id }
+    )
   if (to.direction === 'out')
-    fail('INVALID', `Port '${toNode.name}.${to.name}' is an output and cannot end an edge`)
+    fail(
+      'E_EDGE_DIRECTION',
+      `Port '${toNode.name}.${to.name}' is an output and cannot end an edge`,
+      { portId: to.id }
+    )
   const fromAccepts = acceptsOf(src, from)
   const toAccepts = acceptsOf(src, to)
   let type = connectionType ?? null
