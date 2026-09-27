@@ -13,7 +13,7 @@ Split from 0202 by the human on 2026-09-27.
 
 ## Goal
 
-Every node state in ds §6 has its treatment on the default component shape, in light and dark themes. The interaction states are hover, selected, multi-selected, keyboard focus, dragging, and valid or invalid connect target. The model states are planned, deprecated, by reference, missing component, failing, out of scope, run-only change and context ghost. The model states come in as node data from the host; strata-graph never works them out itself.
+Every node state in ds §6 has its treatment on the default component shape, in light and dark themes. The interaction states are hover, selected, multi-selected, keyboard focus, dragging, and valid or invalid connect target. The model states are planned, deprecated, by reference, missing component, failing, out of scope, run-only change and context ghost. The model states come in as node data from the host; strata-graph never works them out itself. A multi-selection shows one bounding box around the selected nodes; its resize handles and the group resize they emit are 0204's, as the human decided on 2026-09-27.
 
 ## Tests to write first
 
