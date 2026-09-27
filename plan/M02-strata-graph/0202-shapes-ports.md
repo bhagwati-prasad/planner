@@ -10,14 +10,13 @@
 
 ## Goal
 
-`registerShape()`; the default component shape with icon tile, title, subtitle and badges; ports shown on hover, selection and connect.
+`registerShape()`; the default component shape with icon tile, title, subtitle and badges; ports shown on hover, selection and connect. The human split this task on 2026-09-27: the ds §6 node states and their visual snapshots moved to [0209](../M02-strata-graph/0209-node-states.md).
 
 ## Tests to write first
 
 Write these tests first, in `packages/graph/test/shapes.spec.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
 - [ ] A registered shape renders through its `render` function with keyed joins
-- [ ] Every component state in ds §6 matches its visual snapshot in light and dark themes
 - [ ] Port hit areas are 24 px although ports draw at 8 px
 
 ## Done when
