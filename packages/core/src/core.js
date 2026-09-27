@@ -12,6 +12,8 @@ import { createUlidFactory } from './ulid.js'
 import { registerCoreCommands } from './commands/index.js'
 import { rollup, checkContracts } from './rollup.js'
 import { findProblems } from './validate.js'
+import { canonicalJson } from './plain.js'
+import { sha256, toHex } from './sha256.js'
 import {
   acceptsOf,
   boundaryPortsOf,
@@ -297,6 +299,16 @@ export class Core {
   }
 
   /**
+   * Like `dispatch`, but returns `{ ok: false, code, details }` instead of throwing when the
+   * command is refused, and `{ ok: true, value }` otherwise.
+   * @param {{ type: string, payload?: any }} command
+   * @param {import('./bus.js').DispatchOptions} [options]
+   */
+  tryDispatch(command, options) {
+    return this.#bus.tryDispatch(command, options)
+  }
+
+  /**
    * @template T
    * @param {() => T} fn
    * @param {{ label?: string }} [options]
@@ -337,7 +349,7 @@ export class Core {
    * Adds a command type (plugins use the same API as the core).
    * @param {string} type
    * @param {(payload: any, ctx: import('./bus.js').HandlerContext) => any} handler
-   * @param {{ undoable?: boolean, description?: string, signature?: string, replace?: boolean }} [meta]
+   * @param {import('./bus.js').CommandMeta} [meta]
    */
   register(type, handler, meta) {
     this.#bus.register(type, handler, meta)
@@ -350,7 +362,9 @@ export class Core {
 
   /**
    * Events: 'change' { op, changes }, 'op' (Operation), 'history' { canUndo, canRedo },
-   * 'undo' / 'redo' { op, applied }, and '*' for all of them.
+   * 'undo' / 'redo' { op, applied }, any event a command emits with `ctx.emit`, and '*' for
+   * all of them. Events arrive after the commit; a change a listener starts is queued until
+   * every listener has heard them.
    * @param {string} event
    * @param {Function} fn
    */
@@ -369,6 +383,14 @@ export class Core {
   /** A JSON-ready copy of the model. */
   snapshot() {
     return this.#store.snapshot()
+  }
+
+  /**
+   * The state hash: the SHA-256, in hex, of the snapshot as sorted-key JSON. Equal models
+   * (entities, their audit fields and `rev`) hash the same however they were built.
+   */
+  stateHash() {
+    return toHex(sha256(canonicalJson(this.snapshot())))
   }
 }
 

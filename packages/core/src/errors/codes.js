@@ -22,6 +22,11 @@ const DESCRIPTIONS = {
   E_ERROR_CODE_UNREGISTERED: 'An error was raised with a code missing from this registry',
   E_ADAPTER_MISSING: 'A required adapter (clock, random source) was not passed in at startup',
 
+  E_COMMAND_PAYLOAD:
+    'A command payload holds a value JSON cannot carry: undefined, a Date, a Map, a class instance, a function or a non-finite number',
+  E_COMMAND_VERSION:
+    'An operation was written by a newer version of its command, or a command version has no upgrader from the one before',
+
   E_BUNDLE_BARE_SPECIFIER:
     'A bundle imports an npm package; only relative imports, d3 and three are allowed',
   E_BUNDLE_CYCLE:
@@ -32,6 +37,22 @@ const DESCRIPTIONS = {
   E_BUNDLE_SYNTAX: 'A bundle module is not valid JavaScript',
 
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',
+
+  E_UNIT_PARSE: 'A quantity is not written in a form its unit understands',
+  E_UNIT_VALUE:
+    'A value is not canonical for its quantity, such as money in fractions of a micro-unit',
+  E_UNIT_UNKNOWN: 'No quantity of that name converts units',
+
+  E_SCHEMA_TYPE: 'A value has the wrong type for its property or state schema',
+  E_SCHEMA_RANGE: "A value is below its schema's min or above its max",
+  E_SCHEMA_ENUM: "A value is not one of its enum's options",
+  E_SCHEMA_UNIT: 'A duration, size or rate is neither a number nor a string with a known unit',
+  E_SCHEMA_DISTRIBUTION:
+    'A distribution has an unknown kind, or a parameter that is missing or invalid',
+  E_SCHEMA_FIELD: 'A table row lacks a column the table declares, or has one it does not',
+  E_SCHEMA_KEY: "A table row repeats another row's key",
+  E_SCHEMA_UNKNOWN_TYPE:
+    'A schema names a type that is neither a property or state type nor a known record type',
 
   E_SIM_NO_EDGE: 'The system has no edge for a request to travel over',
   E_SIM_EDGE_NOT_FOUND: 'The edge a run names is not in the model',

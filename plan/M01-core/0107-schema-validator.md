@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M01 Core](../ROADMAP.md#m01-core) | R0 | todo | [0102](../M01-core/0102-errors.md) |
+| [M01 Core](../ROADMAP.md#m01-core) | R0 | done | [0102](../M01-core/0102-errors.md) |
 
 ## Read first
 
@@ -18,14 +18,14 @@ In-house validator for property and state values: all property types with units,
 
 Write these tests first, in `packages/core/test/schema.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] Every property and state type accepts valid values and rejects invalid ones with a path to the error
-- [ ] `"4d"` parses to milliseconds and `"512 KB"` to bytes
-- [ ] Every distribution kind validates its parameters
+- [x] Every property and state type accepts valid values and rejects invalid ones with a path to the error
+- [x] `"4d"` parses to milliseconds and `"512 KB"` to bytes
+- [x] Every distribution kind validates its parameters
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

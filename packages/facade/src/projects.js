@@ -274,7 +274,7 @@ export class ProjectsApi {
     if (id && (open.has(id) || (await storage.load(id))))
       fail('CONFLICT', `A project with id '${id}' already exists`)
     const core = makeCore()
-    core.dispatch({ type: 'project.init', payload: { name, id } })
+    core.dispatch({ type: 'project.init', payload: id === undefined ? { name } : { name, id } })
     const project = new ProjectHandle(this.#strata, core, emit)
     open.set(project.id, project)
     await this.save(project)

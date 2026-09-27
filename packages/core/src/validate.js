@@ -4,7 +4,7 @@
  * wrong (missing components, unmapped boundary ports, broken contracts) and guards against
  * data that arrived from a file or another replica.
  */
-import { validateValue } from './props.js'
+import { checkValue } from './schema.js'
 import { checkConnection } from './commands/ops.js'
 import { checkContracts } from './rollup.js'
 import {
@@ -90,13 +90,12 @@ export function findProblems(src, registry, { contracts = true } = {}) {
         )
         continue
       }
-      try {
-        validateValue(schema, value, `${node.name}.${key}`)
-      } catch (err) {
+      const checked = checkValue(schema, value, `${node.name}.${key}`)
+      if (checked.ok === false) {
         add(
           'error',
           'INVALID_PROPERTY',
-          /** @type {Error} */ (err).message,
+          String(checked.details.message),
           'node',
           node.id,
           node.systemId
@@ -171,13 +170,12 @@ export function findProblems(src, registry, { contracts = true } = {}) {
         )
         continue
       }
-      try {
-        validateValue(schema, edge.props[key], `${name}.${key}`)
-      } catch (err) {
+      const checked = checkValue(schema, edge.props[key], `${name}.${key}`)
+      if (checked.ok === false) {
         add(
           'error',
           'INVALID_PROPERTY',
-          /** @type {Error} */ (err).message,
+          String(checked.details.message),
           'edge',
           edge.id,
           edge.systemId
