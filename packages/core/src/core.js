@@ -28,6 +28,7 @@ import {
   edgesOf,
   effectiveProps,
   explainProps,
+  exposedMethods,
   manifestOf,
   nodesOf,
   pathsTo,
@@ -271,6 +272,15 @@ export class Core {
   }
   /** @param {string|object} entity a node or an edge */ effectiveProps(entity) {
     return effectiveProps(this.#registry, this.#propsArg(entity))
+  }
+  /**
+   * The public methods a port exposes (spec §6): those its component's manifest lists, or, on a
+   * System component, the methods bound on the boundary port it mirrors.
+   * @param {string|{ nodeId: string, name: string, boundaryPortId?: string|null }} port
+   */
+  exposedMethods(port) {
+    const entity = typeof port === 'string' ? this.#store.require('port', port) : port
+    return exposedMethods(this.#store, this.#registry, entity)
   }
   /** @param {string|object} entity a node or an edge */ explainProps(entity) {
     return explainProps(this.#registry, this.#propsArg(entity))

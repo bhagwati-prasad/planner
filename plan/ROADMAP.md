@@ -54,7 +54,7 @@ The headless heart: immutable state, commands, undo, op log, graph invariants, r
 - [x] [0111 Method bindings across boundaries](M01-core/0111-method-bindings.md) (after 0110)
 - [x] [0112 Extract as system and inline system](M01-core/0112-extract-inline.md) (after 0111)
 - [x] [0113 Roll-up engine](M01-core/0113-rollups.md) (after 0111)
-- [ ] [0114 The recursive payments fixture](M01-core/0114-recursive-fixture.md) (after 0112, 0113)
+- [x] [0114 The recursive payments fixture](M01-core/0114-recursive-fixture.md) (after 0112, 0113)
 - [ ] [0115 Facade, handles and help metadata](M01-core/0115-facade.md) (after 0114, 0106)
 
 ### M02 strata-graph
