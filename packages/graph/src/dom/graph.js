@@ -140,7 +140,6 @@ export class Graph {
   /** @type {any} */ #root
   /** @type {Record<string, any>} */ #layers = {}
   /** @type {any} */ #marquee
-  /** @type {any} */ #gridPattern
 
   /**
    * @param {HTMLElement} host
@@ -344,7 +343,7 @@ export class Graph {
   setTransform(t, { animate = false } = {}) {
     const d3 = this.#d3
     const z = d3.zoomIdentity.translate(t.x, t.y).scale(t.k)
-    if (animate && typeof this.#svg.transition === 'function')
+    if (animate && !this.#reducedMotion() && typeof this.#svg.transition === 'function')
       this.#svg.transition().duration(350).call(this.#zoom.transform, z)
     else this.#svg.call(this.#zoom.transform, z)
     return this
@@ -629,16 +628,15 @@ export class Graph {
       .attr('class', 'sg-background')
       .attr('width', '100%')
       .attr('height', '100%')
-    this.#svg
-      .append('rect')
-      .attr('class', 'sg-grid')
-      .attr('width', '100%')
-      .attr('height', '100%')
-      .attr('fill', `url(#${this.#uid}-grid)`)
-      .attr('pointer-events', 'none')
-    this.#gridPattern = this.#svg.select(`#${this.#uid}-grid`)
     this.#root = this.#svg.append('g').attr('class', 'sg-viewport')
     this.#layers = this.#makeLayers(this.#root)
+    // The dot grid lives in world space, in the first scene layer, over the visible area.
+    for (const which of ['minor', 'major'])
+      this.#layers.grid
+        .append('rect')
+        .attr('class', `sg-grid sg-grid-${which}`)
+        .attr('fill', `url(#${this.#uid}-grid-${which})`)
+        .attr('pointer-events', 'none')
     this.#marquee = this.#svg
       .append('rect')
       .attr('class', 'sg-marquee')
@@ -683,61 +681,93 @@ export class Graph {
     }
     marker(`${this.#uid}-arrow`, 'sg-arrow')
     marker(`${this.#uid}-arrow-active`, 'sg-arrow sg-arrow-active')
-    if (!forExport) {
-      const g = this.#opts.grid || 10
-      const pattern = svgEl(
-        'pattern',
-        { id: `${this.#uid}-grid`, patternUnits: 'userSpaceOnUse', width: g * 5, height: g * 5 },
-        doc
-      )
-      pattern.appendChild(svgEl('path', { class: 'sg-grid-minor', fill: 'none', d: '' }, doc))
-      pattern.appendChild(
-        svgEl(
-          'path',
-          { class: 'sg-grid-major', fill: 'none', d: `M${g * 5},0 L0,0 0,${g * 5}` },
+    if (!forExport)
+      for (const which of ['minor', 'major']) {
+        const pattern = svgEl(
+          'pattern',
+          { id: `${this.#uid}-grid-${which}`, patternUnits: 'userSpaceOnUse' },
           doc
         )
-      )
-      defs.appendChild(pattern)
-    }
+        pattern.appendChild(svgEl('circle', { class: `sg-grid-dot-${which}` }, doc))
+        defs.appendChild(pattern)
+      }
     return defs
   }
 
+  /**
+   * The scene layers, in the fixed order of eng §12: grid, zones and frames, edges, nodes,
+   * overlays, annotations, comment pins, handles. Frames and regions (zones) share a layer, and
+   * so do the overlays: smart guides and simulation tokens.
+   */
   #makeLayers(root) {
+    const layer = (/** @type {string} */ name) =>
+      root.append('g').attr('class', `sg-layer sg-layer-${name}`).attr('data-layer', name)
+    const grid = layer('grid')
+    const frames = layer('frames')
+    const edges = layer('edges')
+    const nodes = layer('nodes')
+    const overlays = layer('overlays')
+    const annotations = layer('annotations')
+    const pins = layer('comment-pins')
+    const handles = layer('handles')
     return {
-      frames: root.append('g').attr('class', 'sg-layer-frames'),
-      regions: root.append('g').attr('class', 'sg-layer-regions'),
-      edges: root.append('g').attr('class', 'sg-layer-edges'),
-      nodes: root.append('g').attr('class', 'sg-layer-nodes'),
-      annotations: root.append('g').attr('class', 'sg-layer-annotations'),
-      handles: root.append('g').attr('class', 'sg-layer-handles'),
-      guides: root.append('g').attr('class', 'sg-layer-guides'),
-      tokens: root.append('g').attr('class', 'sg-layer-tokens'),
+      grid,
+      frames: frames.append('g').attr('class', 'sg-frames'),
+      regions: frames.append('g').attr('class', 'sg-regions'),
+      edges,
+      nodes,
+      guides: overlays.append('g').attr('class', 'sg-guides'),
+      tokens: overlays.append('g').attr('class', 'sg-tokens'),
+      annotations,
+      pins,
+      handles,
     }
   }
 
+  /**
+   * The dot grid (design system §6): a dot every `grid` units and a stronger one every ten,
+   * each the same size on screen at any zoom. Minor dots fade out below 50% zoom and are gone
+   * at 25%; major dots go once they would sit closer than 8 px.
+   */
   #updateGrid() {
     const { grid, showGrid } = this.#opts
     const g = grid || 10
-    const { x, y, k } = this.#transform
-    const pattern = this.#gridPattern
-    pattern
-      .attr('width', g * 5)
-      .attr('height', g * 5)
-      .attr('patternTransform', `translate(${x},${y}) scale(${k})`)
-    const minor = []
-    for (let i = 1; i < 5; i++)
-      minor.push(`M${i * g},0 L${i * g},${g * 5} M0,${i * g} L${g * 5},${i * g}`)
-    pattern
-      .select('.sg-grid-minor')
-      .attr('d', minor.join(' '))
-      .attr('visibility', g * k < 6 ? 'hidden' : 'visible')
-    pattern
-      .select('.sg-grid-major')
-      .attr('d', `M${g * 5},0 L0,0 0,${g * 5}`)
-      .attr('visibility', g * 5 * k < 8 ? 'hidden' : 'visible')
-    pattern.selectAll('path').attr('vector-effect', 'non-scaling-stroke')
-    this.#svg.select('.sg-grid').attr('visibility', showGrid ? 'visible' : 'hidden')
+    const { k } = this.#transform
+    const layer = this.#layers.grid
+    layer.attr('visibility', showGrid ? 'visible' : 'hidden')
+    if (!showGrid) return
+    const view = visibleRect(this.#transform, this.#size)
+    const minorOpacity = Math.min(1, Math.max(0, (k - 0.25) / 0.25))
+    const opacity = { minor: minorOpacity, major: g * 10 * k < 8 ? 0 : 1 }
+    for (const [which, step, r] of /** @type {const} */ ([
+      ['minor', g, 0.75],
+      ['major', g * 10, 1.25],
+    ])) {
+      this.#svg
+        .select(`#${this.#uid}-grid-${which}`)
+        .attr('x', -step / 2)
+        .attr('y', -step / 2)
+        .attr('width', step)
+        .attr('height', step)
+        .select('circle')
+        .attr('cx', step / 2)
+        .attr('cy', step / 2)
+        .attr('r', r / k)
+      layer
+        .select(`.sg-grid-${which}`)
+        .attr('x', view.x)
+        .attr('y', view.y)
+        .attr('width', view.w)
+        .attr('height', view.h)
+        .attr('visibility', opacity[which] > 0 ? 'visible' : 'hidden')
+        .style('opacity', opacity[which])
+    }
+  }
+
+  /** True when the user asks for reduced motion (eng §12): views jump instead of animating. */
+  #reducedMotion() {
+    return !!this.#host.ownerDocument?.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')
+      .matches
   }
 
   #measureSize() {
@@ -1620,7 +1650,13 @@ export class Graph {
       enter.append('rect').attr('class', 'sg-frame-title').attr('height', 24)
       this.#bindItem(enter, 'frame')
     }
-    const all = enter.merge(sel)
+    const selected = d => interactive && this.#selection.has(d.id)
+    const dimmed = d => !!dim && !dim.has(d.id)
+    const all = enter
+      .merge(sel)
+      .filter((d, i, nodes) =>
+        stale(nodes[i], [d, this.#itemRect(d.id), selected(d), m.isLocked(d), dimmed(d)])
+      )
     all
       .attr('class', d => `sg-frame sg-kind-${d.kind}`)
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
@@ -1670,7 +1706,29 @@ export class Graph {
     enter.append('g').attr('class', 'sg-decor')
     enter.append('g').attr('class', 'sg-ports')
     if (interactive) this.#bindItem(enter, 'node')
-    const all = enter.merge(sel)
+    const heat = this.#overlays.get('heatmap')
+    const badges = this.#overlays.get('badges')
+    const heatDomain = heat ? domainOf(heat) : null
+    const target =
+      this.#drag?.type === 'connect' || this.#drag?.type === 'reconnect' ? this.#drag.target : null
+    const all = enter
+      .merge(sel)
+      .filter((d, i, groups) =>
+        stale(groups[i], [
+          d,
+          this.#itemRect(d.id),
+          interactive,
+          interactive && this.#selection.has(d.id),
+          m.isLocked(d),
+          !!dim && !dim.has(d.id),
+          heat?.values?.[d.id] ?? null,
+          heat ? heatDomain : null,
+          badges?.values?.[d.id] ?? null,
+          target?.node === d.id ? target.port : null,
+          this.#opts.portRadius,
+          this.#themeVersion,
+        ])
+      )
     all
       .attr('transform', d => {
         const r = this.#itemRect(d.id)
@@ -1691,9 +1749,6 @@ export class Graph {
           d => [d.title ?? d.label, d.sublabel].filter(Boolean).join(', ') || d.id
         )
     }
-    const heat = this.#overlays.get('heatmap')
-    const badges = this.#overlays.get('badges')
-    const heatDomain = heat ? domainOf(heat) : null
     const heatColor = heat
       ? this.#d3.interpolateRgb?.(this.#tokens.heatLow, this.#tokens.heatHigh)
       : null
@@ -1714,10 +1769,6 @@ export class Graph {
       const penter = psel.enter().append('circle').attr('class', 'sg-port')
       penter.append('title')
       if (portDrag && !d.ghost) penter.call(portDrag)
-      const target =
-        this.#drag?.type === 'connect' || this.#drag?.type === 'reconnect'
-          ? this.#drag.target
-          : null
       penter
         .merge(psel)
         .attr('cx', p => p.a.x)
@@ -1880,7 +1931,20 @@ export class Graph {
     const widths = this.#overlays.get('edge-width')
     const wDomain = widths ? domainOf(widths) : null
     const [wMin, wMax] = widths?.range ?? [1, 8]
-    const all = enter.merge(sel)
+    const all = enter
+      .merge(sel)
+      .filter((d, i, groups) =>
+        stale(groups[i], [
+          d,
+          this.#routeOf(d).path,
+          interactive && this.#selection.has(d.id),
+          !!(m.nodes.get(d.source.node)?.ghost || m.nodes.get(d.target.node)?.ghost),
+          !!dim && !dim.has(d.id),
+          widths?.values?.[d.id] ?? null,
+          widths ? [wDomain, wMin, wMax] : null,
+          this.#themeVersion,
+        ])
+      )
     all
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed(
@@ -1933,6 +1997,14 @@ export class Graph {
     if (interactive) this.#bindItem(enter, 'annotation')
     const all = enter.merge(sel)
     all
+      .filter((d, i, groups) =>
+        stale(groups[i], [
+          d.kind,
+          interactive && this.#selection.has(d.id),
+          m.isLocked(d),
+          !!dim && !dim.has(d.id),
+        ])
+      )
       .attr('class', d => `sg-annotation sg-kind-${d.kind}`)
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed('sg-locked', d => m.isLocked(d))
@@ -2029,6 +2101,7 @@ export class Graph {
       .append('line')
       .attr('class', 'sg-guide')
       .merge(gsel)
+      .filter((g, i, nodes) => stale(nodes[i], [g, k]))
       .attr('x1', g => (g.axis === 'x' ? g.value : g.from))
       .attr('x2', g => (g.axis === 'x' ? g.value : g.to))
       .attr('y1', g => (g.axis === 'x' ? g.from : g.value))
@@ -2071,6 +2144,7 @@ export class Graph {
       .append('rect')
       .call(this.#resizeDragBehavior())
       .merge(hsel)
+      .filter((h, i, nodes) => stale(nodes[i], [h, k]))
       .attr('class', h => `sg-handle sg-handle-${h.dir}`)
       .attr('x', h => h.x - size / 2)
       .attr('y', h => h.y - size / 2)
@@ -2144,6 +2218,7 @@ export class Graph {
         })
       })
       .merge(esel)
+      .filter((h, i, nodes) => stale(nodes[i], [h, k]))
       .attr(
         'class',
         h =>
@@ -2179,6 +2254,7 @@ export class Graph {
       .append('path')
       .attr('class', 'sg-ghost-edge')
       .merge(csel)
+      .filter((p, i, nodes) => stale(nodes[i], [p, k]))
       .attr('d', p => p)
       .attr('stroke-width', 1.5 / k)
     const connecting = d?.type === 'connect' || d?.type === 'reconnect'
@@ -2204,6 +2280,20 @@ export class Graph {
  * @param {{ values?: Record<string, number>, domain?: [number, number] }} spec
  * @returns {[number, number]}
  */
+/**
+ * Whether an element needs drawing: the first time, and whenever the key of what it shows differs
+ * from the one it was last drawn with. Unchanged elements are left alone, so updates touch only
+ * the elements whose data or state changed (eng §12) and an identical setData mutates nothing.
+ * @param {any} el
+ * @param {unknown[]} state
+ */
+function stale(el, state) {
+  const key = JSON.stringify(state)
+  if (el.__sgState === key) return false
+  el.__sgState = key
+  return true
+}
+
 function domainOf(spec) {
   if (spec.domain) return spec.domain
   const values = Object.values(spec.values ?? {}).filter(v => typeof v === 'number')

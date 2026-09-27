@@ -123,8 +123,8 @@ export const STYLESHEET = `
 .sg-root { font-family: ${v('fontFamily')}; font-size: ${v('fontSize')}; user-select: none; -webkit-user-select: none; outline: none; touch-action: none; }
 .sg-root:focus-visible { outline: 2px solid ${v('accent')}; outline-offset: -2px; }
 .sg-background { fill: ${v('background')}; }
-.sg-grid-minor { stroke: ${v('grid')}; }
-.sg-grid-major { stroke: ${v('gridMajor')}; }
+.sg-grid-dot-minor { fill: ${v('grid')}; }
+.sg-grid-dot-major { fill: ${v('gridMajor')}; }
 .sg-node { cursor: default; }
 .sg-node:focus { outline: none; }
 .sg-node .sg-shape { fill: ${v('nodeFill')}; stroke: ${v('nodeStroke')}; stroke-width: 1.25; }

@@ -70,7 +70,7 @@ The diagram library from §9. It knows nothing about Strata: hosts hand it plain
 | Viewport, text | `viewport.js`, `text.js` | d3-zoom-compatible transforms, fit and zoom-at; word wrapping with an injected measurer. |
 | Data | `data.js` | Normalisation with defaults, problem reporting, frame nesting, layers (hidden, locked). |
 | Theme | `theme.js` | Every colour, font and radius is a CSS custom property; light and dark sets. |
-| Renderer | `dom/graph.js` | D3 joins into SVG layers; d3-zoom, d3-drag; gestures and keyboard; overlays; culling; SVG/PNG export. |
+| Renderer | `dom/graph.js` | D3 joins into SVG layers in the order of eng §12 (grid, frames and zones, edges, nodes, overlays, annotations, comment pins, handles); each element keeps the key of what it last drew and is skipped while that is unchanged, so an identical `setData` mutates nothing; the dot grid of design system §6 in world space (minor dots fade out below 50% zoom); d3-zoom, with `zoomTo` and `fit` jumping instead of animating under `prefers-reduced-motion`; d3-drag; gestures and keyboard; overlays; culling; SVG/PNG export. |
 | Shapes | `dom/shapes.js` | box, rect, ellipse, diamond, hexagon, cylinder, queue, document, note, cloud, person, component, placeholder, boundary-port; hosts register more. |
 | Minimap | `dom/minimap.js` | Overview with the visible area; click or drag to move. |
 

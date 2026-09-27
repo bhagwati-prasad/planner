@@ -17,6 +17,7 @@ const SERVED = [
   ...E2E,
   'tools/testing/browser/**/*.spec.js',
   'packages/*/test/components/**/*.spec.js',
+  'packages/*/test/*.spec.js',
 ]
 
 /** @typedef {keyof typeof DEVICES} BrowserName */

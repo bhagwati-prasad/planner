@@ -62,7 +62,7 @@ The headless heart: immutable state, commands, undo, op log, graph invariants, r
 
 The generic D3 diagram library: data in, intents out, fast at 500+ components, with every visual state from the design system.
 
-- [ ] [0201 Scene, layers and zoom](M02-strata-graph/0201-scene-zoom.md) (after 0010, 0007)
+- [x] [0201 Scene, layers and zoom](M02-strata-graph/0201-scene-zoom.md) (after 0010, 0007)
 - [ ] [0202 Shape registry, components and ports](M02-strata-graph/0202-shapes-ports.md) (after 0201)
 - [ ] [0203 Edges, arrowheads and routing](M02-strata-graph/0203-edges-routing.md) (after 0202)
 - [ ] [0204 Selection, dragging and connecting as intents](M02-strata-graph/0204-selection-intents.md) (after 0203)

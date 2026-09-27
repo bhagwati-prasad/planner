@@ -30,7 +30,7 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 | Budget | Recorded | Removed by |
 | --- | --- | --- |
-| strata-graph | 75.8 KB of 60 KB | 0207 (level of detail and performance). The minifier lowered it from 99.5 KB: to 88.5 KB by dropping unneeded line breaks and spaces, then to 75.8 KB by shortening local names (0119) |
+| strata-graph | 76.9 KB of 60 KB | 0207 (level of detail and performance). The minifier lowered it from 99.5 KB: to 88.5 KB by dropping unneeded line breaks and spaces, then to 75.8 KB by shortening local names (0119). The scene of 0201 (eng §12 layers, per-element state keys, the dot grid) raised it to 76.9 KB, as the human decided on 2026-09-27: a task that grows the package raises this recorded size to what it ships and says so in its `plan/LOG.md` line |
 | Simulation worker bundle | 154.4 KB of 120 KB | 0402 (worker host). Shortening local names (0119) lowered it from 168.6 KB to 138.3 KB; method bindings (0111), extract planning (0112) and memoised roll-ups (0113) raised it as core grew |
 
 The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR. Until then, as the human decided on 2026-09-26, a task that grows `core` raises this recorded size to what it ships, and says so in its `plan/LOG.md` line.
