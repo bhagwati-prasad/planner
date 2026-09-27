@@ -112,9 +112,9 @@ export function uniqueName(taken, base) {
  * Creates a system and, unless disabled, its default logical view.
  * @param {Ctx} ctx
  * @param {{ id?: string, name: string, levelTag?: string|null, description?: string, ownerNodeId?: string|null, contract?: object, rollups?: object, tags?: string[] }} fields
- * @param {{ defaultView?: boolean }} [options]
+ * @param {{ defaultView?: boolean, viewId?: string }} [options]  viewId: the default view's id
  */
-export function createSystem(ctx, fields, { defaultView = true } = {}) {
+export function createSystem(ctx, fields, { defaultView = true, viewId } = {}) {
   const id = fields.id ?? ctx.newId()
   ctx.tx.create('system', {
     id,
@@ -126,7 +126,7 @@ export function createSystem(ctx, fields, { defaultView = true } = {}) {
     tags: fields.tags ?? [],
     ownerNodeId: fields.ownerNodeId ?? null,
   })
-  if (defaultView) createView(ctx, id, { name: 'Logical', kind: 'logical' })
+  if (defaultView) createView(ctx, id, { id: viewId, name: 'Logical', kind: 'logical' })
   return id
 }
 
@@ -182,9 +182,8 @@ export function linkBoundaryPort(ctx, systemId, port) {
   return bp.id
 }
 
-/** @param {Ctx} ctx @param {string} nodeId @param {any} bp */
-export function createMirrorPort(ctx, nodeId, bp) {
-  const id = ctx.newId()
+/** @param {Ctx} ctx @param {string} nodeId @param {any} bp @param {string} [id] */
+export function createMirrorPort(ctx, nodeId, bp, id = ctx.newId()) {
   ctx.tx.create('port', {
     id,
     nodeId,
@@ -408,7 +407,7 @@ export function removeNode(ctx, nodeId) {
  * @param {Ctx} ctx
  * @param {{ id: string, systemId: string }} node
  */
-function unbindTarget(ctx, node) {
+export function unbindTarget(ctx, node) {
   for (const bp of boundaryPortsOf(ctx.tx, node.systemId)) {
     const entries = Object.entries(bp.bindings ?? {})
     const kept = entries.filter(([, target]) => target.nodeId !== node.id)

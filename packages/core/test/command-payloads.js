@@ -263,6 +263,31 @@ export const PAYLOADS = {
     return node && { nodeId: node.id }
   }),
 
+  // Moves one or two components of a system into another; refused while an edge would cross.
+  'node.move': inProject((snap, random) => {
+    const node = pick(random, snap.nodes)
+    const target =
+      node &&
+      pick(
+        random,
+        snap.systems.filter(sys => sys.id !== node.systemId)
+      )
+    if (!node || !target) return null
+    const other = pick(
+      random,
+      snap.nodes.filter(n => n.systemId === node.systemId && n.id !== node.id)
+    )
+    return { ids: other && below(random, 2) ? [node.id, other.id] : [node.id], systemId: target.id }
+  }),
+  // Owns a system that nothing places or owns yet, such as one system.create made.
+  'node.own': inProject((snap, random) => {
+    const placed = new Set(snap.nodes.map(n => n.innerSystemRef))
+    const free = snap.systems.filter(
+      sys => !sys.ownerNodeId && sys.id !== snap.project.rootSystemId && !placed.has(sys.id)
+    )
+    const inner = pick(random, free)
+    return inner && { systemId: snap.project.rootSystemId, innerSystemRef: inner.id }
+  }),
   'component.openAsSystem': inProject((snap, random) => {
     const node = pick(
       random,

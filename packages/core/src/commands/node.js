@@ -8,14 +8,18 @@ import { parseTypeRef, typeRefOf } from '../registry.js'
 import {
   NODE_STATUSES,
   PLACEMENTS,
+  boundaryPortsOf,
+  edgesAtPort,
   manifestOf,
   nodesOf,
   portsOf,
+  referencingNodes,
   requireProject,
   wouldCycle,
 } from '../model.js'
 import {
   cloneSystem,
+  createMirrorPort,
   createMirrorPorts,
   createSystem,
   deleteSystemDeep,
@@ -26,11 +30,13 @@ import {
   onlyKeys,
   optionalString,
   plainObject,
+  removeFromViews,
   removeNode,
   removePort,
   requireDirection,
   requireString,
   stringList,
+  unbindTarget,
   uniqueName,
   validateProps,
 } from './ops.js'
@@ -228,6 +234,98 @@ export const nodeCommands = {
       })
       createMirrorPorts(ctx, id, innerSystemRef)
       return id
+    },
+  },
+
+  'node.own': {
+    description:
+      'Gives a system that is neither placed nor owned a System component that owns it, placed by value',
+    signature:
+      '{ systemId, innerSystemRef, name?, status?, ports?: { boundaryPortId: portId }, id? }',
+    /** @param {any} p @param {Ctx} ctx */
+    handler(p, ctx) {
+      const container = ctx.tx.require('system', requireString(p.systemId, 'systemId'))
+      const inner = ctx.tx.require('system', requireString(p.innerSystemRef, 'innerSystemRef'))
+      if (inner.id === requireProject(ctx.tx).rootSystemId)
+        fail('INVALID', 'The root system is never owned by a component')
+      if (inner.ownerNodeId) fail('INVALID', `'${inner.name}' already has an owner`)
+      if (referencingNodes(ctx.tx, inner.id).length)
+        fail('INVALID', `'${inner.name}' is placed by reference; remove or detach those first`)
+      if (wouldCycle(ctx.tx, container.id, inner.id))
+        fail(
+          'E_SYSTEM_CYCLE',
+          `Owning '${inner.name}' inside '${container.name}' would make a system contain itself`,
+          { systemId: container.id, innerSystemRef: inner.id }
+        )
+      const ports = plainObject(p.ports, 'ports') ?? {}
+      const id = optionalString(p.id, 'id') ?? ctx.newId()
+      ctx.tx.create('node', {
+        id,
+        systemId: container.id,
+        typeRef: SYSTEM_TYPE_REF,
+        innerSystemRef: inner.id,
+        placement: 'value',
+        name: p.name !== undefined ? requireString(p.name, 'name').trim() : inner.name,
+        description: '',
+        props: {},
+        tags: [],
+        owner: null,
+        status: oneOf(p.status ?? 'planned', NODE_STATUSES, 'status'),
+      })
+      ctx.tx.update('system', inner.id, { ownerNodeId: id })
+      for (const bp of boundaryPortsOf(ctx.tx, inner.id))
+        createMirrorPort(ctx, id, bp, optionalString(ports[bp.id], `ports.${bp.id}`))
+      return id
+    },
+  },
+
+  'node.move': {
+    description:
+      'Moves components, and the edges among them, into another system; bindings that targeted them are dropped',
+    signature: '{ ids: [id], systemId }',
+    /** @param {any} p @param {Ctx} ctx */
+    handler(p, ctx) {
+      const target = ctx.tx.require('system', requireString(p.systemId, 'systemId'))
+      const ids = stringList(p.ids, 'ids') ?? []
+      if (!ids.length) fail('INVALID', 'Name at least one component to move')
+      if (new Set(ids).size !== ids.length) fail('INVALID', 'ids contains duplicates')
+      const nodes = ids.map(id => ctx.tx.require('node', id))
+      const from = nodes[0].systemId
+      if (nodes.some(n => n.systemId !== from))
+        fail('INVALID', 'The components to move must all be in one system')
+      if (from === target.id) fail('INVALID', `They are already in '${target.name}'`)
+      for (const node of nodes)
+        if (node.innerSystemRef && wouldCycle(ctx.tx, target.id, node.innerSystemRef))
+          fail(
+            'E_SYSTEM_CYCLE',
+            `Moving '${node.name}' into '${target.name}' would make a system contain itself`,
+            { nodeId: node.id, systemId: target.id }
+          )
+      const ports = new Set(nodes.flatMap(n => portsOf(ctx.tx, n.id).map(port => port.id)))
+      /** @type {Map<string, any>} */
+      const edges = new Map()
+      for (const portId of ports)
+        for (const edge of edgesAtPort(ctx.tx, portId)) edges.set(edge.id, edge)
+      for (const edge of edges.values())
+        if (!ports.has(edge.fromPort) || !ports.has(edge.toPort))
+          fail(
+            'E_EDGE_CROSS_LEVEL',
+            `Edge '${edge.label || edge.id}' would join components in different systems; rewire or remove it first`,
+            { edgeId: edge.id }
+          )
+      for (const bp of boundaryPortsOf(ctx.tx, from))
+        if (bp.internalPortId && ports.has(bp.internalPortId))
+          fail(
+            'INVALID',
+            `Boundary port '${bp.name}' maps to a port of a component being moved; map it elsewhere first`,
+            { boundaryPortId: bp.id }
+          )
+      removeFromViews(ctx, from, [...ids, ...edges.keys()])
+      for (const node of nodes) {
+        unbindTarget(ctx, node)
+        ctx.tx.update('node', node.id, { systemId: target.id })
+      }
+      for (const id of edges.keys()) ctx.tx.update('edge', id, { systemId: target.id })
     },
   },
 

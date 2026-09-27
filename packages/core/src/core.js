@@ -14,6 +14,7 @@ import { registerCoreCommands } from './commands/index.js'
 import { migrateSnapshot } from './migrations/index.js'
 import { rollup, checkContracts } from './rollup.js'
 import { findProblems } from './validate.js'
+import { planExtract, planInline } from './planners.js'
 import { canonicalJson } from './plain.js'
 import { sha256, toHex } from './sha256.js'
 import {
@@ -68,6 +69,8 @@ export class Core {
   #bus
   #emitter = new Emitter()
   #registry
+  /** @type {() => string} */
+  #newId
 
   /** @param {CoreOptions} options */
   constructor(
@@ -87,10 +90,11 @@ export class Core {
     this.#registry = registry
     this.#store = new Store()
     if (snapshot) this.#store.load(migrateSnapshot(snapshot, { registry }))
+    this.#newId = createUlidFactory({ now: clock, random })
     this.#bus = new CommandBus({
       store: this.#store,
       emitter: this.#emitter,
-      newId: createUlidFactory({ now: clock, random }),
+      newId: this.#newId,
       clock,
       actorId,
       services: { registry },
@@ -340,6 +344,25 @@ export class Core {
    */
   resolveSystem(path) {
     return resolveSystem(this.#store, path)
+  }
+
+  /**
+   * The primitive commands `system.extract` would run for this payload, without running them
+   * (eng §7): `{ commands, systemId, nodeId, name }`. Running `commands` as a batch extracts.
+   * @param {{ systemId: string, nodeIds: string[], name?: string, id?: string, nodeId?: string }} payload
+   * @param {{ newId?: () => string }} [options]  ids for the new entities (default: fresh ULIDs)
+   */
+  planExtract(payload, { newId = this.#newId } = {}) {
+    return planExtract(this.#store, this.#registry, payload, newId)
+  }
+
+  /**
+   * The primitive commands `system.inline` would run for a composite placed by value, without
+   * running them: `{ commands, nodeIds }`.
+   * @param {{ nodeId: string }} payload
+   */
+  planInline(payload) {
+    return planInline(this.#store, this.#registry, payload)
   }
 
   /**

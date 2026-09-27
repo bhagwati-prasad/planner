@@ -128,20 +128,25 @@ export const projectCommands = {
   },
 
   'system.create': {
-    description: 'Creates a library system that can be placed by reference or by value',
-    signature: '{ name, id?, levelTag?, description?, contract?, rollups?, tags? }',
+    description:
+      'Creates a library system, with a logical view, that can be placed by reference or by value',
+    signature: '{ name, id?, viewId?, levelTag?, description?, contract?, rollups?, tags? }',
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       requireProject(ctx.tx)
-      return createSystem(ctx, {
-        id: optionalString(p.id, 'id'),
-        name: requireString(p.name, 'name').trim(),
-        levelTag: levelTag(p.levelTag) ?? null,
-        description: optionalString(p.description, 'description'),
-        contract: checkContract(p.contract),
-        rollups: checkRollups(p.rollups),
-        tags: stringList(p.tags, 'tags'),
-      })
+      return createSystem(
+        ctx,
+        {
+          id: optionalString(p.id, 'id'),
+          name: requireString(p.name, 'name').trim(),
+          levelTag: levelTag(p.levelTag) ?? null,
+          description: optionalString(p.description, 'description'),
+          contract: checkContract(p.contract),
+          rollups: checkRollups(p.rollups),
+          tags: stringList(p.tags, 'tags'),
+        },
+        { viewId: optionalString(p.viewId, 'viewId') }
+      )
     },
   },
 

@@ -31,10 +31,33 @@ import {
 
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
 
+/**
+ * The public method an edge calls (ADR 0011): null for any the target port exposes, or one it
+ * exposes. A private method is never reachable over an edge.
+ * @param {Ctx} ctx
+ * @param {string} toPort
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function checkEdgeMethod(ctx, toPort, value) {
+  const method = value === undefined ? null : nullableString(value, 'method')
+  if (method === null) return null
+  const port = ctx.tx.require('port', toPort)
+  if (!exposedMethods(ctx.tx, ctx.registry, port).includes(method)) {
+    const node = ctx.tx.require('node', port.nodeId)
+    fail('E_METHOD_NOT_EXPOSED', `'${node.name}.${port.name}' does not expose '${method}'`, {
+      portId: port.id,
+      method,
+    })
+  }
+  return method
+}
+
 export const edgeCommands = {
   'edge.add': {
-    description: 'Connects an output port to an input port in the same system',
-    signature: '{ fromPort, toPort, connectionType?, props?, label?, id? }',
+    description:
+      'Connects an output port to an input port in the same system, optionally naming the public method it calls',
+    signature: '{ fromPort, toPort, connectionType?, method?, props?, label?, id? }',
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       const { systemId, connectionType } = checkConnection(
@@ -51,6 +74,7 @@ export const edgeCommands = {
         plainObject(p.props, 'props') ?? {},
         'the edge'
       )
+      const method = checkEdgeMethod(ctx, p.toPort, p.method)
       const id = optionalString(p.id, 'id') ?? ctx.newId()
       ctx.tx.create('edge', {
         id,
@@ -58,6 +82,7 @@ export const edgeCommands = {
         fromPort: p.fromPort,
         toPort: p.toPort,
         connectionType,
+        method,
         props,
         label: optionalString(p.label, 'label') ?? '',
       })
@@ -66,14 +91,17 @@ export const edgeCommands = {
   },
 
   'edge.update': {
-    description: 'Changes an edge’s label or connection type',
-    signature: '{ id, changes: { label?, connectionType? } }',
+    description:
+      'Changes an edge’s label, connection type or the method it calls (null calls any the port exposes)',
+    signature: '{ id, changes: { label?, connectionType?, method? } }',
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       const edge = ctx.tx.require('edge', requireString(p.id, 'id'))
       const changes = plainObject(p.changes, 'changes') ?? {}
-      onlyKeys(changes, ['label', 'connectionType'], 'edge.update')
+      onlyKeys(changes, ['label', 'connectionType', 'method'], 'edge.update')
       optionalString(changes.label, 'label')
+      if (changes.method !== undefined)
+        changes.method = checkEdgeMethod(ctx, edge.toPort, changes.method)
       if (changes.connectionType !== undefined) {
         changes.connectionType = checkConnection(
           ctx.tx,

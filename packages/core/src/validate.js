@@ -248,8 +248,9 @@ export function findProblems(src, registry, { contracts = true } = {}) {
 
 /**
  * Method bindings (spec §7, ADR 0010): every public method a composite's ports expose is bound
- * on the matching boundary port, and every binding targets a component the port reaches. A
- * System component declares its methods by binding them, so it has none unbound.
+ * on the matching boundary port, every binding targets a component the port reaches, and every
+ * edge that names a method calls one its target port exposes (ADR 0011). A System component
+ * declares its methods by binding them, so it has none unbound.
  * @param {import('./model.js').Source} src
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {(severity: 'error'|'warning'|'info', code: string, message: string, kind: string, id: string, systemId?: string|null) => void} add
@@ -270,6 +271,20 @@ function checkBindings(src, registry, add) {
             node.systemId
           )
     }
+  }
+  for (const edge of src.all('edge')) {
+    if (!edge.method) continue
+    const port = src.get('port', edge.toPort)
+    if (!port || exposedMethods(src, registry, port).includes(edge.method)) continue
+    const node = src.get('node', port.nodeId)
+    add(
+      'warning',
+      'E_METHOD_NOT_EXPOSED',
+      `An edge calls '${edge.method}', which '${node?.name}.${port.name}' does not expose`,
+      'edge',
+      edge.id,
+      edge.systemId
+    )
   }
   for (const bp of src.all('boundaryPort')) {
     const bindings = Object.entries(bp.bindings ?? {})

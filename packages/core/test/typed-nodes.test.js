@@ -2,7 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import * as core from '../src/index.js'
 import { fixtures } from '../../../tools/testing/index.js'
-import { createTestCore, setup, testRegistry } from './helpers.js'
+import { createTestCore, modelState, setup, testRegistry } from './helpers.js'
 import { buildRecursive, probe } from './recursive-probe.js'
 
 const fixture = fixtures(import.meta.url)
@@ -53,7 +53,11 @@ describe('typed nodes', () => {
     const opened = createTestCore({ snapshot: v2 })
     const replayed = createTestCore()
     replayed.replay(fixture('schema-v2/recursive-oplog'))
-    assert.equal(replayed.stateHash(), opened.stateHash())
+    // The same model, entity by entity. Extract now runs as primitive steps (ADR 0012), so the
+    // entities it creates and then maps count one more change in their own rev than the older
+    // code recorded; rev only marks change for redraws and memoisation.
+    assert.deepEqual(modelState(replayed), modelState(opened))
+    assert.equal(replayed.snapshot().rev, opened.snapshot().rev, 'and the same model revision')
   })
 
   it('roll-ups, extract, inline and detach give the same results on the migrated fixture as before the change', () => {

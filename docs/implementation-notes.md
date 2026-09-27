@@ -16,7 +16,7 @@ What is built so far, and the decisions taken where the specification left room.
 | Events | `emitter.js` | `change` ({ op, changes }), `op`, `history`, `undo`, `redo`, and `*`. A throwing listener cannot break a command. |
 | Components (§7) | `registry.js`, `builtins.js`, `props.js` | Manifest validation, versions side by side, `extends` inheritance, the nine base types plus `base:component` (common properties and metrics from §8), all 13 property types, distributions with quantiles and means. |
 | Model commands | `commands/*.js` | `project.*`, `system.*`, `node.*`, `port.*`, `edge.*`, `boundary.*`, `view.*`. `core.commands()` lists them with signatures. |
-| Recursion (§6) | `commands/recursion.js`, `model.js` | Placement by reference or by value, cycle rejection (direct and transitive), extract as system, inline, detach, boundary ports that propagate to every placement, port resolution through any depth, paths from the root. Tested to 10 levels. |
+| Recursion (§6) | `commands/recursion.js`, `planners.js`, `model.js` | Placement by reference or by value, cycle rejection (direct and transitive), extract as system, inline, detach, boundary ports that propagate to every placement, port resolution through any depth, paths from the root. Extract and inline run the primitive commands a pure planner returns (ADR 0012), and `core.planExtract` and `core.planInline` preview them. Tested to 10 levels. |
 | Data roll-up (§6) | `rollup.js` | `sum`, `min`, `max`, `count`, `union`, `worst`, `critical-path`, `min-path`, `product`; system overrides; contracts; abstract (black-box) systems valued from their contract. |
 | Problems | `validate.js` | Placeholders, unknown or invalid properties, broken or invalid edges, unmapped boundary ports, unused library systems, contract violations. |
 
@@ -41,6 +41,7 @@ What is built so far, and the decisions taken where the specification left room.
 
 **Recursion**
 - Extract creates one boundary port per internal port and direction that traffic crosses (not one per edge), named after the port, and `Node.port` on a clash. Boundary ports of the parent that pointed into the selection are re-routed through the new composite. The child gets the next C4 level (context → container → component).
+- Extract binds the methods called across the entering edges on the new System's boundary ports: an edge's method, or every method its port exposes when it names none (ADR 0011). Bindings of the parent that targeted a moved component go through the new System, and inline puts them back (ADR 0010).
 - The child view keeps the selection's positions; the composite appears at their centre in every parent view. Inline does the reverse, re-centring the nodes on the composite's position.
 - Inlining a by-reference composite copies the library system's contents with new ids and leaves the library system untouched; inlining a by-value composite moves the nodes and keeps their ids.
 - Read-only for by-reference placements (§6) is enforced by the facade: a system reached through a by-reference node is read-only there, while `project.system(name)` edits the source. `node.detach()` turns a reference into an editable copy.

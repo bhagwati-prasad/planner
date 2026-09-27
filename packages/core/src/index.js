@@ -49,6 +49,7 @@ export { BUILTIN_MANIFESTS, SYSTEM_TYPE_REF } from './builtins.js'
 export { CORE_COMMANDS, registerCoreCommands } from './commands/index.js'
 export { rollup, resolveRule, nodeValue, contractValue, checkContracts } from './rollup.js'
 export { findProblems } from './validate.js'
+export { planExtract, planInline } from './planners.js'
 export {
   NODE_STATUSES,
   LEVEL_TAGS,

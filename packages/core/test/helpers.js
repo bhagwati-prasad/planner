@@ -93,6 +93,35 @@ export function testRegistry() {
   return registry
 }
 
+/** An API whose `in` port exposes two public methods, and a worker that exposes one. */
+export const API = {
+  id: 'test.api',
+  name: 'Test API',
+  version: '1.0.0',
+  extends: 'base:service',
+  ports: [
+    { name: 'in', direction: 'in', accepts: ['http'], exposes: ['checkout', 'refund'] },
+    { name: 'out', direction: 'out', accepts: ['http'] },
+  ],
+  methods: { public: { checkout: {}, refund: {} }, private: { audit: {} } },
+}
+export const WORKER = {
+  id: 'test.worker',
+  name: 'Test Worker',
+  version: '1.0.0',
+  extends: 'base:service',
+  ports: [{ name: 'in', direction: 'in', accepts: ['http'], exposes: ['record'] }],
+  methods: { public: { record: {} } },
+}
+
+/** The test registry, plus the API and the worker. */
+export function bindingRegistry() {
+  const registry = testRegistry()
+  registry.register(API)
+  registry.register(WORKER)
+  return registry
+}
+
 /** A core with a deterministic clock and id stream. */
 export function createTestCore({
   seed = 1,

@@ -2,37 +2,19 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import * as core from '../src/index.js'
 import { fixtures } from '../../../tools/testing/index.js'
-import { add, connect, createTestCore, port, setup, testRegistry } from './helpers.js'
+import {
+  add,
+  bindingRegistry,
+  connect,
+  createTestCore,
+  modelState,
+  port,
+  setup,
+  testRegistry,
+  WORKER,
+} from './helpers.js'
 
 const fixture = fixtures(import.meta.url)
-
-/** An API whose `in` port exposes two public methods, and a worker that exposes one. */
-const API = {
-  id: 'test.api',
-  name: 'Test API',
-  version: '1.0.0',
-  extends: 'base:service',
-  ports: [
-    { name: 'in', direction: 'in', accepts: ['http'], exposes: ['checkout', 'refund'] },
-    { name: 'out', direction: 'out', accepts: ['http'] },
-  ],
-  methods: { public: { checkout: {}, refund: {} }, private: { audit: {} } },
-}
-const WORKER = {
-  id: 'test.worker',
-  name: 'Test Worker',
-  version: '1.0.0',
-  extends: 'base:service',
-  ports: [{ name: 'in', direction: 'in', accepts: ['http'], exposes: ['record'] }],
-  methods: { public: { record: {} } },
-}
-
-function bindingRegistry() {
-  const registry = testRegistry()
-  registry.register(API)
-  registry.register(WORKER)
-  return registry
-}
 
 /** @param {import('../src/index.js').Core} c @param {string} nodeId @param {string} name */
 const boundaryOf = (c, nodeId, name) =>
@@ -224,11 +206,17 @@ describe('method bindings', () => {
     assert.equal(migrated.project.schemaVersion, 4)
     assert.ok(migrated.boundaryPorts.length > 0)
     for (const bp of migrated.boundaryPorts) assert.deepEqual(bp.bindings, {}, bp.name)
+    assert.ok(migrated.edges.length > 0)
+    for (const edge of migrated.edges) assert.equal(edge.method, null, 'an edge names no method')
     assert.deepEqual(v3, fixture('schema-v3/bindings'), 'the migration does not change its input')
 
     const opened = createTestCore({ snapshot: v3 })
     const replayed = createTestCore()
     replayed.replay(fixture('schema-v3/bindings-oplog'))
-    assert.equal(replayed.stateHash(), opened.stateHash())
+    // The same model, entity by entity. Extract now runs as primitive steps (ADR 0012), so the
+    // entities it creates and then maps count one more change in their own rev than the older
+    // code recorded; rev only marks change for redraws and memoisation.
+    assert.deepEqual(modelState(replayed), modelState(opened))
+    assert.equal(replayed.snapshot().rev, opened.snapshot().rev, 'and the same model revision')
   })
 })
