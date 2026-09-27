@@ -1,6 +1,6 @@
 # 0012 How compound commands plan their changes
 
-Status: Proposed
+Status: Accepted
 Date: 2026-09-27
 
 ## Context and problem
@@ -30,7 +30,18 @@ So following eng §7 to the letter needs new public commands, which is a choice 
 
 ## Decision outcome
 
-Proposed: option 1. It follows eng §7 as written. `node.move` is also what dragging components into or out of a system needs later (M03), so neither new command exists for extract alone. The planners stay pure: they read the model and return commands, and previews and tests can run them without applying anything.
+Chosen option: 1, decided by the human on 2026-09-27. It follows eng §7 as written. `node.move` is also what dragging components into or out of a system needs later (M03), so neither new command exists for extract alone. The planners stay pure: they read the model and return commands, and previews and tests can run them without applying anything.
+
+The two primitives behave like this, which is what lets each step of an extract or an inline stay valid:
+
+- `node.move { ids, systemId }` moves nodes, and the edges among them, into another system. It refuses:
+  - an edge to a node left behind (`E_EDGE_CROSS_LEVEL`);
+  - a boundary port of the old system that maps to a moved port;
+  - a move that would make a system contain itself (`E_SYSTEM_CYCLE`).
+
+  Like `node.remove`, it drops the bindings that target a moved node from the old system's boundary ports (ADR 0010). The planner then binds them again through the new System.
+- `node.own { systemId, innerSystemRef, name?, status?, ports?, id? }` creates a System component owning a system that is neither placed nor owned. It gives the component a port for each boundary port, with the ids in `ports` when given, so a planner can wire them in its next commands.
+- Rewiring an edge keeps its method (ADR 0011) without checking it, because an extract rewires edges before the new System has bound its methods. `problems()` reports an edge whose method its target port does not expose.
 
 ## Consequences
 
