@@ -389,7 +389,7 @@ export function applyIntent(intent, { strata, system, viewId }) {
   const readOnly = () => {
     if (system.readOnly)
       throw new StrataError(
-        'READ_ONLY',
+        'E_SYSTEM_READONLY',
         `'${system.name}' is placed by reference and is read-only here. Open the source system to edit it, or detach this node.`
       )
   }

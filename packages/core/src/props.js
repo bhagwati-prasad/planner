@@ -3,9 +3,9 @@
  * parsing of unit-bearing values (durations, sizes, rates), distributions, validation, defaults
  * and effective values.
  *
- * Stored property values keep the author's notation ("4d", "10MB"); `normalizeValue` converts
- * them to canonical numbers (ms, bytes, per second) for consumers such as roll-ups and the
- * simulation.
+ * Property values are stored in canonical units (ADR 0008): commands and the registry convert
+ * what authors write ("4d", "10MB", 99.9 percent) with the schema validator (schema.js), so
+ * readers such as roll-ups and the simulation use them as they are.
  */
 import { fail } from './errors.js'
 import { isPlainObject } from './plain.js'
@@ -250,8 +250,9 @@ export function validateValue(schema, value, label = 'value') {
 }
 
 /**
- * Converts a stored value to its canonical form: durations → ms, sizes → bytes,
- * rates → per second, distributions → normalised objects. Other values pass through.
+ * Converts a value as written to its canonical form: durations → ms, sizes → bytes,
+ * rates → per second, distributions → normalised objects. Other values pass through. Stored
+ * values are canonical already (ADR 0008); percentages convert through checkValue.
  * @param {PropertySchema|undefined} schema
  * @param {unknown} value
  */

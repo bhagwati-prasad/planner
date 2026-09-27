@@ -121,7 +121,7 @@ test('a checkout flow built from starter parts picks sensible connection types',
     err => err.code === 'NOT_FOUND'
   )
   assert.equal(toDb.props.poolSize, 10, 'connection type defaults')
-  assert.equal(toDb.props.timeout, '5s', 'inherited from base:connection')
+  assert.equal(toDb.props.timeout, 5000, 'inherited from base:connection, in milliseconds')
   toDb.set({ poolSize: 25, retries: 2 })
   assert.equal(toDb.explain().poolSize.source, 'override')
   assert.throws(

@@ -15,7 +15,6 @@ const DESCRIPTIONS = {
   INVALID: 'An argument, payload or property value failed validation',
   NOT_FOUND: 'A referenced project, system, node, port, edge or type does not exist',
   NO_ROLLUP_RULE: 'No roll-up rule is defined for that key',
-  READ_ONLY: 'The target is read-only, such as a system placed by reference',
   UNKNOWN_COMMAND: 'No command is registered under that type',
   UNSUPPORTED: 'The feature arrives in a later release',
 
@@ -37,6 +36,15 @@ const DESCRIPTIONS = {
   E_BUNDLE_SYNTAX: 'A bundle module is not valid JavaScript',
 
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',
+  E_SYSTEM_CYCLE: 'The change would make a system contain itself, directly or through descendants',
+  E_SYSTEM_READONLY:
+    'The change is inside a system placed by reference, which is edited at its source or detached first',
+  E_SYSTEM_TOO_DEEP: 'A system is nested deeper than the resolver limit of 64 levels',
+  E_SYSTEM_PATH: 'A path to a system names a node that is not a composite in the system before it',
+  E_EDGE_DIRECTION: 'An edge starts at an input-only port or ends at an output-only one',
+  E_EDGE_SELF_LOOP: 'An edge starts and ends on the same component; that is a private method call',
+  E_EDGE_CROSS_LEVEL:
+    'An edge joins components in different systems; traffic crosses levels through boundary ports',
 
   E_UNIT_PARSE: 'A quantity is not written in a form its unit understands',
   E_UNIT_VALUE:
@@ -85,7 +93,6 @@ export const LEGACY_ERROR_CODES = Object.freeze([
   'INVALID',
   'NOT_FOUND',
   'NO_ROLLUP_RULE',
-  'READ_ONLY',
   'UNKNOWN_COMMAND',
   'UNSUPPORTED',
 ])

@@ -6,7 +6,7 @@
  */
 import { fail, didYouMean, suggest } from './errors.js'
 import { deepFreeze, isPlainObject, toPlain } from './plain.js'
-import { checkSchema, ROLLUP_RULES } from './props.js'
+import { checkSchema, ROLLUP_RULES, validateValue } from './props.js'
 import { compareSemver, isSemver, satisfies } from './semver.js'
 import { BUILTIN_MANIFESTS } from './builtins.js'
 
@@ -133,7 +133,15 @@ export function normalizeManifest(input) {
     extends: m.extends ?? null,
     abstract: m.abstract === true,
     ports,
-    properties,
+    // Defaults are stored like any value, in canonical units (eng §8, ADR 0008).
+    properties: Object.fromEntries(
+      Object.entries(properties).map(([key, schema]) => [
+        key,
+        schema.default === undefined
+          ? schema
+          : { ...schema, default: validateValue(schema, schema.default, `properties.${key}`) },
+      ])
+    ),
     metrics,
   })
 }

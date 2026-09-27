@@ -241,11 +241,13 @@ test('systems placed by reference are read-only where they are placed', async ()
   assert.equal(strata.nav.current.readOnly, true)
   assert.throws(
     () => inside.add('service'),
-    err => err.code === 'READ_ONLY' && /project.system\('Standard Auth Service'\)/.test(err.message)
+    err =>
+      err.code === 'E_SYSTEM_READONLY' &&
+      /project.system\('Standard Auth Service'\)/.test(err.message)
   )
   assert.throws(
     () => inside.node('Auth').set({ concurrency: 2 }),
-    err => err.code === 'READ_ONLY'
+    err => err.code === 'E_SYSTEM_READONLY'
   )
   p.system('Standard Auth Service').add('relational-db', { name: 'Users DB' })
   assert.deepEqual(
@@ -387,13 +389,14 @@ test('components: list, get and register', () => {
 
 test('printing a node shows ports with their connections and props with their source', async () => {
   const { strata, svc } = await specSession()
-  svc.set({ concurrency: 64 })
+  svc.set({ concurrency: 64, availabilityTarget: 99.95 })
   const text = strata.format(svc)
   assert.match(text, /^Orders {2}starter\.service@1\.0\.0 · planned/)
   assert.match(text, /db \(out, db-protocol\) {2}→ Orders DB\.in/)
   assert.match(text, /in \(in, http\|grpc\) {2}⇠ boundary port 'in' of Orders System/)
   assert.match(text, /concurrency = 64$/m)
   assert.match(text, /instances = 1 {2}\(default\)/)
+  assert.match(text, /availabilityTarget = 99\.95%$/m, 'percentages print in points')
 })
 
 test('without an open project, calls explain what to do', () => {

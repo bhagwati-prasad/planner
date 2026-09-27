@@ -124,8 +124,7 @@ export const nodeCommands = {
               nodesOf(ctx.tx, system.id).map(n => n.name),
               manifest?.name ?? parseTypeRef(typeRef).id
             )
-      const props = plainObject(p.props, 'props') ?? {}
-      validateProps(manifest, props, name)
+      const props = validateProps(manifest, plainObject(p.props, 'props') ?? {}, name)
       const ports = checkPortSpecs(p.ports ?? manifest?.ports ?? [])
 
       // Normalise the logged payload so replay needs no registry and yields the same node.
@@ -180,8 +179,9 @@ export const nodeCommands = {
         fail('INVALID', 'The root system cannot be placed inside another system')
       if (wouldCycle(ctx.tx, container.id, target.id)) {
         fail(
-          'CYCLE',
-          `Placing '${target.name}' inside '${container.name}' would make a system contain itself`
+          'E_SYSTEM_CYCLE',
+          `Placing '${target.name}' inside '${container.name}' would make a system contain itself`,
+          { systemId: container.id, systemRef: target.id }
         )
       }
       if (placement === 'reference' && target.ownerNodeId) {
@@ -244,9 +244,12 @@ export const nodeCommands = {
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       const node = requireAtomic(ctx, requireString(p.id, 'id'))
-      const props = plainObject(p.props, 'props') ?? {}
+      const props = validateProps(
+        manifestOf(ctx.registry, node),
+        plainObject(p.props, 'props') ?? {},
+        node.name
+      )
       const unset = stringList(p.unset, 'unset') ?? []
-      validateProps(manifestOf(ctx.registry, node), props, node.name)
       const next = { ...node.props, ...props }
       for (const key of unset) delete next[key]
       ctx.tx.update('node', node.id, { props: next })

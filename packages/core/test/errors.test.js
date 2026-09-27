@@ -126,7 +126,6 @@ describe('the error code registry', () => {
       'INVALID',
       'NOT_FOUND',
       'NO_ROLLUP_RULE',
-      'READ_ONLY',
       'UNKNOWN_COMMAND',
       'UNSUPPORTED',
     ])

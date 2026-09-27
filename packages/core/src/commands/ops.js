@@ -181,15 +181,18 @@ export function createMirrorPort(ctx, nodeId, bp) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Checks property values against a manifest (a component or connection type). Without a
- * manifest (not installed) values are kept unchecked.
+ * Checks property values against a manifest (a component or connection type) and returns them
+ * in canonical units (eng §8), leaving `props` as written. Without a manifest (not installed)
+ * values are kept unchecked, as written.
  * @param {import('../registry.js').EffectiveManifest|null} manifest
  * @param {Record<string, unknown>} props
  * @param {string} label
  */
 export function validateProps(manifest, props, label) {
-  if (!manifest) return
+  if (!manifest) return { ...props }
   const known = Object.keys(manifest.properties)
+  /** @type {Record<string, unknown>} */
+  const canonical = {}
   for (const [key, value] of Object.entries(props)) {
     const schema = manifest.properties[key]
     if (!schema)
@@ -197,8 +200,9 @@ export function validateProps(manifest, props, label) {
         'INVALID',
         `Unknown property '${key}' for ${label} (${manifest.typeRef}).${didYouMean(suggest(key, known))}`
       )
-    validateValue(schema, value, `${label}.${key}`)
+    canonical[key] = validateValue(schema, value, `${label}.${key}`)
   }
+  return canonical
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -225,19 +229,34 @@ function requirePort(src, id) {
 export function checkConnection(src, fromPortId, toPortId, connectionType) {
   const from = requirePort(src, fromPortId)
   const to = requirePort(src, toPortId)
-  if (from.id === to.id) fail('INVALID', 'An edge cannot connect a port to itself')
   const fromNode = src.require('node', from.nodeId)
   const toNode = src.require('node', to.nodeId)
+  // Spec §5 graph invariants: two different components, one level, output into input.
+  if (fromNode.id === toNode.id)
+    fail(
+      'E_EDGE_SELF_LOOP',
+      `An edge cannot start and end on '${fromNode.name}': a component calling itself is a private method call`,
+      { nodeId: fromNode.id }
+    )
   if (fromNode.systemId !== toNode.systemId) {
     fail(
-      'INVALID',
-      `'${fromNode.name}' and '${toNode.name}' are in different systems; connect through boundary ports instead`
+      'E_EDGE_CROSS_LEVEL',
+      `'${fromNode.name}' and '${toNode.name}' are in different systems; connect through boundary ports instead`,
+      { fromNodeId: fromNode.id, toNodeId: toNode.id }
     )
   }
   if (from.direction === 'in')
-    fail('INVALID', `Port '${fromNode.name}.${from.name}' is an input and cannot start an edge`)
+    fail(
+      'E_EDGE_DIRECTION',
+      `Port '${fromNode.name}.${from.name}' is an input and cannot start an edge`,
+      { portId: from.id }
+    )
   if (to.direction === 'out')
-    fail('INVALID', `Port '${toNode.name}.${to.name}' is an output and cannot end an edge`)
+    fail(
+      'E_EDGE_DIRECTION',
+      `Port '${toNode.name}.${to.name}' is an output and cannot end an edge`,
+      { portId: to.id }
+    )
   const fromAccepts = acceptsOf(src, from)
   const toAccepts = acceptsOf(src, to)
   let type = connectionType ?? null

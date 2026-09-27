@@ -39,6 +39,20 @@ export const CLIP_FORMAT = 'strata/clip@1'
  * @param {Iterable<string>} ids node ids (edge ids are ignored: edges between copied nodes come along)
  * @returns {Clip}
  */
+/**
+ * An entity's own property values as a person writes them, so pasting reads them back to the
+ * same stored values: a percentage stored as 0.999 is written 99.9 (see core's inputValue).
+ * @param {any} core
+ * @param {string} id  a node or an edge
+ * @param {Record<string, unknown>} props
+ */
+function writtenProps(core, id, props) {
+  const explained = core.explainProps(id)
+  return Object.fromEntries(
+    Object.keys(props).map(key => [key, structuredClone(explained[key]?.input ?? props[key])])
+  )
+}
+
 export function copyNodes(project, ids) {
   const core = project[CORE]
   const nodes = [...new Set(ids)].map(id => core.get('node', id)).filter(Boolean)
@@ -66,7 +80,7 @@ export function copyNodes(project, ids) {
       placement: n.placement,
       name: n.name,
       description: n.description,
-      props: structuredClone(n.props),
+      props: writtenProps(core, n.id, n.props),
       tags: [...n.tags],
       owner: n.owner,
       status: n.status,
@@ -103,7 +117,7 @@ export function copyNodes(project, ids) {
           from: { node: /** @type {number} */ (keyOf.get(from.nodeId)), port: from.name },
           to: { node: /** @type {number} */ (keyOf.get(to.nodeId)), port: to.name },
           connectionType: edge.connectionType,
-          props: structuredClone(edge.props),
+          props: writtenProps(core, edge.id, edge.props),
           label: edge.label,
         })
       }

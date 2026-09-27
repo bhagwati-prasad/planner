@@ -5,6 +5,7 @@ import { fail } from '../errors.js'
 import { SCHEMA_VERSION } from '../store.js'
 import { ROLLUP_RULES } from '../props.js'
 import { isPlainObject } from '../plain.js'
+import { decimal } from '../units.js'
 import { LEVEL_TAGS, projectOf, referencingNodes, requireProject } from '../model.js'
 import {
   createSystem,
@@ -20,7 +21,25 @@ import {
 /** @typedef {import('../bus.js').HandlerContext} Ctx */
 
 /**
+ * A contract with its bounds in canonical units (ADR 0008): a target whose unit is '%' is
+ * written in points and stored as a fraction. The unit stays, to show the bounds as written.
+ * @param {Record<string, any>} contract  a checked contract
+ */
+export function canonicalContract(contract) {
+  return Object.fromEntries(
+    Object.entries(contract).map(([key, target]) => {
+      if (target.unit !== '%') return [key, target]
+      const out = { ...target }
+      for (const bound of ['min', 'max', 'equals'])
+        if (typeof out[bound] === 'number') out[bound] = Number(decimal(out[bound], -2))
+      return [key, out]
+    })
+  )
+}
+
+/**
  * A contract declares targets for derived values, e.g. `{ "latency.p99": { max: 200, unit: "ms" } }`.
+ * Returns it checked and in canonical units, leaving `value` as written.
  * @param {unknown} value
  */
 export function checkContract(value) {
@@ -42,7 +61,7 @@ export function checkContract(value) {
       fail('INVALID', `contract.${key} needs min, max or equals`)
     }
   }
-  return contract
+  return canonicalContract(contract)
 }
 
 /**
@@ -142,10 +161,10 @@ export const projectCommands = {
       if (changes.name !== undefined) changes.name = requireString(changes.name, 'name').trim()
       levelTag(changes.levelTag)
       nullableString(changes.description, 'description')
-      checkContract(changes.contract)
+      const contract = checkContract(changes.contract)
       checkRollups(changes.rollups)
       stringList(changes.tags, 'tags')
-      ctx.tx.update('system', system.id, changes)
+      ctx.tx.update('system', system.id, contract ? { ...changes, contract } : changes)
     },
   },
 

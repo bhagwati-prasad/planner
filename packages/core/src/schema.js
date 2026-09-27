@@ -14,7 +14,7 @@
  */
 import { isPlainObject } from './plain.js'
 import { err, ok } from './result.js'
-import { decimal, durationMs, perSecond, sizeBytes } from './units.js'
+import { decimal, durationMs, formatQuantity, perSecond, sizeBytes } from './units.js'
 
 export const PROPERTY_TYPES = Object.freeze([
   'number',
@@ -186,6 +186,24 @@ function checkEmpirical(d, path) {
   return badDistribution(path, `${path}: an empirical distribution needs 'values' or 'buckets'`)
 }
 
+/** How each unit-bearing type is written, as a quantity of units.js. */
+const WRITTEN_AS = { duration: 'duration', bytes: 'size', rate: 'rate' }
+
+/**
+ * A stored value as a person writes it, which a command reads back to the same stored value:
+ * a percentage in points (0.999 is 99.9), and durations, sizes and rates as text ('1 h 30 min',
+ * '1.5 MB', '850/s'). Other values are the same. Code that sends stored values back through a
+ * command, such as paste or an inspector field, writes them this way.
+ * @param {Schema|undefined} schema
+ * @param {unknown} value
+ */
+export function inputValue(schema, value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || !schema) return value
+  if (schema.type === 'percent') return Number(decimal(value, 2))
+  const quantity = WRITTEN_AS[/** @type {keyof typeof WRITTEN_AS} */ (schema.type)]
+  return quantity && value >= 0 ? formatQuantity(quantity, value) : value
+}
+
 /** @param {string} path @param {string} message */
 const badType = (path, message) => err('E_SCHEMA_TYPE', { path, message })
 
@@ -341,12 +359,13 @@ export function checkValue(schema, value, path = 'value', options = {}) {
     case 'percent': {
       if (typeof value !== 'number' || !Number.isFinite(value))
         return badType(path, `${path} must be a percentage number`)
+      // Written in percentage points; stored as a fraction (eng §8).
+      const points = options.stored ? Number(decimal(value, 2)) : value
       const min = Number(schema.min ?? 0)
       const max = Number(schema.max ?? 100)
-      if (value < min || value > max)
+      if (points < min || points > max)
         return err('E_SCHEMA_RANGE', { path, message: `${path} must be between ${min} and ${max}` })
-      // Written in percentage points; stored as a fraction (eng §8).
-      return ok(Number(decimal(value, -2)))
+      return ok(options.stored ? value : Number(decimal(value, -2)))
     }
     case 'distribution':
       return checkDistribution(value, path)
@@ -402,4 +421,6 @@ export function checkValue(schema, value, path = 'value', options = {}) {
  *
  * @typedef {object} CheckOptions
  * @property {Record<string, Schema>} [types]  record types that `of` may name, such as 'message'
+ * @property {boolean} [stored]  the value is stored, so already canonical: a percentage is a
+ *   fraction rather than points
  */

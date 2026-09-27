@@ -44,6 +44,19 @@ test('copy captures nodes, props, extra ports, positions and the edges between t
   void gw
 })
 
+test('pasted copies keep percentages as they were', async () => {
+  const { strata, p, svc } = await setup()
+  svc.set({ availabilityTarget: 99.95 })
+  strata.copy([svc])
+  const [copy] = strata.paste({ into: p.createSystem('Elsewhere') })
+  assert.deepEqual(copy.props, svc.props)
+  assert.equal(
+    copy.props.availabilityTarget,
+    0.9995,
+    'stored as a fraction, not read again as points'
+  )
+})
+
 test('paste into another system adds copies with their edges, as one undo step', async () => {
   const { strata, p, svc, db } = await setup()
   strata.copy([svc, db])
@@ -140,6 +153,6 @@ test('paste needs a clip and a writable target', async () => {
   const clip = strata.copy([p.root.node('GW')])
   assert.throws(
     () => placed.child.paste(clip),
-    err => err.code === 'READ_ONLY'
+    err => err.code === 'E_SYSTEM_READONLY'
   )
 })
