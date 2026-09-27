@@ -64,7 +64,7 @@ The generic D3 diagram library: data in, intents out, fast at 500+ components, w
 
 - [x] [0201 Scene, layers and zoom](M02-strata-graph/0201-scene-zoom.md) (after 0010, 0007)
 - [x] [0202 Shape registry, components and ports](M02-strata-graph/0202-shapes-ports.md) (after 0201)
-- [ ] [0210 Visual snapshot harness](M02-strata-graph/0210-visual-harness.md) (after 0202)
+- [x] [0210 Visual snapshot harness](M02-strata-graph/0210-visual-harness.md) (after 0202)
 - [ ] [0209 Node states](M02-strata-graph/0209-node-states.md) (after 0202, 0210)
 - [ ] [0203 Edges, arrowheads and routing](M02-strata-graph/0203-edges-routing.md) (after 0202, 0210)
 - [ ] [0204 Selection, dragging and connecting as intents](M02-strata-graph/0204-selection-intents.md) (after 0203)

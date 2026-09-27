@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M02 strata-graph](../ROADMAP.md#m02-strata-graph) | R0 | todo | [0202](../M02-strata-graph/0202-shapes-ports.md) |
+| [M02 strata-graph](../ROADMAP.md#m02-strata-graph) | R0 | done | [0202](../M02-strata-graph/0202-shapes-ports.md) |
 
 Added by the human on 2026-09-27, before the first visual snapshots (0209, 0203).
 
@@ -21,14 +21,14 @@ Visual snapshots that give the same pixels on every machine. IBM Plex Sans (regu
 
 Write these tests first. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] Visual tests run in Chromium only and compare screenshots at a 0.1% pixel threshold (`tools/test/ci.test.js`)
-- [ ] The strata-graph test harness renders text in IBM Plex Sans from `vendor/plex` (`packages/graph/test/fonts.spec.js`)
-- [ ] `vendor/plex` pins the three fonts and the OFL licence (`tools/test/vendor.test.js`)
+- [x] Visual tests run in Chromium only and compare screenshots at a 0.1% pixel threshold (`tools/test/ci.test.js`)
+- [x] The strata-graph test harness renders text in IBM Plex Sans from `vendor/plex` (`packages/graph/test/fonts.spec.js`)
+- [x] `vendor/plex` pins the three fonts and the OFL licence (`tools/test/vendor.test.js`)
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

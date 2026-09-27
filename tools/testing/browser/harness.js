@@ -1,5 +1,6 @@
 // The element harness (eng §18 "Component"): one page that mounts one custom element in
 // isolation. Tests drive it through the `mount` fixture in tools/testing/playwright.js.
+import { loadFonts } from './fonts.js'
 
 /**
  * Loads the element's module, creates the element and puts it alone in #host.
@@ -15,4 +16,5 @@ async function mount({ tag, module, attributes = {}, properties = {} }) {
   document.getElementById('host')?.replaceChildren(element)
 }
 
+await loadFonts()
 Object.assign(window, { mount, harnessReady: true })

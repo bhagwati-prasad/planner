@@ -1,6 +1,7 @@
 // Test harness: exposes the library and a minimal in-memory host that applies intents the
 // way Strata's view adapter will (M3), so tests exercise the full intent → setData loop.
 import * as strataGraph from '../../src/index.js'
+import { loadFonts } from '../../../../tools/testing/browser/fonts.js'
 
 const w = /** @type {any} */ (window)
 w.strataGraph = strataGraph
@@ -169,4 +170,5 @@ w.portOf = (nodeId, portId) => {
 /** Client coordinates of a world point. */
 w.clientOf = (x, y) => w.g.worldToClient({ x, y })
 
+await loadFonts()
 w.harnessReady = true

@@ -18,7 +18,7 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url))
  * @property {string} version
  * @property {string} licence   SPDX identifier
  * @property {string} source    where the files came from, unmodified
- * @property {string} global    the global the library defines in the browser
+ * @property {string} [global]  the global a script library defines in the browser (fonts define none)
  * @property {Record<string, string>} files  path under vendor/ → 'sha256-<base64>'
  *
  * @typedef {object} VendorManifest
