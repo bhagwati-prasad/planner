@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+import { describe, it, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { setup, add, connect, buildPayments } from './helpers.js'
 
@@ -224,4 +224,156 @@ test('an empty subsystem is valued from its contract (stubbing unfinished work)'
   const fraud = core.dispatch({ type: 'node.place', payload: { systemId: root, systemRef: stub } })
   connect(core, front, 'out', fraud, 'in', { connectionType: 'http' })
   assert.equal(core.rollup(root, 'serviceTime.p99').value, 34)
+})
+
+/**
+ * Web client → Gateway → [Orders: Orders service → [Storage: Cache → Orders DB]], with a
+ * Billing system beside Orders: three levels.
+ */
+function threeLevels() {
+  const { core, root } = setup()
+  const client = add(core, root, 'base:client', 'Web client')
+  const gateway = add(core, root, 'test.service', 'Gateway', {
+    props: { serviceTime: 5, maxRps: 2000, monthlyCost: 50, technology: 'Nginx 1.27' },
+  })
+  const service = add(core, root, 'test.service', 'Orders service', {
+    props: {
+      serviceTime: 20,
+      maxRps: 800,
+      monthlyCost: 120,
+      instances: 3,
+      technology: 'Node.js 20',
+    },
+  })
+  const cache = add(core, root, 'base:cache', 'Cache', {
+    props: { monthlyCost: 40, technology: 'Redis 7' },
+  })
+  const db = add(core, root, 'test.db', 'Orders DB', {
+    props: {
+      serviceTime: 10,
+      maxRps: 5000,
+      monthlyCost: 300,
+      technology: 'PostgreSQL 16',
+      availabilityTarget: 99.5,
+    },
+  })
+  const billed = add(core, root, 'test.service', 'Billing service', { props: { monthlyCost: 70 } })
+  connect(core, client, 'out', gateway, 'in', { connectionType: 'http' })
+  connect(core, gateway, 'out', service, 'in', { connectionType: 'http' })
+  connect(core, service, 'db', cache, 'in')
+  connect(core, cache, 'origin', db, 'in')
+  const extract = (/** @type {string[]} */ nodeIds, /** @type {string} */ name, systemId = root) =>
+    core.dispatch({ type: 'system.extract', payload: { systemId, nodeIds, name } })
+  const storage = extract([cache, db], 'Storage')
+  const orders = extract([service, storage.nodeId], 'Orders')
+  const billing = extract([billed], 'Billing')
+  return {
+    core,
+    root,
+    orders: orders.systemId,
+    storage: storage.systemId,
+    billing: billing.systemId,
+    gateway,
+    service,
+    cache,
+    db,
+  }
+}
+
+describe('the roll-up engine', () => {
+  it('each rule computes the expected value on a hand-built three-level graph', () => {
+    const { core, root, orders, storage, gateway, service, cache, db } = threeLevels()
+    const value = (/** @type {string} */ systemId, /** @type {string} */ key, options = {}) =>
+      core.rollup(systemId, key, options).value
+    assert.deepEqual(
+      [root, orders, storage].map(id => value(id, 'monthlyCost')),
+      [580, 460, 340],
+      'sum'
+    )
+    assert.equal(value(root, 'instances'), 8, 'sum, with the default of 1')
+    assert.equal(value(root, 'serviceTime.p99'), 35, 'critical-path: 5 + 20 + 10')
+    assert.equal(value(storage, 'serviceTime.p99'), 10)
+    assert.equal(value(root, 'maxRps'), 800, 'min-path: the Orders service is the bottleneck')
+    assert.equal(value(root, 'serviceTime.p99', { rule: 'min' }), 5, 'min')
+    assert.equal(value(root, 'maxRps', { rule: 'max' }), 5000, 'max')
+    close(value(root, 'availabilityTarget'), 0.999 ** 4 * 0.995)
+    assert.deepEqual(value(root, 'technology'), [
+      'Nginx 1.27',
+      'Node.js 20',
+      'PostgreSQL 16',
+      'Redis 7',
+    ])
+    const health = { [gateway]: 'up', [service]: 'degraded', [cache]: 'up', [db]: 'up' }
+    assert.equal(
+      value(root, 'health', {
+        values: (node, key) => (key === 'health' ? health[node.id] : undefined),
+      }),
+      'degraded',
+      'worst'
+    )
+    for (const id of [service, db])
+      core.dispatch({ type: 'node.update', payload: { id, changes: { status: 'existing' } } })
+    const existing = { rule: { rule: 'count', where: { status: 'existing' } } }
+    assert.deepEqual(
+      [root, orders, storage].map(id => value(id, 'existing', existing)),
+      [2, 2, 1],
+      'count'
+    )
+  })
+
+  it('a change inside a system invalidates only its ancestors’ cached roll-ups', () => {
+    const { core, root, orders, storage, billing, gateway, db } = threeLevels()
+    const at = (/** @type {string} */ id) => core.rollup(id, 'monthlyCost')
+    const cached = {
+      root: at(root),
+      orders: at(orders),
+      storage: at(storage),
+      billing: at(billing),
+    }
+    assert.equal(at(root), cached.root, 'asking again is served from the cache')
+
+    core.dispatch({ type: 'node.setProps', payload: { id: db, props: { monthlyCost: 500 } } })
+    assert.equal(at(billing), cached.billing, 'a sibling system keeps its cached roll-up')
+    assert.deepEqual(
+      [at(storage), at(orders), at(root)].map(r => r.value),
+      [540, 660, 780],
+      'the changed system and every ancestor recompute'
+    )
+    assert.notEqual(at(root), cached.root)
+
+    const below = { orders: at(orders), storage: at(storage) }
+    core.dispatch({ type: 'node.setProps', payload: { id: gateway, props: { monthlyCost: 60 } } })
+    assert.equal(at(orders), below.orders, 'a change above leaves the systems below cached')
+    assert.equal(at(storage), below.storage)
+    assert.equal(at(root).value, 790)
+    core.undo()
+    assert.equal(at(root).value, 780, 'undo invalidates too')
+
+    core.registry.register({
+      id: 'test.extra',
+      name: 'Extra',
+      version: '1.0.0',
+      extends: 'base:service',
+    })
+    assert.notEqual(at(storage), below.storage, 'new component types invalidate every roll-up')
+    assert.throws(() => {
+      ;/** @type {any} */ (at(root)).value = 0
+    }, 'cached results are frozen')
+  })
+
+  it('a contract that the derived value breaks produces a problem entry', () => {
+    const { core, orders, db } = threeLevels()
+    core.dispatch({
+      type: 'system.update',
+      payload: { id: orders, changes: { contract: { monthlyCost: { max: 400 } } } },
+    })
+    const violations = () =>
+      core
+        .problems()
+        .filter(p => p.code === 'CONTRACT_VIOLATION')
+        .map(p => p.id)
+    assert.deepEqual(violations(), [orders], '460 is above 400')
+    core.dispatch({ type: 'node.setProps', payload: { id: db, props: { monthlyCost: 200 } } })
+    assert.deepEqual(violations(), [], 'a change two levels down brings it within the contract')
+  })
 })

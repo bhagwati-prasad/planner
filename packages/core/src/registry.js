@@ -193,6 +193,12 @@ export class Registry {
   #byId = new Map()
   /** @type {Map<string, EffectiveManifest>} */
   #effective = new Map()
+  #revision = 0
+
+  /** Counts the changes to the registered types, so caches that depend on them can tell. */
+  get revision() {
+    return this.#revision
+  }
 
   /**
    * Registers a manifest. Registering the same id@version again is an error unless `replace`.
@@ -208,6 +214,7 @@ export class Registry {
       fail('CONFLICT', `Component ${typeRefOf(m)} is already registered`)
     versions.set(m.version, m)
     this.#effective.clear()
+    this.#revision++
     return m
   }
 
@@ -218,6 +225,7 @@ export class Registry {
     const removed = version ? versions.delete(version) : versions.size > 0
     if (!version || versions.size === 0) this.#byId.delete(id)
     this.#effective.clear()
+    if (removed) this.#revision++
     return removed
   }
 
