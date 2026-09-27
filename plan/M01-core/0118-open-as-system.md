@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M01 Core](../ROADMAP.md#m01-core) | R0 | todo | [0117](../M01-core/0117-typed-nodes.md) |
+| [M01 Core](../ROADMAP.md#m01-core) | R0 | done | [0117](../M01-core/0117-typed-nodes.md) |
 
 ## Read first
 
@@ -17,14 +17,14 @@
 
 Write these tests first, in `packages/core/test/open-as-system.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] Opening a component as a system creates boundary ports matching its ports one to one
-- [ ] Adding a port to the owner adds a boundary port in the same batch
-- [ ] The opened component keeps its `typeRef` and properties, and removing its inner system leaves it a black box only
+- [x] Opening a component as a system creates boundary ports matching its ports one to one
+- [x] Adding a port to the owner adds a boundary port in the same batch
+- [x] The opened component keeps its `typeRef` and properties, and removing its inner system leaves it a black box only
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

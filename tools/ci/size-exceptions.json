@@ -1,10 +1,14 @@
 {
+  "Core, facade and non-UI packages (minified)": {
+    "bytes": 250725,
+    "owner": "0119"
+  },
   "strata-graph (minified)": {
     "bytes": 88513,
     "owner": "0207"
   },
   "Simulation worker bundle (minified)": {
-    "bytes": 165735,
+    "bytes": 168610,
     "owner": "0402"
   }
 }

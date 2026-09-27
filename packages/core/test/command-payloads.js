@@ -235,6 +235,21 @@ export const PAYLOADS = {
     return node && { nodeId: node.id }
   }),
 
+  'component.openAsSystem': inProject((snap, random) => {
+    const node = pick(
+      random,
+      snap.nodes.filter(n => !n.innerSystemRef)
+    )
+    return node && { id: node.id }
+  }),
+  'component.removeInnerSystem': inProject((snap, random) => {
+    const node = pick(
+      random,
+      snap.nodes.filter(n => n.innerSystemRef && n.typeRef !== 'strata.system@1.0.0')
+    )
+    return node && { id: node.id }
+  }),
+
   'model.restore': inProject((snap, random) => {
     const kind = pick(random, ['node', 'system', 'view'])
     const table = { node: 'nodes', system: 'systems', view: 'views' }[kind]

@@ -29,8 +29,9 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 | Budget | Recorded | Removed by |
 | --- | --- | --- |
+| Core, facade and non-UI packages | 250.7 KB of 250 KB | 0119 (proposed: bring core back within budget), recorded by 0118 |
 | strata-graph | 88.5 KB of 60 KB | 0207 (level of detail and performance). The minifier that drops unneeded line breaks and spaces lowered it from 99.5 KB |
-| Simulation worker bundle | 165.7 KB of 120 KB | 0402 (worker host) |
+| Simulation worker bundle | 168.6 KB of 120 KB | 0402 (worker host) |
 
 The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` (about 138 KB) comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR. Until then, as the human decided on 2026-09-26, a task that grows `core` raises this recorded size to what it ships, and says so in its `plan/LOG.md` line.
 

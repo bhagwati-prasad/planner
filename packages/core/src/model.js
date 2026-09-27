@@ -3,6 +3,7 @@
  * (a Store, or a Tx while a command runs), so handlers and queries share one implementation.
  */
 import { fail } from './errors.js'
+import { SYSTEM_TYPE_REF } from './builtins.js'
 import { defaultProps } from './props.js'
 import { inputValue } from './schema.js'
 
@@ -233,13 +234,14 @@ export function isLibrarySystem(src, system) {
 }
 
 /**
- * The resolved component manifest of a node without an inner system, or null (a composite,
- * whose values come from its inner system, or a placeholder).
+ * The resolved component manifest of a node, or null: a System, whose values come from its
+ * inner system, or a placeholder. A component opened as a system keeps its own manifest (its
+ * black-box model, spec §7).
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {{ typeRef: string|null, innerSystemRef?: string|null }} node
  */
 export function manifestOf(registry, node) {
-  if (node.innerSystemRef || !node.typeRef || !registry) return null
+  if (!node.typeRef || node.typeRef === SYSTEM_TYPE_REF || !registry) return null
   return registry.resolve(node.typeRef)
 }
 

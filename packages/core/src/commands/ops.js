@@ -161,6 +161,26 @@ export function createMirrorPorts(ctx, nodeId, systemId) {
   for (const bp of boundaryPortsOf(ctx.tx, systemId)) createMirrorPort(ctx, nodeId, bp)
 }
 
+/**
+ * Gives an owner's port a boundary port of the same name and direction in its inner system, and
+ * maps the port to it (spec §7: the boundary mirrors the owner's ports).
+ * @param {Ctx} ctx
+ * @param {string} systemId
+ * @param {{ id: string, name: string, direction: string }} port
+ */
+export function linkBoundaryPort(ctx, systemId, port) {
+  const bp = ctx.tx.create('boundaryPort', {
+    id: ctx.newId(),
+    systemId,
+    name: port.name,
+    direction: port.direction,
+    internalPortId: null,
+    description: '',
+  })
+  ctx.tx.update('port', port.id, { boundaryPortId: bp.id })
+  return bp.id
+}
+
 /** @param {Ctx} ctx @param {string} nodeId @param {any} bp */
 export function createMirrorPort(ctx, nodeId, bp) {
   const id = ctx.newId()

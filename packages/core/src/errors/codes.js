@@ -40,6 +40,9 @@ const DESCRIPTIONS = {
   E_SYSTEM_READONLY:
     'The change is inside a system placed by reference, which is edited at its source or detached first',
   E_SYSTEM_TOO_DEEP: 'A system is nested deeper than the resolver limit of 64 levels',
+  E_SYSTEM_EXISTS: 'The component already has an inner system',
+  E_SYSTEM_NONE: 'The component has no inner system',
+  E_SYSTEM_REQUIRED: 'A System component cannot lose its inner system; it is what the component is',
   E_SYSTEM_PATH: 'A path to a system names a node that is not a composite in the system before it',
   E_EDGE_DIRECTION: 'An edge starts at an input-only port or ends at an output-only one',
   E_EDGE_SELF_LOOP: 'An edge starts and ends on the same component; that is a private method call',

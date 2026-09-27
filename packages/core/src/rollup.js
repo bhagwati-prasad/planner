@@ -17,6 +17,7 @@ import { fail } from './errors.js'
 import { isPlainObject } from './plain.js'
 import { ROLLUP_RULES, statistic } from './props.js'
 import { decimal } from './units.js'
+import { SYSTEM_TYPE_REF } from './builtins.js'
 import {
   boundaryPortsOf,
   edgesOf,
@@ -244,6 +245,9 @@ function aggregate(src, registry, system, key, spec, options, stack) {
           : aggregate(src, registry, child, key, spec, options, stack).value
         if (value === undefined) value = contractValue(child, key)
       }
+      // Until its inner system says more, an opened component counts as its black box.
+      if (value === undefined && node.typeRef !== SYSTEM_TYPE_REF)
+        value = nodeValue(registry, node, key, options.values)
     } else if (rule.rule === 'count' && rule.where) {
       value = matches(node, rule.where, registry) ? 1 : 0
     } else {
