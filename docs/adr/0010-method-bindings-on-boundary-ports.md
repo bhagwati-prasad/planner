@@ -1,6 +1,6 @@
 # 0010 Method bindings live on boundary ports
 
-Status: Proposed
+Status: Accepted
 Date: 2026-09-27
 
 ## Context and problem
@@ -36,7 +36,7 @@ Four points are left open:
 
 ## Decision outcome
 
-Proposed: option 1, together with these rules.
+Chosen option: 1, decided by the human on 2026-09-27, together with these rules. It is where spec §5 puts bindings, and it keeps one set of bindings for a library system however often it is placed.
 
 - **Methods in manifests.** The registry checks `methods.public` and `methods.private`: each is an object of method names to objects, and no name is both public and private. It also checks that each port's `exposes` names public methods. The plugins validator reports the same problems. Manifests without methods stay valid.
 - **The public methods of a System component** (`strata.system`, ADR 0009) are the methods bound on its boundary ports. Binding a method on a System's boundary port is how the System declares it, which is what extract (spec §7, task 0112) produces. Because every placement shares the one inner system, a library system has the same methods wherever it is placed.
