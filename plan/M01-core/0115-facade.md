@@ -1,4 +1,4 @@
-# 0115 Facade, handles and help metadata
+# 0115 Facade handles for recursion
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
@@ -11,15 +11,16 @@
 
 ## Goal
 
-`createStrata(adapters)` with project, system and component handles, events, `help()`, `print()` and `toTable()`.
+Project, system and component handles for everything M01 added: components opened as systems, their methods and state, method bindings, and edges that name a method. The spec §18 console example runs in Node up to the first simulation call. The human split this task on 2026-09-27: help metadata for every facade method and the `print()` snapshot moved to [0120](../M01-core/0120-facade-help.md).
+
+The starter components declare the public and private method names that spec §9 lists, and their ports expose the public ones, as the human decided on 2026-09-27. Their behaviours, state and cost models stay in M04 (0407–0411).
 
 ## Tests to write first
 
 Write these tests first, in `packages/facade/test/facade.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
 - [ ] Handles re-read state, so a rename made by command is visible through an older handle
-- [ ] Every facade method has help metadata
-- [ ] `strata.print()` renders the recursive fixture as a stable text tree (snapshot)
+- [ ] A component opened as a system, its methods, its bindings and edges that name a method are reachable from handles
 - [ ] The spec §18 console example runs in Node up to the first simulation call
 
 ## Done when
