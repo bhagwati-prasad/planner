@@ -22,6 +22,7 @@ import {
   edgesOf,
   effectiveProps,
   manifestOf,
+  nodeKind,
   nodesOf,
   portsOf,
   subtreeSystemIds,
@@ -180,7 +181,7 @@ export function contractValue(system, key) {
  * @param {import('./registry.js').Registry|undefined} registry
  */
 function matches(node, where, registry) {
-  if (where.kind !== undefined && node.kind !== where.kind) return false
+  if (where.kind !== undefined && nodeKind(node) !== where.kind) return false
   if (where.status !== undefined && node.status !== where.status) return false
   if (where.owner !== undefined && node.owner !== where.owner) return false
   if (where.tag !== undefined && !node.tags.includes(where.tag)) return false
@@ -235,8 +236,8 @@ function aggregate(src, registry, system, key, spec, options, stack) {
   const missing = []
   for (const node of nodesOf(src, system.id)) {
     let value
-    if (node.kind === 'composite') {
-      const child = src.get('system', node.systemRef)
+    if (node.innerSystemRef) {
+      const child = src.get('system', node.innerSystemRef)
       if (child) {
         value = options.abstract.has(child.id)
           ? undefined

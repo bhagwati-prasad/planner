@@ -3,6 +3,7 @@
  */
 import { fail } from '../errors.js'
 import { compareSemver } from '../semver.js'
+import { SYSTEM_TYPE_REF } from '../builtins.js'
 import { parseTypeRef, typeRefOf } from '../registry.js'
 import {
   NODE_STATUSES,
@@ -65,6 +66,11 @@ function resolveType(ctx, ref) {
     if (pinned.length) typeRef = `${found.id}@${pinned[0].version}`
   }
   const manifest = registry?.resolve(typeRef) ?? null
+  if (manifest?.id === 'strata.system')
+    fail(
+      'INVALID',
+      'A System component is placed, not added: use node.place with a system, or system.extract'
+    )
   if (manifest?.abstract)
     fail('INVALID', `'${manifest.id}' is an abstract base type; use a component that extends it`)
   return { typeRef, manifest }
@@ -99,7 +105,7 @@ function nodeFields(p, label) {
 /** @param {Ctx} ctx @param {string} id */
 function requireAtomic(ctx, id) {
   const node = ctx.tx.require('node', id)
-  if (node.kind !== 'atomic')
+  if (node.innerSystemRef)
     fail(
       'INVALID',
       `'${node.name}' is a composite; its values are derived from the system it contains`
@@ -141,9 +147,8 @@ export const nodeCommands = {
       ctx.tx.create('node', {
         id,
         systemId: system.id,
-        kind: 'atomic',
         typeRef,
-        systemRef: null,
+        innerSystemRef: null,
         placement: null,
         name,
         description: fields.description ?? '',
@@ -200,16 +205,15 @@ export const nodeCommands = {
       p.name = name
       p.placement = placement
       const id = optionalString(p.id, 'id') ?? ctx.newId()
-      const systemRef =
+      const innerSystemRef =
         placement === 'value'
           ? cloneSystem(ctx, target.id, { ownerNodeId: id }).systemId
           : target.id
       ctx.tx.create('node', {
         id,
         systemId: container.id,
-        kind: 'composite',
-        typeRef: null,
-        systemRef,
+        typeRef: SYSTEM_TYPE_REF,
+        innerSystemRef,
         placement,
         name,
         description: '',
@@ -218,7 +222,7 @@ export const nodeCommands = {
         owner: null,
         status: 'planned',
       })
-      createMirrorPorts(ctx, id, systemRef)
+      createMirrorPorts(ctx, id, innerSystemRef)
       return id
     },
   },
@@ -272,10 +276,10 @@ export const nodeCommands = {
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       const node = ctx.tx.require('node', requireString(p.id, 'id'))
-      if (node.kind !== 'composite' || node.placement !== 'reference')
+      if (!node.innerSystemRef || node.placement !== 'reference')
         fail('INVALID', `'${node.name}' is not placed by reference`)
-      const { systemId, idMap } = cloneSystem(ctx, node.systemRef, { ownerNodeId: node.id })
-      ctx.tx.update('node', node.id, { systemRef: systemId, placement: 'value' })
+      const { systemId, idMap } = cloneSystem(ctx, node.innerSystemRef, { ownerNodeId: node.id })
+      ctx.tx.update('node', node.id, { innerSystemRef: systemId, placement: 'value' })
       for (const port of portsOf(ctx.tx, node.id)) {
         if (port.boundaryPortId)
           ctx.tx.update('port', port.id, { boundaryPortId: idMap.get(port.boundaryPortId) ?? null })

@@ -34,6 +34,7 @@ import {
   referencingNodes,
   resolvePort,
   resolveSystem,
+  nodeKind,
   subtreeSystemIds,
   walk,
   viewsOf,
@@ -224,7 +225,7 @@ export class Core {
     }
     return list.filter(
       n =>
-        (filter.kind === undefined || n.kind === filter.kind) &&
+        (filter.kind === undefined || nodeKind(n) === filter.kind) &&
         (filter.type === undefined ||
           n.typeRef === filter.type ||
           n.typeRef?.startsWith(`${filter.type}@`)) &&

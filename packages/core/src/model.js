@@ -40,8 +40,16 @@ export const portsOf = (src, nodeId) => src.find('port', 'nodeId', nodeId)
 export const boundaryPortsOf = (src, systemId) => src.find('boundaryPort', 'systemId', systemId)
 /** @param {Source} src @param {string} systemId */
 export const viewsOf = (src, systemId) => src.find('view', 'systemId', systemId)
+/**
+ * 'composite' when a node has an inner system, 'atomic' when it has none (ADR 0009: the model
+ * stores only `innerSystemRef`).
+ * @param {{ innerSystemRef?: string|null }} node
+ * @returns {'atomic'|'composite'}
+ */
+export const nodeKind = node => (node.innerSystemRef ? 'composite' : 'atomic')
+
 /** Composite nodes that place `systemId`. @param {Source} src @param {string} systemId */
-export const referencingNodes = (src, systemId) => src.find('node', 'systemRef', systemId)
+export const referencingNodes = (src, systemId) => src.find('node', 'innerSystemRef', systemId)
 
 /** Edges attached to a port, in id order. @param {Source} src @param {string} portId */
 export function edgesAtPort(src, portId) {
@@ -69,8 +77,8 @@ export function systemOfPort(src, portId) {
 /** Systems placed directly inside `systemId`, in node order. @param {Source} src @param {string} systemId */
 export function childSystemIds(src, systemId) {
   return nodesOf(src, systemId)
-    .filter(n => n.kind === 'composite')
-    .map(n => n.systemRef)
+    .filter(n => n.innerSystemRef)
+    .map(n => n.innerSystemRef)
 }
 
 /** The resolver's defensive depth limit (eng §9); the UI warns from depth 8. */
@@ -95,13 +103,13 @@ export function resolveSystem(src, path) {
   let readOnly = false
   for (const nodeId of path) {
     const node = src.get('node', nodeId)
-    if (!node || node.systemId !== systemId || node.kind !== 'composite')
+    if (!node || node.systemId !== systemId || !node.innerSystemRef)
       fail('E_SYSTEM_PATH', `'${nodeId}' is not a composite node in system '${systemId}'`, {
         nodeId,
         systemId,
       })
     readOnly ||= node.placement === 'reference'
-    systemId = node.systemRef
+    systemId = node.innerSystemRef
   }
   return { systemId, depth: path.length, readOnly, path: [...path] }
 }
@@ -124,14 +132,14 @@ export function walk(src, systemId, visit, { maxDepth = Infinity } = {}) {
     seen.add(id)
     for (const node of nodesOf(src, id)) {
       visit(node, { depth, systemId: id })
-      if (node.kind !== 'composite' || !node.systemRef || depth >= maxDepth) continue
+      if (!node.innerSystemRef || depth >= maxDepth) continue
       if (depth + 1 > MAX_SYSTEM_DEPTH)
         fail(
           'E_SYSTEM_TOO_DEEP',
-          `System '${node.systemRef}' is more than ${MAX_SYSTEM_DEPTH} levels deep`,
-          { systemId: node.systemRef, depth: depth + 1 }
+          `System '${node.innerSystemRef}' is more than ${MAX_SYSTEM_DEPTH} levels deep`,
+          { systemId: node.innerSystemRef, depth: depth + 1 }
         )
-      go(node.systemRef, depth + 1)
+      go(node.innerSystemRef, depth + 1)
     }
   }
   go(systemId, 0)
@@ -225,12 +233,13 @@ export function isLibrarySystem(src, system) {
 }
 
 /**
- * The resolved component manifest of an atomic node, or null (composite, placeholder).
+ * The resolved component manifest of a node without an inner system, or null (a composite,
+ * whose values come from its inner system, or a placeholder).
  * @param {import('./registry.js').Registry|undefined} registry
- * @param {{ kind: string, typeRef: string|null }} node
+ * @param {{ typeRef: string|null, innerSystemRef?: string|null }} node
  */
 export function manifestOf(registry, node) {
-  if (node.kind !== 'atomic' || !node.typeRef || !registry) return null
+  if (node.innerSystemRef || !node.typeRef || !registry) return null
   return registry.resolve(node.typeRef)
 }
 

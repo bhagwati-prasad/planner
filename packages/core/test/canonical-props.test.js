@@ -91,8 +91,8 @@ describe('canonical property values', () => {
     const v1 = fixture('schema-v1/payments')
     assert.equal(v1.schemaVersion, 1)
     const migrated = core.migrateSnapshot(v1, { registry: registry() })
-    assert.equal(migrated.schemaVersion, 2)
-    assert.equal(migrated.project.schemaVersion, 2)
+    assert.equal(migrated.schemaVersion, core.SCHEMA_VERSION, 'up to the current version')
+    assert.equal(migrated.project.schemaVersion, core.SCHEMA_VERSION)
     const node = name => migrated.nodes.find(n => n.name === name)
     assert.equal(node('Settlement queue').props.retention, 172_800_000)
     assert.equal(node('Payment service').props.timeout, 1500)
@@ -110,7 +110,11 @@ describe('canonical property values', () => {
     assert.deepEqual(v1, fixture('schema-v1/payments'), 'the migration does not change its input')
 
     const opened = createTestCore({ snapshot: v1, registry: registry() })
-    assert.equal(opened.snapshot().schemaVersion, 2, 'a core opens a version-1 snapshot')
+    assert.equal(
+      opened.snapshot().schemaVersion,
+      core.SCHEMA_VERSION,
+      'a core opens a version-1 snapshot'
+    )
     const replayed = createTestCore({ registry: registry() })
     replayed.replay(fixture('schema-v1/payments-oplog'))
     assert.equal(replayed.stateHash(), opened.stateHash())

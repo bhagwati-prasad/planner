@@ -6,9 +6,10 @@
 import { fail } from '../errors.js'
 import { SCHEMA_VERSION } from '../store.js'
 import { v1ToV2 } from './v1-to-v2.js'
+import { v2ToV3 } from './v2-to-v3.js'
 
 /** @type {Record<number, (snapshot: Record<string, any>, context: { registry: import('../registry.js').Registry }) => Record<string, any>>} */
-const MIGRATIONS = { 1: v1ToV2 }
+const MIGRATIONS = { 1: v1ToV2, 2: v2ToV3 }
 
 /**
  * Brings a snapshot from any earlier schema version up to the current one, one version at a

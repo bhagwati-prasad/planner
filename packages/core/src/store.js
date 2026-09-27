@@ -9,8 +9,11 @@
 import { fail } from './errors.js'
 import { deepEqual, deepFreeze, toPlain } from './plain.js'
 
-/** Version 2 stores property values in canonical units (ADR 0008). */
-export const SCHEMA_VERSION = 2
+/**
+ * Version 2 stores property values in canonical units (ADR 0008); version 3 makes every node a
+ * typed component that may own an inner system (ADR 0009).
+ */
+export const SCHEMA_VERSION = 3
 
 /**
  * Entity kinds, the snapshot table each is stored under, and the fields indexed for lookups.
@@ -19,7 +22,7 @@ export const SCHEMA_VERSION = 2
 export const ENTITY_KINDS = Object.freeze({
   project: { table: 'project', single: true, indexes: [] },
   system: { table: 'systems', indexes: ['ownerNodeId'] },
-  node: { table: 'nodes', indexes: ['systemId', 'systemRef'] },
+  node: { table: 'nodes', indexes: ['systemId', 'innerSystemRef'] },
   port: { table: 'ports', indexes: ['nodeId', 'boundaryPortId'] },
   edge: { table: 'edges', indexes: ['systemId', 'fromPort', 'toPort'] },
   boundaryPort: { table: 'boundaryPorts', indexes: ['systemId', 'internalPortId'] },

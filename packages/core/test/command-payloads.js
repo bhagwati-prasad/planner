@@ -98,7 +98,7 @@ export const PAYLOADS = {
   'node.setProps': inProject((snap, random) => {
     const node = pick(
       random,
-      snap.nodes.filter(n => n.kind === 'atomic')
+      snap.nodes.filter(n => !n.innerSystemRef)
     )
     return node && { id: node.id, props: { instances: below(random, 9) } }
   }),
@@ -230,7 +230,7 @@ export const PAYLOADS = {
   'system.inline': inProject((snap, random) => {
     const node = pick(
       random,
-      snap.nodes.filter(n => n.kind === 'composite')
+      snap.nodes.filter(n => n.innerSystemRef)
     )
     return node && { nodeId: node.id }
   }),

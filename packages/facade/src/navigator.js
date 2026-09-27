@@ -3,7 +3,7 @@
  * the system being viewed. It is per-project, per-tab working state (sessionStorage in M5);
  * any attached UI follows the 'navigate' event.
  */
-import { fail } from '../../core/src/index.js'
+import { fail, nodeKind } from '../../core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE } from './internal.js'
 import { NodeHandle, SystemHandle, resolveSystemId } from './handles.js'
@@ -75,10 +75,10 @@ export class Navigator {
 
     if (nodeId) {
       const node = core.require('node', nodeId)
-      if (node.kind !== 'composite')
+      if (nodeKind(node) !== 'composite')
         fail('INVALID', `'${node.name}' is not a composite; there is nothing to enter`)
       if (node.systemId !== here.systemId) this.#path = this.#bestPath(node.systemId, null)
-      this.#path = [...this.#path, { systemId: node.systemRef, viaNodeId: node.id }]
+      this.#path = [...this.#path, { systemId: node.innerSystemRef, viaNodeId: node.id }]
       return this.#changed()
     }
 
@@ -87,7 +87,7 @@ export class Navigator {
     if (systemId === here.systemId && (!via || via === here.viaNodeId)) return this.current
     const inHere = core
       .nodesOf(here.systemId)
-      .filter(n => n.kind === 'composite' && n.systemRef === systemId)
+      .filter(n => nodeKind(n) === 'composite' && n.innerSystemRef === systemId)
     if (inHere.length) {
       const pick = inHere.find(n => n.id === via) ?? inHere[0]
       this.#path = [...this.#path, { systemId, viaNodeId: pick.id }]
@@ -151,7 +151,7 @@ export class Navigator {
     if (!core.get('system', systemId)) return false
     if (i === 0) return true
     const via = viaNodeId && core.get('node', viaNodeId)
-    return !!via && via.systemId === this.#path[i - 1].systemId && via.systemRef === systemId
+    return !!via && via.systemId === this.#path[i - 1].systemId && via.innerSystemRef === systemId
   }
 
   /** The path from the root that reaches `systemId` (preferring one through `via`). */

@@ -55,8 +55,8 @@ test('extract as system reproduces the payments example from the spec', () => {
   assert.equal(child.ownerNodeId, nodeId)
   const composite = core.node(nodeId)
   assert.deepEqual(
-    [composite.kind, composite.placement, composite.systemRef],
-    ['composite', 'value', systemId]
+    [composite.typeRef, composite.placement, composite.innerSystemRef],
+    ['strata.system@1.0.0', 'value', systemId]
   )
 
   assert.deepEqual(
@@ -331,8 +331,8 @@ test('by value places an independent deep copy; by reference stays linked', () =
     type: 'node.place',
     payload: { systemId: root, systemRef: outer, placement: 'value' },
   })
-  assert.equal(core.node(byRef).systemRef, outer)
-  const copy = core.node(byVal).systemRef
+  assert.equal(core.node(byRef).innerSystemRef, outer)
+  const copy = core.node(byVal).innerSystemRef
   assert.notEqual(copy, outer)
   assert.equal(core.system(copy).ownerNodeId, byVal)
   const copyNodes = core.nodesOf(copy)
@@ -341,9 +341,9 @@ test('by value places an independent deep copy; by reference stays linked', () =
     core.nodesOf(outer).map(n => n.name)
   )
   const copiedOwned = copyNodes.find(n => n.name === 'Owned')
-  assert.notEqual(copiedOwned.systemRef, owned.systemId, 'owned child systems are copied too')
+  assert.notEqual(copiedOwned.innerSystemRef, owned.systemId, 'owned child systems are copied too')
   const copiedRef = copyNodes.find(n => n.name === 'Inner')
-  assert.equal(copiedRef.systemRef, inner, 'references inside stay references')
+  assert.equal(copiedRef.innerSystemRef, inner, 'references inside stay references')
   assert.deepEqual(
     core.portsOf(byVal).map(p => p.name),
     ['in']
@@ -385,7 +385,7 @@ test('detach turns a reference into an editable copy without breaking edges', ()
   const e = connect(core, client, 'out', placed, 'in')
   const copy = core.dispatch({ type: 'node.detach', payload: { id: placed } })
   assert.equal(core.node(placed).placement, 'value')
-  assert.equal(core.node(placed).systemRef, copy)
+  assert.equal(core.node(placed).innerSystemRef, copy)
   assert.ok(core.edge(e))
   const target = core.resolvePort(core.edge(e).toPort).port
   assert.notEqual(target.id, port(core, svc, 'in'))
@@ -403,7 +403,7 @@ test('removing a by-value composite deletes its whole subtree; undo brings it ba
   const { nodeId } = extractPayments(core, root, m)
   const inner = core.dispatch({
     type: 'system.extract',
-    payload: { systemId: core.node(nodeId).systemRef, nodeIds: [m.ledger], name: 'Storage' },
+    payload: { systemId: core.node(nodeId).innerSystemRef, nodeIds: [m.ledger], name: 'Storage' },
   })
   const withTree = modelState(core)
   core.dispatch({ type: 'node.remove', payload: { id: nodeId } })
@@ -532,7 +532,7 @@ describe('the recursion resolver', () => {
     const client = add(core, root, 'base:client', 'Client')
     const service = add(core, root, 'test.service', 'Service')
     const [first] = nest(core, root, service, 1)
-    const level1 = core.node(first).systemRef
+    const level1 = core.node(first).innerSystemRef
     const db = add(core, level1, 'test.db', 'DB')
     const [second] = nest(core, level1, db, 1)
     const library = core.dispatch({ type: 'system.create', payload: { name: 'Shared' } })
