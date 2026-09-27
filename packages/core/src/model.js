@@ -73,6 +73,70 @@ export function childSystemIds(src, systemId) {
     .map(n => n.systemRef)
 }
 
+/** The resolver's defensive depth limit (eng §9); the UI warns from depth 8. */
+export const MAX_SYSTEM_DEPTH = 64
+
+/**
+ * The system reached by going down through composite nodes from the root, and whether it is
+ * read-only there: everything inside a system placed by reference is, at every depth, because
+ * it is edited at its source (eng §9).
+ * @param {Source} src
+ * @param {string[]} path  composite node ids, each inside the system the one before it opens
+ * @returns {{ systemId: string, depth: number, readOnly: boolean, path: string[] }}
+ */
+export function resolveSystem(src, path) {
+  if (path.length > MAX_SYSTEM_DEPTH)
+    fail(
+      'E_SYSTEM_TOO_DEEP',
+      `A path of ${path.length} levels is deeper than the limit of ${MAX_SYSTEM_DEPTH}`,
+      { depth: path.length }
+    )
+  let systemId = requireProject(src).rootSystemId
+  let readOnly = false
+  for (const nodeId of path) {
+    const node = src.get('node', nodeId)
+    if (!node || node.systemId !== systemId || node.kind !== 'composite')
+      fail('E_SYSTEM_PATH', `'${nodeId}' is not a composite node in system '${systemId}'`, {
+        nodeId,
+        systemId,
+      })
+    readOnly ||= node.placement === 'reference'
+    systemId = node.systemRef
+  }
+  return { systemId, depth: path.length, readOnly, path: [...path] }
+}
+
+/**
+ * Visits every component of `systemId` and, through composites, of every system below it,
+ * depth-first in node order. A system placed by reference in several places is walked once, so
+ * each component is visited once. Depth 0 is `systemId` itself; `maxDepth` stops the descent,
+ * and a model deeper than MAX_SYSTEM_DEPTH fails with E_SYSTEM_TOO_DEEP.
+ * @param {Source} src
+ * @param {string} systemId
+ * @param {(node: any, where: { depth: number, systemId: string }) => void} visit
+ * @param {{ maxDepth?: number }} [options]
+ */
+export function walk(src, systemId, visit, { maxDepth = Infinity } = {}) {
+  const seen = new Set()
+  /** @param {string} id @param {number} depth */
+  const go = (id, depth) => {
+    if (seen.has(id)) return
+    seen.add(id)
+    for (const node of nodesOf(src, id)) {
+      visit(node, { depth, systemId: id })
+      if (node.kind !== 'composite' || !node.systemRef || depth >= maxDepth) continue
+      if (depth + 1 > MAX_SYSTEM_DEPTH)
+        fail(
+          'E_SYSTEM_TOO_DEEP',
+          `System '${node.systemRef}' is more than ${MAX_SYSTEM_DEPTH} levels deep`,
+          { systemId: node.systemRef, depth: depth + 1 }
+        )
+      go(node.systemRef, depth + 1)
+    }
+  }
+  go(systemId, 0)
+}
+
 /**
  * True when `outer` contains `inner` at any depth (not counting outer === inner).
  * @param {Source} src

@@ -5,6 +5,7 @@
  */
 import { Emitter } from './emitter.js'
 import { fail } from './errors.js'
+import { err } from './result.js'
 import { Store } from './store.js'
 import { CommandBus } from './bus.js'
 import { createRegistry } from './registry.js'
@@ -32,7 +33,9 @@ import {
   projectOf,
   referencingNodes,
   resolvePort,
+  resolveSystem,
   subtreeSystemIds,
+  walk,
   viewsOf,
   wouldCycle,
 } from './model.js'
@@ -293,10 +296,20 @@ export class Core {
   // --- commands ------------------------------------------------------------------------------
 
   /**
+   * Applies a command. With `at`, the path of composite nodes from the root to where the edit is
+   * made (see resolveSystem), an edit inside a system placed by reference fails with
+   * E_SYSTEM_READONLY: it is made at the system's source instead (eng §9).
    * @param {{ type: string, payload?: any }} command
-   * @param {import('./bus.js').DispatchOptions} [options]
+   * @param {import('./bus.js').DispatchOptions & { at?: string[] }} [options]
    */
-  dispatch(command, options) {
+  dispatch(command, { at, ...options } = {}) {
+    const via = at && this.#referenceOn(at)
+    if (via)
+      fail(
+        'E_SYSTEM_READONLY',
+        `'${this.#store.require('node', via).name}' places its system by reference, so it is read-only here; edit it at its source, or detach the placement for an editable copy`,
+        { viaNodeId: via }
+      )
     return this.#bus.dispatch(command, options)
   }
 
@@ -304,10 +317,37 @@ export class Core {
    * Like `dispatch`, but returns `{ ok: false, code, details }` instead of throwing when the
    * command is refused, and `{ ok: true, value }` otherwise.
    * @param {{ type: string, payload?: any }} command
-   * @param {import('./bus.js').DispatchOptions} [options]
+   * @param {import('./bus.js').DispatchOptions & { at?: string[] }} [options]
    */
-  tryDispatch(command, options) {
+  tryDispatch(command, { at, ...options } = {}) {
+    const via = at && this.#referenceOn(at)
+    if (via) return err('E_SYSTEM_READONLY', { viaNodeId: via })
     return this.#bus.tryDispatch(command, options)
+  }
+
+  /** The first node on a path that places its system by reference, or null. @param {string[]} path */
+  #referenceOn(path) {
+    if (!resolveSystem(this.#store, path).readOnly) return null
+    return path.find(id => this.#store.get('node', id)?.placement === 'reference') ?? null
+  }
+
+  /**
+   * The system at the end of a path of composite nodes from the root, its depth, and whether it
+   * is read-only there because a placement on the way is by reference.
+   * @param {string[]} path
+   */
+  resolveSystem(path) {
+    return resolveSystem(this.#store, path)
+  }
+
+  /**
+   * Visits every component of a system and of the systems below it, each once.
+   * @param {string} systemId
+   * @param {(node: any, where: { depth: number, systemId: string }) => void} visit
+   * @param {{ maxDepth?: number }} [options]
+   */
+  walk(systemId, visit, options) {
+    walk(this.#store, systemId, visit, options)
   }
 
   /**

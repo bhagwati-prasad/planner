@@ -47,7 +47,7 @@ The headless heart: immutable state, commands, undo, op log, graph invariants, r
 - [x] [0108 Canonical units and conversions](M01-core/0108-units.md) (after 0107)
 - [x] [0116 Store property values in canonical units](M01-core/0116-canonical-property-values.md) (after 0108)
 - [x] [0109 Graph model and invariants](M01-core/0109-graph-model.md) (after 0105, 0107)
-- [ ] [0110 The recursion resolver and its guards](M01-core/0110-recursion-resolver.md) (after 0109)
+- [x] [0110 The recursion resolver and its guards](M01-core/0110-recursion-resolver.md) (after 0109)
 - [ ] [0117 Every node is a typed component](M01-core/0117-typed-nodes.md) (after 0110)
 - [ ] [0118 Open a component as a system](M01-core/0118-open-as-system.md) (after 0117)
 - [ ] [0111 Method bindings across boundaries](M01-core/0111-method-bindings.md) (after 0110)

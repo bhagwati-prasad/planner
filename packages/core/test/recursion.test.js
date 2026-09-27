@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+import { describe, it, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { setup, add, port, connect, buildPayments, modelState } from './helpers.js'
 
@@ -278,23 +278,23 @@ test('placements that would make a system contain itself are rejected', () => {
     core.dispatch({ type: 'node.place', payload: { systemId, systemRef, placement } })
   assert.throws(
     () => place(a, a),
-    err => err.code === 'CYCLE'
+    err => err.code === 'E_SYSTEM_CYCLE'
   )
   place(a, b)
   place(b, c)
   assert.ok(core.containsSystem(a, c))
   assert.throws(
     () => place(b, a),
-    err => err.code === 'CYCLE'
+    err => err.code === 'E_SYSTEM_CYCLE'
   )
   assert.throws(
     () => place(c, a),
-    err => err.code === 'CYCLE',
+    err => err.code === 'E_SYSTEM_CYCLE',
     'transitive cycles too'
   )
   assert.throws(
     () => place(c, a, 'value'),
-    err => err.code === 'CYCLE',
+    err => err.code === 'E_SYSTEM_CYCLE',
     'copies cannot smuggle a cycle in'
   )
   assert.throws(() => place(a, root), /root system cannot be placed/)
@@ -456,4 +456,128 @@ test('recursion depth is unlimited: ten nested levels', () => {
   for (let i = 0; i < 10; i++) core.undo()
   assert.equal(core.node(leaf).systemId, root)
   assert.equal(core.all('system').length, 1)
+})
+
+/**
+ * Moves `nodeId` `levels` levels down by extracting it into a new system each time. Returns the
+ * composite nodes from the root down, the path to the innermost system.
+ */
+function nest(core, systemId, nodeId, levels) {
+  const path = []
+  let system = systemId
+  for (let level = 1; level <= levels; level++) {
+    const extracted = core.dispatch({
+      type: 'system.extract',
+      payload: { systemId: system, nodeIds: [nodeId], name: `Level ${level}` },
+    })
+    path.push(extracted.nodeId)
+    system = extracted.systemId
+  }
+  return path
+}
+
+describe('the recursion resolver', () => {
+  it('a placement that creates a cycle fails with E_SYSTEM_CYCLE', () => {
+    const { core } = setup()
+    const a = core.dispatch({ type: 'system.create', payload: { name: 'A' } })
+    const b = core.dispatch({ type: 'system.create', payload: { name: 'B' } })
+    core.dispatch({ type: 'node.place', payload: { systemId: a, systemRef: b } })
+    const before = core.snapshot()
+    for (const placement of ['reference', 'value'])
+      assert.deepEqual(
+        core.tryDispatch({ type: 'node.place', payload: { systemId: b, systemRef: a, placement } }),
+        { ok: false, code: 'E_SYSTEM_CYCLE', details: { systemId: b, systemRef: a } },
+        placement
+      )
+    assert.deepEqual(core.snapshot(), before)
+  })
+
+  it('editing inside a by-reference inner system fails with E_SYSTEM_READONLY', () => {
+    const { core, root } = setup()
+    const library = core.dispatch({ type: 'system.create', payload: { name: 'Auth' } })
+    const token = add(core, library, 'base:service', 'Token service')
+    const [owned] = nest(core, library, token, 1)
+    const byRef = core.dispatch({
+      type: 'node.place',
+      payload: { systemId: root, systemRef: library },
+    })
+    const byValue = core.dispatch({
+      type: 'node.place',
+      payload: { systemId: root, systemRef: library, placement: 'value' },
+    })
+
+    const inside = core.resolveSystem([byRef])
+    assert.deepEqual(inside, { systemId: library, depth: 1, readOnly: true, path: [byRef] })
+    assert.equal(core.resolveSystem([byRef, owned]).readOnly, true, 'at every depth below it')
+    assert.equal(core.resolveSystem([byValue]).readOnly, false, 'a copy is editable')
+    assert.equal(core.resolveSystem([]).systemId, root)
+
+    const before = core.snapshot()
+    const addHere = { type: 'component.add', payload: { systemId: library, typeRef: 'base:store' } }
+    assert.throws(
+      () => core.dispatch(addHere, { at: [byRef] }),
+      err => err.code === 'E_SYSTEM_READONLY' && err.details.viaNodeId === byRef
+    )
+    assert.deepEqual(core.snapshot(), before)
+    core.dispatch(addHere, { at: [] })
+    assert.equal(
+      core.nodesOf(library).length,
+      2,
+      'the library system (its composite, now with a store) is edited at its source'
+    )
+  })
+
+  it('walk visits every component of a three-level graph exactly once and honours maxDepth', () => {
+    const { core, root } = setup()
+    const client = add(core, root, 'base:client', 'Client')
+    const service = add(core, root, 'test.service', 'Service')
+    const [first] = nest(core, root, service, 1)
+    const level1 = core.node(first).systemRef
+    const db = add(core, level1, 'test.db', 'DB')
+    const [second] = nest(core, level1, db, 1)
+    const library = core.dispatch({ type: 'system.create', payload: { name: 'Shared' } })
+    const shared = add(core, library, 'base:store', 'Shared store')
+    const refs = [1, 2].map(() =>
+      core.dispatch({ type: 'node.place', payload: { systemId: root, systemRef: library } })
+    )
+
+    const seen = []
+    core.walk(root, (node, { depth }) => seen.push([core.node(node.id).name, depth]))
+    assert.deepEqual(
+      seen.map(([name]) => name).sort(),
+      ['Client', 'DB', 'Level 1', 'Level 1', 'Service', 'Shared', 'Shared 2', 'Shared store'].sort()
+    )
+    assert.equal(
+      new Set(seen.map(([name, depth]) => `${name}@${depth}`)).size,
+      seen.length,
+      'each once'
+    )
+    assert.deepEqual(
+      Object.fromEntries(seen.filter(([name]) => ['DB', 'Shared store'].includes(name))),
+      { DB: 2, 'Shared store': 1 }
+    )
+
+    const shallow = []
+    core.walk(root, node => shallow.push(node.id), { maxDepth: 1 })
+    assert.ok(shallow.includes(service) && shallow.includes(second) && !shallow.includes(db))
+    const top = []
+    core.walk(root, node => top.push(node.id), { maxDepth: 0 })
+    assert.deepEqual(top.sort(), [client, first, ...refs].sort())
+    void shared
+  })
+
+  it('the resolver refuses a system deeper than 64 levels with E_SYSTEM_TOO_DEEP', () => {
+    const { core, root } = setup()
+    const leaf = add(core, root, 'base:service', 'Leaf')
+    const path = nest(core, root, leaf, 65)
+    assert.equal(core.resolveSystem(path.slice(0, 64)).depth, 64)
+    assert.throws(
+      () => core.resolveSystem(path),
+      err => err.code === 'E_SYSTEM_TOO_DEEP'
+    )
+    assert.throws(
+      () => core.walk(root, () => {}),
+      err => err.code === 'E_SYSTEM_TOO_DEEP'
+    )
+  })
 })

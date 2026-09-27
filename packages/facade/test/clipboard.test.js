@@ -153,6 +153,6 @@ test('paste needs a clip and a writable target', async () => {
   const clip = strata.copy([p.root.node('GW')])
   assert.throws(
     () => placed.child.paste(clip),
-    err => err.code === 'READ_ONLY'
+    err => err.code === 'E_SYSTEM_READONLY'
   )
 })

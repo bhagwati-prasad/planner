@@ -119,7 +119,7 @@ export class SystemHandle extends Handle {
   #writable() {
     if (this.#readOnly) {
       fail(
-        'READ_ONLY',
+        'E_SYSTEM_READONLY',
         `'${this.name}' is placed by reference and is read-only here. Edit the source with project.system('${this.name}'), or detach the placement to get an editable copy.`
       )
     }
@@ -493,7 +493,7 @@ export class NodeHandle extends Handle {
   #writable() {
     if (this.#readOnly)
       fail(
-        'READ_ONLY',
+        'E_SYSTEM_READONLY',
         `'${this.name}' is inside a system placed by reference and is read-only here`
       )
   }
@@ -788,7 +788,10 @@ export class EdgeHandle extends Handle {
 
   #writable() {
     if (this.#readOnly)
-      fail('READ_ONLY', 'This edge is inside a system placed by reference and is read-only here')
+      fail(
+        'E_SYSTEM_READONLY',
+        'This edge is inside a system placed by reference and is read-only here'
+      )
   }
 
   /** @param {Record<string, unknown>} props */
@@ -889,7 +892,7 @@ export class BoundaryPortHandle extends Handle {
   #writable() {
     if (this.#readOnly)
       fail(
-        'READ_ONLY',
+        'E_SYSTEM_READONLY',
         'This boundary port belongs to a system placed by reference and is read-only here'
       )
   }

@@ -241,11 +241,13 @@ test('systems placed by reference are read-only where they are placed', async ()
   assert.equal(strata.nav.current.readOnly, true)
   assert.throws(
     () => inside.add('service'),
-    err => err.code === 'READ_ONLY' && /project.system\('Standard Auth Service'\)/.test(err.message)
+    err =>
+      err.code === 'E_SYSTEM_READONLY' &&
+      /project.system\('Standard Auth Service'\)/.test(err.message)
   )
   assert.throws(
     () => inside.node('Auth').set({ concurrency: 2 }),
-    err => err.code === 'READ_ONLY'
+    err => err.code === 'E_SYSTEM_READONLY'
   )
   p.system('Standard Auth Service').add('relational-db', { name: 'Users DB' })
   assert.deepEqual(

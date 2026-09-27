@@ -223,7 +223,8 @@ export function rollup(src, registry, systemId, key, options = {}) {
 }
 
 function aggregate(src, registry, system, key, spec, options, stack) {
-  if (stack.has(system.id)) fail('CYCLE', `System '${system.name}' contains itself`)
+  if (stack.has(system.id))
+    fail('E_SYSTEM_CYCLE', `System '${system.name}' contains itself`, { systemId: system.id })
   stack.add(system.id)
   const override = system.rollups?.[key]
   const rule = override && !options.rule ? normalizeRule(override, spec) : spec

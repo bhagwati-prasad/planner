@@ -179,8 +179,9 @@ export const nodeCommands = {
         fail('INVALID', 'The root system cannot be placed inside another system')
       if (wouldCycle(ctx.tx, container.id, target.id)) {
         fail(
-          'CYCLE',
-          `Placing '${target.name}' inside '${container.name}' would make a system contain itself`
+          'E_SYSTEM_CYCLE',
+          `Placing '${target.name}' inside '${container.name}' would make a system contain itself`,
+          { systemId: container.id, systemRef: target.id }
         )
       }
       if (placement === 'reference' && target.ownerNodeId) {
