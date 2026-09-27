@@ -2,6 +2,7 @@
  * Structural roll-up (spec §6): extract a selection as a child system, and the inverse,
  * inlining a composite back into its parent. Each is one command, so one undo step.
  */
+import { SYSTEM_TYPE_REF } from '../builtins.js'
 import { fail } from '../errors.js'
 import {
   boundaryPortsOf,
@@ -98,9 +99,8 @@ export const recursionCommands = {
       ctx.tx.create('node', {
         id: compositeId,
         systemId: parent.id,
-        kind: 'composite',
-        typeRef: null,
-        systemRef: systemId,
+        typeRef: SYSTEM_TYPE_REF,
+        innerSystemRef: systemId,
         placement: 'value',
         name,
         description: '',
@@ -182,9 +182,10 @@ export const recursionCommands = {
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       const composite = ctx.tx.require('node', requireString(p.nodeId, 'nodeId'))
-      if (composite.kind !== 'composite') fail('INVALID', `'${composite.name}' is not a composite`)
+      if (!composite.innerSystemRef)
+        fail('INVALID', `'${composite.name}' has no inner system to inline`)
       const parentId = composite.systemId
-      const child = ctx.tx.require('system', composite.systemRef)
+      const child = ctx.tx.require('system', composite.innerSystemRef)
       const byValue = composite.placement === 'value'
       const childNodes = nodesOf(ctx.tx, child.id)
       const childEdges = edgesOf(ctx.tx, child.id)

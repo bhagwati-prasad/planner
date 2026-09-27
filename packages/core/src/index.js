@@ -45,7 +45,7 @@ export {
   PORT_DIRECTIONS,
   PLUGIN_KINDS,
 } from './registry.js'
-export { BUILTIN_MANIFESTS } from './builtins.js'
+export { BUILTIN_MANIFESTS, SYSTEM_TYPE_REF } from './builtins.js'
 export { CORE_COMMANDS, registerCoreCommands } from './commands/index.js'
 export { rollup, resolveRule, nodeValue, contractValue, checkContracts } from './rollup.js'
 export { findProblems } from './validate.js'
@@ -62,6 +62,7 @@ export {
   resolvePort,
   resolveSystem,
   walk,
+  nodeKind,
   MAX_SYSTEM_DEPTH,
   acceptsOf,
   effectiveProps,

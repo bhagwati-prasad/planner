@@ -2,6 +2,7 @@
  * Text renderings of the model for the console and terminal (spec §16: "strata.print(root) —
  * text tree of the system"). Text is one of three interchangeable renderers, beside 2D and 3D.
  */
+import { nodeKind } from '../../core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE } from './internal.js'
 import {
@@ -84,12 +85,12 @@ export function formatSystem(core, systemId, { depth = Infinity, edges = true } 
         }
       }
       if (
-        node.kind === 'composite' &&
+        nodeKind(node) === 'composite' &&
         levelsLeft > 1 &&
-        core.get('system', node.systemRef) &&
-        !stack.has(node.systemRef)
+        core.get('system', node.innerSystemRef) &&
+        !stack.has(node.innerSystemRef)
       ) {
-        walk(node.systemRef, inner, levelsLeft - 1, new Set([...stack, node.systemRef]))
+        walk(node.innerSystemRef, inner, levelsLeft - 1, new Set([...stack, node.innerSystemRef]))
       }
     })
   }
@@ -100,8 +101,8 @@ export function formatSystem(core, systemId, { depth = Infinity, edges = true } 
 /** @param {Core} core @param {any} node */
 function nodeLabel(core, node) {
   const status = node.status !== 'planned' ? ` · ${node.status}` : ''
-  if (node.kind !== 'composite') return `${node.name}  ${node.typeRef}${status}`
-  const child = core.get('system', node.systemRef)
+  if (nodeKind(node) !== 'composite') return `${node.name}  ${node.typeRef}${status}`
+  const child = core.get('system', node.innerSystemRef)
   const how =
     node.placement === 'reference'
       ? `by reference${child && child.name !== node.name ? ` → ${child.name}` : ''}`
@@ -120,7 +121,7 @@ function formatNode(node) {
   const core = node[CORE]
   const e = node.entity
   const lines = [
-    `${e.name}  ${e.kind === 'composite' ? nodeLabel(core, e).slice(e.name.length + 2) : e.typeRef} · ${e.status}${e.owner ? ` · owner ${e.owner}` : ''}`,
+    `${e.name}  ${nodeKind(e) === 'composite' ? nodeLabel(core, e).slice(e.name.length + 2) : e.typeRef} · ${e.status}${e.owner ? ` · owner ${e.owner}` : ''}`,
   ]
   const ports = core.portsOf(e.id)
   if (ports.length) {
@@ -141,7 +142,7 @@ function formatNode(node) {
       )
     }
   }
-  if (e.kind === 'atomic') {
+  if (nodeKind(e) === 'atomic') {
     const props = Object.entries(core.explainProps(e.id))
     if (props.length) {
       lines.push('  props')

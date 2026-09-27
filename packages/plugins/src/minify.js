@@ -1,6 +1,7 @@
 /**
  * The in-house minifier for bundles. It drops comments, indentation and every space or line
- * break the program cannot notice, and keeps every token in order. Names are not mangled.
+ * break the program cannot notice, and keeps every token in order. With `rename`, it first
+ * gives local variables, parameters and private class members short names (rename.js).
  *
  * A line break stays when automatic semicolon insertion could depend on it: the token before it
  * could end a statement and the token after it could start one, or it follows a restricted
@@ -9,6 +10,7 @@
  * expression.
  */
 import { tokenize } from './tokenize.js'
+import { renameLocals } from './rename.js'
 
 /** Punctuators after which no statement can end, so a line break after them is never a semicolon. */
 const CONTINUES_AFTER = new Set([
@@ -171,10 +173,11 @@ function needsSpace(prev, next) {
 
 /**
  * @param {string} code
+ * @param {{ rename?: boolean }} [options]  rename: shorten local names too
  * @returns {string}
  */
-export function minify(code) {
-  const tokens = tokenize(code)
+export function minify(code, { rename = false } = {}) {
+  const tokens = tokenize(rename ? renameLocals(code) : code)
   let out = ''
   /** @type {Token|null} */
   let prev = null

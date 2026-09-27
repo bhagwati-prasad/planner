@@ -7,7 +7,7 @@
  * system; composites placed by value paste as a fresh copy of their system (so the source
  * must still exist when pasting).
  */
-import { fail } from '../../core/src/index.js'
+import { fail, nodeKind } from '../../core/src/index.js'
 import { CORE, defined } from './internal.js'
 
 export const CLIP_FORMAT = 'strata/clip@1'
@@ -74,9 +74,9 @@ export function copyNodes(project, ids) {
     const p = placed[key]
     return {
       key,
-      kind: n.kind,
+      kind: nodeKind(n),
       typeRef: n.typeRef,
-      systemRef: n.systemRef,
+      systemRef: n.innerSystemRef,
       placement: n.placement,
       name: n.name,
       description: n.description,

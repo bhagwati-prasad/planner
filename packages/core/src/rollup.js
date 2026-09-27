@@ -17,11 +17,13 @@ import { fail } from './errors.js'
 import { isPlainObject } from './plain.js'
 import { ROLLUP_RULES, statistic } from './props.js'
 import { decimal } from './units.js'
+import { SYSTEM_TYPE_REF } from './builtins.js'
 import {
   boundaryPortsOf,
   edgesOf,
   effectiveProps,
   manifestOf,
+  nodeKind,
   nodesOf,
   portsOf,
   subtreeSystemIds,
@@ -180,7 +182,7 @@ export function contractValue(system, key) {
  * @param {import('./registry.js').Registry|undefined} registry
  */
 function matches(node, where, registry) {
-  if (where.kind !== undefined && node.kind !== where.kind) return false
+  if (where.kind !== undefined && nodeKind(node) !== where.kind) return false
   if (where.status !== undefined && node.status !== where.status) return false
   if (where.owner !== undefined && node.owner !== where.owner) return false
   if (where.tag !== undefined && !node.tags.includes(where.tag)) return false
@@ -235,14 +237,17 @@ function aggregate(src, registry, system, key, spec, options, stack) {
   const missing = []
   for (const node of nodesOf(src, system.id)) {
     let value
-    if (node.kind === 'composite') {
-      const child = src.get('system', node.systemRef)
+    if (node.innerSystemRef) {
+      const child = src.get('system', node.innerSystemRef)
       if (child) {
         value = options.abstract.has(child.id)
           ? undefined
           : aggregate(src, registry, child, key, spec, options, stack).value
         if (value === undefined) value = contractValue(child, key)
       }
+      // Until its inner system says more, an opened component counts as its black box.
+      if (value === undefined && node.typeRef !== SYSTEM_TYPE_REF)
+        value = nodeValue(registry, node, key, options.values)
     } else if (rule.rule === 'count' && rule.where) {
       value = matches(node, rule.where, registry) ? 1 : 0
     } else {

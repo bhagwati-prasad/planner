@@ -5,7 +5,7 @@
  *
  * Every change goes through `project.dispatch`, i.e. through the command bus.
  */
-import { fail } from '../../core/src/index.js'
+import { fail, nodeKind } from '../../core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE, INSPECT, defined } from './internal.js'
 import { pasteClip } from './clipboard.js'
@@ -329,7 +329,7 @@ export class SystemHandle extends Handle {
   children() {
     return Collection.from(
       this[CORE].nodesOf(this.id)
-        .filter(n => n.kind === 'composite')
+        .filter(n => nodeKind(n) === 'composite')
         .map(n => this.#node(n.id).child)
     )
   }
@@ -432,10 +432,10 @@ export class NodeHandle extends Handle {
     return this.entity.name
   }
   get kind() {
-    return this.entity.kind
+    return nodeKind(this.entity)
   }
   get isComposite() {
-    return this.entity.kind === 'composite'
+    return nodeKind(this.entity) === 'composite'
   }
   /** Pinned component type, e.g. 'acme.message-queue@1.2.0' (null for composites). */
   get type() {
@@ -478,8 +478,8 @@ export class NodeHandle extends Handle {
   /** For a composite: the system it contains, reached through this node. */
   get child() {
     const e = this.entity
-    if (e.kind !== 'composite') return null
-    return new SystemHandle(this.project, e.systemRef, {
+    if (nodeKind(e) !== 'composite') return null
+    return new SystemHandle(this.project, e.innerSystemRef, {
       via: e.id,
       readOnly: this.#readOnly || e.placement === 'reference',
     })
@@ -654,8 +654,8 @@ export class NodeHandle extends Handle {
       id: e.id,
       name: e.name,
       type:
-        e.kind === 'composite'
-          ? `▣ ${this[CORE].get('system', e.systemRef)?.name ?? '?'} (${e.placement})`
+        nodeKind(e) === 'composite'
+          ? `▣ ${this[CORE].get('system', e.innerSystemRef)?.name ?? '?'} (${e.placement})`
           : e.typeRef,
       status: e.status,
       owner: e.owner ?? '',
@@ -665,7 +665,7 @@ export class NodeHandle extends Handle {
   toString() {
     const e = this[CORE].get('node', this.id)
     if (!e) return `Node<deleted ${this.id}>`
-    return `Node<${e.name} ${e.kind === 'composite' ? `▣ ${e.placement}` : e.typeRef}>`
+    return `Node<${e.name} ${nodeKind(e) === 'composite' ? `▣ ${e.placement}` : e.typeRef}>`
   }
 }
 

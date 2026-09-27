@@ -43,8 +43,8 @@ export function findProblems(src, registry, { contracts = true } = {}) {
   for (const node of src.all('node')) {
     if (!src.get('system', node.systemId))
       add('error', 'ORPHAN_NODE', `'${node.name}' belongs to a missing system`, 'node', node.id)
-    if (node.kind === 'composite') {
-      if (!src.get('system', node.systemRef))
+    if (node.innerSystemRef) {
+      if (!src.get('system', node.innerSystemRef))
         add(
           'error',
           'MISSING_SYSTEM',

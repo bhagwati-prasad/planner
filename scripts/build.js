@@ -56,15 +56,16 @@ async function sources() {
 /**
  * @param {Record<string, string>} files
  * @param {string} entry
- * @param {{ format: 'iife'|'cjs', globalName?: string, minify: boolean, banner: string }} options
+ * @param {{ format: 'iife'|'cjs', globalName?: string, minify: boolean, rename?: boolean, banner: string }} options
+ *   rename: shorten local names when minifying; vendored code keeps them
  */
-function script(files, entry, { format, globalName, minify, banner }) {
+function script(files, entry, { format, globalName, minify, rename = true, banner }) {
   const bundle = bundleModules(files, [entry])
   const errors = bundle.problems.filter(p => p.level === 'error')
   if (errors.length)
     throw new Error(`Cannot bundle ${entry}:\n${errors.map(formatProblem).join('\n')}`)
   let code = emitScript(bundle, { entry, format, globalName })
-  if (minify) code = minifyCode(code)
+  if (minify) code = minifyCode(code, { rename })
   code = `${banner}\n${code}`
   // A syntax check of the output, so a bundler bug fails the build rather than the page.
 
@@ -88,7 +89,13 @@ async function threeScript(minify) {
   ).libraries.three
   const copyright = /Copyright .+/.exec(await readFile(join(dir, 'LICENSE'), 'utf8'))?.[0]
   const banner = `/*! three.js ${version} · ${copyright} · ${licence} licence: LICENSE-three · bundled by the Strata bundler */`
-  return script(files, 'three.module.js', { format: 'iife', globalName: 'THREE', minify, banner })
+  return script(files, 'three.module.js', {
+    format: 'iife',
+    globalName: 'THREE',
+    minify,
+    rename: false,
+    banner,
+  })
 }
 
 /** The simulation worker's entry (eng §13), bundled with everything it imports. */

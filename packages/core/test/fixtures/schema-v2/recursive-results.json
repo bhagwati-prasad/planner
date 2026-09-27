@@ -1,0 +1,57 @@
+{
+  "rollups": {
+    "monthlyCost": 500,
+    "serviceTime.p99": 15,
+    "maxRps": 1000,
+    "technology": ["Node.js 20", "PostgreSQL 16"]
+  },
+  "walk": [
+    "Auth 2@0",
+    "Auth@0",
+    "Bank API@0",
+    "Gateway@1",
+    "Ledger DB@1",
+    "Payment service@1",
+    "Payments@0",
+    "Settlement queue@1",
+    "Token service@1",
+    "Token service@1",
+    "Token store@1",
+    "Token store@1",
+    "Web client@0"
+  ],
+  "readOnly": [false, true, false],
+  "inside": {
+    "payments": ["Gateway", "Ledger DB", "Payment service", "Settlement queue"],
+    "byRef": ["Token service", "Token store"],
+    "byValue": ["Token service", "Token store"]
+  },
+  "rootWiring": ["Payments.out → Bank API.events", "Web client.out → Payments.in"],
+  "problems": [],
+  "afterDetach": {
+    "readOnly": false,
+    "inside": ["Token service", "Token store"]
+  },
+  "afterInline": {
+    "root": [
+      "Auth",
+      "Auth 2",
+      "Bank API",
+      "Gateway",
+      "Ledger DB",
+      "Payment service",
+      "Settlement queue",
+      "Web client"
+    ],
+    "wiring": [
+      "Gateway.out → Payment service.in",
+      "Payment service.db → Ledger DB.in",
+      "Payment service.publish → Settlement queue.in",
+      "Settlement queue.out → Bank API.events",
+      "Web client.out → Gateway.in"
+    ]
+  },
+  "afterInlineRollups": {
+    "monthlyCost": 500
+  }
+}

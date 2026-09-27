@@ -115,7 +115,27 @@ const connection = {
   },
 }
 
+/**
+ * The component type of a placed system (ADR 0009): a component whose inner system is
+ * required. Its ports mirror its system's boundary ports, and its black-box model is its
+ * contract (spec §7). It is abstract, so it is placed rather than added.
+ */
+export const SYSTEM_TYPE_REF = 'strata.system@1.0.0'
+
 export const BUILTIN_MANIFESTS = Object.freeze([
+  {
+    strataApi: '^1.0',
+    id: 'strata.system',
+    name: 'System',
+    version: '1.0.0',
+    category: 'Systems',
+    abstract: true,
+    description:
+      'A component whose inner system is required; its ports are its boundary ports and its black-box model is its contract.',
+    ports: [],
+    properties: {},
+    metrics: {},
+  },
   {
     strataApi: '^1.0',
     id: 'base:component',

@@ -15,7 +15,7 @@
 
 ## Size
 
-`size.js` reads the budgets from the eng §15 table, so a budget changed there (through an ADR) changes the check. Each budget is measured the way the build ships the code: every source file minified by `packages/plugins`' minifier, summed, with 1 KB = 1,000 bytes.
+`size.js` reads the budgets from the eng §15 table, so a budget changed there (through an ADR) changes the check. Each budget is measured the way the build ships the code: every source file minified by `packages/plugins`' minifier, with local names shortened (`minify(code, { rename: true })`), summed, with 1 KB = 1,000 bytes.
 
 | Budget | Measures |
 | --- | --- |
@@ -29,12 +29,12 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 | Budget | Recorded | Removed by |
 | --- | --- | --- |
-| strata-graph | 88.5 KB of 60 KB | 0207 (level of detail and performance). The minifier that drops unneeded line breaks and spaces lowered it from 99.5 KB |
-| Simulation worker bundle | 164.2 KB of 120 KB | 0402 (worker host) |
+| strata-graph | 75.8 KB of 60 KB | 0207 (level of detail and performance). The minifier lowered it from 99.5 KB: to 88.5 KB by dropping unneeded line breaks and spaces, then to 75.8 KB by shortening local names (0119) |
+| Simulation worker bundle | 138.3 KB of 120 KB | 0402 (worker host). Shortening local names (0119) lowered it from 168.6 KB |
 
-The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` (about 138 KB) comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR. Until then, as the human decided on 2026-09-26, a task that grows `core` raises this recorded size to what it ships, and says so in its `plan/LOG.md` line.
+The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR. Until then, as the human decided on 2026-09-26, a task that grows `core` raises this recorded size to what it ships, and says so in its `plan/LOG.md` line.
 
-Core, facade and the non-UI packages are close to their 250 KB. As the human decided on 2026-09-27, the same policy applies when a task takes them past it: the task records an exception at the size they reach and says so in its `plan/LOG.md` line. It also proposes the task that brings them back within budget, which the exception names as its owner.
+Core, facade and the non-UI packages measure 230.1 KB of their 250 KB. Task 0118 took them to 250.7 KB, and 0119 brought them back by shortening local names. As the human decided on 2026-09-27, the same policy applies when a task takes them past 250 KB again: the task records an exception at the size they reach and says so in its `plan/LOG.md` line. It also proposes the task that brings them back within budget, which the exception names as its owner.
 
 ## Licences
 

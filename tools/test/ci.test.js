@@ -227,6 +227,14 @@ describe('size check', () => {
     assert.match(result.problems[0], /within its budget: remove its exception/)
   })
 
+  it('measures core, facade and the non-UI packages under 250 KB, and passes without an exception for them', () => {
+    const { rows, problems } = checkSizes()
+    const core = rows.find(r => r.label.startsWith('Core'))
+    assert.ok(core?.bytes && core.bytes < 250_000, `${core?.bytes} bytes`)
+    assert.equal(core.exception, undefined, 'no exception is recorded for them')
+    assert.deepEqual(problems, [])
+  })
+
   it('keeps tools/ci/size-exceptions.json to budgets owned by later tasks', () => {
     const exceptions = JSON.parse(readFileSync(join(ROOT, 'tools/ci/size-exceptions.json'), 'utf8'))
     const labels = budgets().map(b => b.label)

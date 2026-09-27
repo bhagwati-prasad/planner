@@ -161,6 +161,26 @@ export function createMirrorPorts(ctx, nodeId, systemId) {
   for (const bp of boundaryPortsOf(ctx.tx, systemId)) createMirrorPort(ctx, nodeId, bp)
 }
 
+/**
+ * Gives an owner's port a boundary port of the same name and direction in its inner system, and
+ * maps the port to it (spec §7: the boundary mirrors the owner's ports).
+ * @param {Ctx} ctx
+ * @param {string} systemId
+ * @param {{ id: string, name: string, direction: string }} port
+ */
+export function linkBoundaryPort(ctx, systemId, port) {
+  const bp = ctx.tx.create('boundaryPort', {
+    id: ctx.newId(),
+    systemId,
+    name: port.name,
+    direction: port.direction,
+    internalPortId: null,
+    description: '',
+  })
+  ctx.tx.update('port', port.id, { boundaryPortId: bp.id })
+  return bp.id
+}
+
 /** @param {Ctx} ctx @param {string} nodeId @param {any} bp */
 export function createMirrorPort(ctx, nodeId, bp) {
   const id = ctx.newId()
@@ -373,11 +393,11 @@ export function removeNode(ctx, nodeId) {
   removeFromViews(ctx, node.systemId, [nodeId])
   ctx.tx.remove('node', nodeId)
   if (
-    node.kind === 'composite' &&
+    node.innerSystemRef &&
     node.placement === 'value' &&
-    ctx.tx.has('system', node.systemRef)
+    ctx.tx.has('system', node.innerSystemRef)
   ) {
-    deleteSystemDeep(ctx, node.systemRef)
+    deleteSystemDeep(ctx, node.innerSystemRef)
   }
 }
 
@@ -433,15 +453,20 @@ export function copyContents(ctx, srcSystemId, destSystemId, idMap = new Map()) 
   for (const node of nodesOf(ctx.tx, srcSystemId)) {
     const nodeId = ctx.newId()
     idMap.set(node.id, nodeId)
-    let systemRef = node.systemRef
+    let innerSystemRef = node.innerSystemRef
     /** @type {Map<string, string>} */
     let bpMap = new Map()
-    if (node.kind === 'composite' && node.placement === 'value') {
-      const clone = cloneSystem(ctx, node.systemRef, { ownerNodeId: nodeId })
-      systemRef = clone.systemId
+    if (node.innerSystemRef && node.placement === 'value') {
+      const clone = cloneSystem(ctx, node.innerSystemRef, { ownerNodeId: nodeId })
+      innerSystemRef = clone.systemId
       bpMap = clone.idMap
     }
-    ctx.tx.create('node', { ...fieldsOf(node), id: nodeId, systemId: destSystemId, systemRef })
+    ctx.tx.create('node', {
+      ...fieldsOf(node),
+      id: nodeId,
+      systemId: destSystemId,
+      innerSystemRef,
+    })
     for (const port of portsOf(ctx.tx, node.id)) {
       const portId = ctx.newId()
       idMap.set(port.id, portId)

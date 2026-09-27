@@ -3,6 +3,7 @@
  */
 import { fail } from '../errors.js'
 import { compareSemver } from '../semver.js'
+import { SYSTEM_TYPE_REF } from '../builtins.js'
 import { parseTypeRef, typeRefOf } from '../registry.js'
 import {
   NODE_STATUSES,
@@ -16,6 +17,10 @@ import {
 import {
   cloneSystem,
   createMirrorPorts,
+  createSystem,
+  deleteSystemDeep,
+  linkBoundaryPort,
+  removeBoundaryPort,
   nullableString,
   oneOf,
   onlyKeys,
@@ -65,6 +70,11 @@ function resolveType(ctx, ref) {
     if (pinned.length) typeRef = `${found.id}@${pinned[0].version}`
   }
   const manifest = registry?.resolve(typeRef) ?? null
+  if (manifest?.id === 'strata.system')
+    fail(
+      'INVALID',
+      'A System component is placed, not added: use node.place with a system, or system.extract'
+    )
   if (manifest?.abstract)
     fail('INVALID', `'${manifest.id}' is an abstract base type; use a component that extends it`)
   return { typeRef, manifest }
@@ -99,7 +109,7 @@ function nodeFields(p, label) {
 /** @param {Ctx} ctx @param {string} id */
 function requireAtomic(ctx, id) {
   const node = ctx.tx.require('node', id)
-  if (node.kind !== 'atomic')
+  if (node.typeRef === SYSTEM_TYPE_REF)
     fail(
       'INVALID',
       `'${node.name}' is a composite; its values are derived from the system it contains`
@@ -141,9 +151,8 @@ export const nodeCommands = {
       ctx.tx.create('node', {
         id,
         systemId: system.id,
-        kind: 'atomic',
         typeRef,
-        systemRef: null,
+        innerSystemRef: null,
         placement: null,
         name,
         description: fields.description ?? '',
@@ -200,16 +209,15 @@ export const nodeCommands = {
       p.name = name
       p.placement = placement
       const id = optionalString(p.id, 'id') ?? ctx.newId()
-      const systemRef =
+      const innerSystemRef =
         placement === 'value'
           ? cloneSystem(ctx, target.id, { ownerNodeId: id }).systemId
           : target.id
       ctx.tx.create('node', {
         id,
         systemId: container.id,
-        kind: 'composite',
-        typeRef: null,
-        systemRef,
+        typeRef: SYSTEM_TYPE_REF,
+        innerSystemRef,
         placement,
         name,
         description: '',
@@ -218,7 +226,7 @@ export const nodeCommands = {
         owner: null,
         status: 'planned',
       })
-      createMirrorPorts(ctx, id, systemRef)
+      createMirrorPorts(ctx, id, innerSystemRef)
       return id
     },
   },
@@ -272,10 +280,10 @@ export const nodeCommands = {
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       const node = ctx.tx.require('node', requireString(p.id, 'id'))
-      if (node.kind !== 'composite' || node.placement !== 'reference')
+      if (!node.innerSystemRef || node.placement !== 'reference')
         fail('INVALID', `'${node.name}' is not placed by reference`)
-      const { systemId, idMap } = cloneSystem(ctx, node.systemRef, { ownerNodeId: node.id })
-      ctx.tx.update('node', node.id, { systemRef: systemId, placement: 'value' })
+      const { systemId, idMap } = cloneSystem(ctx, node.innerSystemRef, { ownerNodeId: node.id })
+      ctx.tx.update('node', node.id, { innerSystemRef: systemId, placement: 'value' })
       for (const port of portsOf(ctx.tx, node.id)) {
         if (port.boundaryPortId)
           ctx.tx.update('port', port.id, { boundaryPortId: idMap.get(port.boundaryPortId) ?? null })
@@ -303,6 +311,9 @@ export const nodeCommands = {
         declared: false,
         boundaryPortId: null,
       })
+      // An opened component's boundary mirrors its ports, in the same batch (spec §7).
+      if (node.innerSystemRef)
+        linkBoundaryPort(ctx, node.innerSystemRef, ctx.tx.require('port', id))
       return id
     },
   },
@@ -329,6 +340,8 @@ export const nodeCommands = {
       }
       stringList(changes.accepts, 'accepts')
       ctx.tx.update('port', port.id, changes)
+      if (changes.name !== undefined && port.boundaryPortId && ownsInnerSystem(ctx, port.nodeId))
+        ctx.tx.update('boundaryPort', port.boundaryPortId, { name: changes.name })
     },
   },
 
@@ -340,7 +353,63 @@ export const nodeCommands = {
       const port = ctx.tx.require('port', requireString(p.id, 'id'))
       if (port.declared)
         fail('INVALID', `Port '${port.name}' is declared by the component and cannot be removed`)
-      removePort(ctx, port.id)
+      // Removing the boundary port an opened component mirrors removes this port with it.
+      if (port.boundaryPortId && ownsInnerSystem(ctx, port.nodeId))
+        removeBoundaryPort(ctx, port.boundaryPortId)
+      else removePort(ctx, port.id)
     },
   },
+
+  'component.openAsSystem': {
+    description:
+      'Gives a component an inner system of its own, with a boundary port for each of its ports; it keeps its type and behaviour as its black-box model',
+    signature: '{ id, name? }',
+    /** @param {any} p @param {Ctx} ctx */
+    handler(p, ctx) {
+      const node = ctx.tx.require('node', requireString(p.id, 'id'))
+      if (node.innerSystemRef)
+        fail('E_SYSTEM_EXISTS', `'${node.name}' already has an inner system`, {
+          nodeId: node.id,
+          systemId: node.innerSystemRef,
+        })
+      const systemId = createSystem(ctx, {
+        name: p.name !== undefined ? requireString(p.name, 'name').trim() : node.name,
+        ownerNodeId: node.id,
+      })
+      for (const port of portsOf(ctx.tx, node.id)) linkBoundaryPort(ctx, systemId, port)
+      ctx.tx.update('node', node.id, { innerSystemRef: systemId, placement: 'value' })
+      return systemId
+    },
+  },
+
+  'component.removeInnerSystem': {
+    description:
+      "Deletes a component's inner system and everything in it, leaving the component a black box",
+    signature: '{ id }',
+    /** @param {any} p @param {Ctx} ctx */
+    handler(p, ctx) {
+      const node = ctx.tx.require('node', requireString(p.id, 'id'))
+      if (!node.innerSystemRef)
+        fail('E_SYSTEM_NONE', `'${node.name}' has no inner system`, { nodeId: node.id })
+      if (node.typeRef === SYSTEM_TYPE_REF)
+        fail('E_SYSTEM_REQUIRED', `'${node.name}' is a System, whose inner system is required`, {
+          nodeId: node.id,
+        })
+      for (const port of portsOf(ctx.tx, node.id))
+        if (port.boundaryPortId) ctx.tx.update('port', port.id, { boundaryPortId: null })
+      deleteSystemDeep(ctx, node.innerSystemRef)
+      ctx.tx.update('node', node.id, { innerSystemRef: null, placement: null })
+    },
+  },
+}
+
+/**
+ * Whether a node owns its inner system, so that its ports and that system's boundary ports are
+ * kept in step: an opened component (spec §7).
+ * @param {Ctx} ctx
+ * @param {string} nodeId
+ */
+function ownsInnerSystem(ctx, nodeId) {
+  const node = ctx.tx.get('node', nodeId)
+  return !!node?.innerSystemRef && node.typeRef !== SYSTEM_TYPE_REF
 }
