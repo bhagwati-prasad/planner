@@ -2,9 +2,9 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M01 Core](../ROADMAP.md#m01-core) | R0 | proposed | [0118](../M01-core/0118-open-as-system.md) |
+| [M01 Core](../ROADMAP.md#m01-core) | R0 | todo | [0118](../M01-core/0118-open-as-system.md) |
 
-Proposed by 0118, under the policy the human chose on 2026-09-27 (`tools/ci/README.md`): 0118 took core, facade and the non-UI packages to 250.7 KB of their 250 KB budget and recorded an exception owned by this task. It awaits the human's approval, and the approach below is a proposal.
+Proposed by 0118, under the policy the human chose on 2026-09-27 (`tools/ci/README.md`): 0118 took core, facade and the non-UI packages to 250.7 KB of their 250 KB budget and recorded an exception owned by this task. The human approved it on 2026-09-27, to run next.
 
 ## Read first
 

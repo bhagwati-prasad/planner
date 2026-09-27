@@ -29,7 +29,7 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 | Budget | Recorded | Removed by |
 | --- | --- | --- |
-| Core, facade and non-UI packages | 250.7 KB of 250 KB | 0119 (proposed: bring core back within budget), recorded by 0118 |
+| Core, facade and non-UI packages | 250.7 KB of 250 KB | 0119 (core within its size budget), recorded by 0118 |
 | strata-graph | 88.5 KB of 60 KB | 0207 (level of detail and performance). The minifier that drops unneeded line breaks and spaces lowered it from 99.5 KB |
 | Simulation worker bundle | 168.6 KB of 120 KB | 0402 (worker host) |
 
