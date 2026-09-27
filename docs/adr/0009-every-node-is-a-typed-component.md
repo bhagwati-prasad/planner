@@ -1,6 +1,6 @@
 # 0009 Every node is a typed component that may own an inner system
 
-Status: Proposed
+Status: Accepted
 Date: 2026-09-27
 
 ## Context and problem
@@ -36,7 +36,7 @@ Task 0110 asks for `component.openAsSystem`, and for boundary ports that follow 
 
 ## Decision outcome
 
-Proposed: option 1. It is what spec §5 and §7 describe, it removes the `atomic` and `composite` special cases instead of adding a third, and it keeps by-reference placement.
+Chosen option: 1, unify, decided by the human on 2026-09-27, together with the split below. It is what spec §5 and §7 describe, it removes the `atomic` and `composite` special cases instead of adding a third, and it keeps by-reference placement.
 
 ## Consequences
 
@@ -45,10 +45,10 @@ Proposed: option 1. It is what spec §5 and §7 describe, it removes the `atomic
 - Bad: about 30 sites across core, the facade and the UI read `kind` or `systemRef` and change with it. The existing recursion tests are rechecked against the new shape.
 - Bad: saved projects need `migrations/v2-to-v3.js`, with fixtures in `test/fixtures/schema-v2/`.
 - Bad: `node.place` still takes the same payload but creates a `strata.system` component. Op logs replay unchanged. Undo payloads recorded before v3 would hold old node shapes, but op logs are not persisted until M06, so none exist.
-- Proposed split of task 0110:
+- Task 0110 is split, as the human agreed:
   - **0110**, as planned but without its first two tests: `resolveSystem`, `walk` with `maxDepth`, and the guards `E_SYSTEM_CYCLE`, `E_SYSTEM_READONLY` and `E_SYSTEM_TOO_DEEP`. It works on either model.
-  - **0117 Every node is a typed component**, after this ADR: the unified node, the `strata.system` built-in, the v2-to-v3 migration and its fixtures.
-  - **0118 Open a component as a system**, after 0117: `component.openAsSystem`, and boundary ports that follow the owner's ports. These are the first two tests of the current 0110.
+  - **[0117](../../plan/M01-core/0117-typed-nodes.md) Every node is a typed component**, after 0110: the unified node, the `strata.system` built-in, the v2-to-v3 migration and its fixtures.
+  - **[0118](../../plan/M01-core/0118-open-as-system.md) Open a component as a system**, after 0117: `component.openAsSystem`, and boundary ports that follow the owner's ports. These are the first two tests of the current 0110.
 
 ## Pros and cons of the options
 

@@ -1,4 +1,4 @@
-# 0110 Inner systems, boundary ports and the resolver
+# 0110 The recursion resolver and its guards
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
@@ -11,14 +11,12 @@
 
 ## Goal
 
-`component.openAsSystem`, boundary ports that mirror the owner's ports, `resolveSystem`, `walk` with `maxDepth`, cycle and depth guards, and read-only by-reference inner systems.
+`resolveSystem`, `walk` with `maxDepth`, cycle and depth guards, and read-only by-reference inner systems. Opening a component as a system and boundary ports that follow the owner's ports moved to [0117](0117-typed-nodes.md) and [0118](0118-open-as-system.md) with [ADR 0009](../../docs/adr/0009-every-node-is-a-typed-component.md).
 
 ## Tests to write first
 
 Write these tests first, in `packages/core/test/recursion.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] Opening a component as a system creates boundary ports matching its ports one to one
-- [ ] Adding a port to the owner adds a boundary port in the same batch
 - [ ] A placement that creates a cycle fails with `E_SYSTEM_CYCLE`
 - [ ] Editing inside a by-reference inner system fails with `E_SYSTEM_READONLY`
 - [ ] `walk` visits every component of a three-level graph exactly once and honours `maxDepth`
