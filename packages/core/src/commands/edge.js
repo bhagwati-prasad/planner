@@ -3,7 +3,16 @@
  * boundary ports are a system's public interface when it is used as a component (spec §6).
  */
 import { fail } from '../errors.js'
-import { boundaryPortsOf, connectionTypeOf, referencingNodes } from '../model.js'
+import { SYSTEM_TYPE_REF } from '../builtins.js'
+import {
+  boundaryPortsOf,
+  connectionTypeOf,
+  exposedMethods,
+  portsOf,
+  publicMethods,
+  reachableFrom,
+  referencingNodes,
+} from '../model.js'
 import {
   checkBoundaryMapping,
   checkConnection,
@@ -141,6 +150,7 @@ export const edgeCommands = {
         direction,
         internalPortId,
         description: optionalString(p.description, 'description') ?? '',
+        bindings: {},
       })
       for (const node of referencingNodes(ctx.tx, system.id)) createMirrorPort(ctx, node.id, bp)
       return id
@@ -174,6 +184,63 @@ export const edgeCommands = {
         }
       }
       ctx.tx.update('boundaryPort', bp.id, changes)
+    },
+  },
+
+  'boundary.bind': {
+    description:
+      "Binds a public method of the system's owner, on a boundary port, to a public method of a component inside that the port reaches",
+    signature: '{ boundaryPortId, method, nodeId, target }',
+    /** @param {any} p @param {Ctx} ctx */
+    handler(p, ctx) {
+      const bp = ctx.tx.require('boundaryPort', requireString(p.boundaryPortId, 'boundaryPortId'))
+      const method = requireString(p.method, 'method')
+      const node = ctx.tx.require('node', requireString(p.nodeId, 'nodeId'))
+      const target = requireString(p.target, 'target')
+      const system = ctx.tx.require('system', bp.systemId)
+      const owner = system.ownerNodeId ? ctx.tx.get('node', system.ownerNodeId) : null
+      // A System component declares its methods by binding them; any other owner exposes them
+      // through its manifest (ADR 0010).
+      if (owner && owner.typeRef !== SYSTEM_TYPE_REF) {
+        const mirror = portsOf(ctx.tx, owner.id).find(q => q.boundaryPortId === bp.id)
+        if (!mirror || !exposedMethods(ctx.tx, ctx.registry, mirror).includes(method))
+          fail(
+            'E_METHOD_NOT_EXPOSED',
+            `'${owner.name}.${bp.name}' does not expose a public method '${method}'`,
+            { boundaryPortId: bp.id, method }
+          )
+      }
+      if (node.systemId !== bp.systemId || !reachableFrom(ctx.tx, bp).has(node.id))
+        fail(
+          'E_METHOD_UNREACHABLE',
+          `'${node.name}' is not reachable from the boundary port '${bp.name}'`,
+          { boundaryPortId: bp.id, nodeId: node.id }
+        )
+      if (!publicMethods(ctx.tx, ctx.registry, node).includes(target))
+        fail('E_METHOD_UNKNOWN', `'${node.name}' has no public method '${target}'`, {
+          nodeId: node.id,
+          method: target,
+        })
+      ctx.tx.update('boundaryPort', bp.id, {
+        bindings: { ...bp.bindings, [method]: { nodeId: node.id, method: target } },
+      })
+    },
+  },
+
+  'boundary.unbind': {
+    description: 'Removes the binding of a public method from a boundary port',
+    signature: '{ boundaryPortId, method }',
+    /** @param {any} p @param {Ctx} ctx */
+    handler(p, ctx) {
+      const bp = ctx.tx.require('boundaryPort', requireString(p.boundaryPortId, 'boundaryPortId'))
+      const method = requireString(p.method, 'method')
+      if (!bp.bindings?.[method])
+        fail('E_METHOD_UNBOUND', `'${method}' is not bound on the boundary port '${bp.name}'`, {
+          boundaryPortId: bp.id,
+          method,
+        })
+      const { [method]: _removed, ...rest } = bp.bindings
+      ctx.tx.update('boundaryPort', bp.id, { bindings: rest })
     },
   },
 

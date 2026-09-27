@@ -13,7 +13,7 @@ import { deepEqual, deepFreeze, toPlain } from './plain.js'
  * Version 2 stores property values in canonical units (ADR 0008); version 3 makes every node a
  * typed component that may own an inner system (ADR 0009).
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 /**
  * Entity kinds, the snapshot table each is stored under, and the fields indexed for lookups.

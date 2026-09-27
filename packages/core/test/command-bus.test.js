@@ -11,7 +11,7 @@ import {
   ok,
 } from '../src/index.js'
 import { createRandom, gen, property } from '../../../tools/testing/index.js'
-import { add, buildPayments, createTestCore, setup, T0 } from './helpers.js'
+import { add, buildPayments, createTestCore, port, setup, T0 } from './helpers.js'
 import { PAYLOADS } from './command-payloads.js'
 
 /** A test command that renames a node, refusing blank names in `validate`. */
@@ -322,6 +322,21 @@ function paymentsWithLibrary() {
   const { core, root } = setup()
   buildPayments(core, root)
   const library = core.dispatch({ type: 'system.create', payload: { name: 'Library' } })
+  // A service behind the library's boundary port, with its method bound (ADR 0010).
+  const worker = add(core, library, 'test.service', 'Worker')
+  const bp = core.dispatch({
+    type: 'boundary.add',
+    payload: {
+      systemId: library,
+      name: 'in',
+      direction: 'in',
+      internalPortId: port(core, worker, 'in'),
+    },
+  })
+  core.dispatch({
+    type: 'boundary.bind',
+    payload: { boundaryPortId: bp, method: 'handle', nodeId: worker, target: 'handle' },
+  })
   core.dispatch({ type: 'node.place', payload: { systemId: root, systemRef: library } })
   return core
 }

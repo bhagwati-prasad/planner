@@ -34,8 +34,12 @@ describe('typed nodes', () => {
     const v2 = fixture('schema-v2/recursive')
     assert.equal(v2.schemaVersion, 2)
     const migrated = core.migrateSnapshot(v2, { registry: testRegistry() })
-    assert.equal(migrated.schemaVersion, 3)
-    assert.equal(migrated.project.schemaVersion, 3)
+    assert.equal(
+      migrated.schemaVersion,
+      core.SCHEMA_VERSION,
+      'through version 3, to the current one'
+    )
+    assert.equal(migrated.project.schemaVersion, core.SCHEMA_VERSION)
     for (const node of migrated.nodes) {
       assert.ok(node.typeRef, `${node.name} is typed`)
       assert.ok(!('kind' in node) && !('systemRef' in node))

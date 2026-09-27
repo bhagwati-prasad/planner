@@ -7,10 +7,14 @@
 import { checkValue } from './schema.js'
 import { checkConnection } from './commands/ops.js'
 import { checkContracts } from './rollup.js'
+import { SYSTEM_TYPE_REF } from './builtins.js'
 import {
   connectionTypeOf,
+  exposedMethods,
   isLibrarySystem,
   manifestOf,
+  portsOf,
+  reachableFrom,
   referencingNodes,
   requireProject,
 } from './model.js'
@@ -214,6 +218,8 @@ export function findProblems(src, registry, { contracts = true } = {}) {
     }
   }
 
+  checkBindings(src, registry, add)
+
   for (const system of src.all('system')) {
     if (isLibrarySystem(src, system) && referencingNodes(src, system.id).length === 0) {
       add(
@@ -236,6 +242,50 @@ export function findProblems(src, registry, { contracts = true } = {}) {
     (a, b) =>
       SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
       a.code.localeCompare(b.code) ||
-      (a.id < b.id ? -1 : 1)
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   )
+}
+
+/**
+ * Method bindings (spec §7, ADR 0010): every public method a composite's ports expose is bound
+ * on the matching boundary port, and every binding targets a component the port reaches. A
+ * System component declares its methods by binding them, so it has none unbound.
+ * @param {import('./model.js').Source} src
+ * @param {import('./registry.js').Registry|undefined} registry
+ * @param {(severity: 'error'|'warning'|'info', code: string, message: string, kind: string, id: string, systemId?: string|null) => void} add
+ */
+function checkBindings(src, registry, add) {
+  for (const node of src.all('node')) {
+    if (!node.innerSystemRef || node.typeRef === SYSTEM_TYPE_REF) continue
+    for (const port of portsOf(src, node.id)) {
+      const bp = port.boundaryPortId ? src.get('boundaryPort', port.boundaryPortId) : null
+      for (const method of exposedMethods(src, registry, port))
+        if (!bp?.bindings?.[method])
+          add(
+            'warning',
+            'E_METHOD_UNBOUND',
+            `Public method '${method}' of '${node.name}' is not bound to a component inside (port '${port.name}')`,
+            'node',
+            node.id,
+            node.systemId
+          )
+    }
+  }
+  for (const bp of src.all('boundaryPort')) {
+    const bindings = Object.entries(bp.bindings ?? {})
+    if (!bindings.length) continue
+    const reached = reachableFrom(src, bp)
+    for (const [method, target] of bindings) {
+      if (reached.has(target.nodeId)) continue
+      const node = src.get('node', target.nodeId)
+      add(
+        'warning',
+        'E_METHOD_UNREACHABLE',
+        `'${method}' on the boundary port '${bp.name}' is bound to ${node ? `'${node.name}'` : 'a missing component'}, which the port does not reach`,
+        'boundaryPort',
+        bp.id,
+        bp.systemId
+      )
+    }
+  }
 }

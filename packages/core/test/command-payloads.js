@@ -172,6 +172,34 @@ export const PAYLOADS = {
     const bp = pick(random, snap.boundaryPorts)
     return bp && { id: bp.id }
   }),
+  // Binds `handle`, which test.service declares, from the component behind the port.
+  'boundary.bind': inProject((snap, random) => {
+    const bp = pick(
+      random,
+      snap.boundaryPorts.filter(b => b.internalPortId)
+    )
+    const inside = bp && snap.ports.find(p => p.id === bp.internalPortId)
+    return (
+      inside && {
+        boundaryPortId: bp.id,
+        method: pick(random, ['handle', 'other']),
+        nodeId: inside.nodeId,
+        target: 'handle',
+      }
+    )
+  }),
+  'boundary.unbind': inProject((snap, random) => {
+    const bp = pick(
+      random,
+      snap.boundaryPorts.filter(b => Object.keys(b.bindings ?? {}).length)
+    )
+    return (
+      bp && {
+        boundaryPortId: bp.id,
+        method: /** @type {string} */ (pick(random, Object.keys(bp.bindings))),
+      }
+    )
+  }),
 
   'view.create': inProject((snap, random) => ({
     systemId: pick(random, snap.systems).id,

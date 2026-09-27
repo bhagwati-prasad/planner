@@ -176,6 +176,7 @@ export function linkBoundaryPort(ctx, systemId, port) {
     direction: port.direction,
     internalPortId: null,
     description: '',
+    bindings: {},
   })
   ctx.tx.update('port', port.id, { boundaryPortId: bp.id })
   return bp.id
@@ -389,6 +390,7 @@ export function removePort(ctx, portId) {
  */
 export function removeNode(ctx, nodeId) {
   const node = ctx.tx.require('node', nodeId)
+  unbindTarget(ctx, node)
   for (const port of portsOf(ctx.tx, nodeId)) removePort(ctx, port.id)
   removeFromViews(ctx, node.systemId, [nodeId])
   ctx.tx.remove('node', nodeId)
@@ -399,6 +401,36 @@ export function removeNode(ctx, nodeId) {
   ) {
     deleteSystemDeep(ctx, node.innerSystemRef)
   }
+}
+
+/**
+ * Removes the bindings that target a component, from the boundary ports of its system.
+ * @param {Ctx} ctx
+ * @param {{ id: string, systemId: string }} node
+ */
+function unbindTarget(ctx, node) {
+  for (const bp of boundaryPortsOf(ctx.tx, node.systemId)) {
+    const entries = Object.entries(bp.bindings ?? {})
+    const kept = entries.filter(([, target]) => target.nodeId !== node.id)
+    if (kept.length !== entries.length)
+      ctx.tx.update('boundaryPort', bp.id, { bindings: Object.fromEntries(kept) })
+  }
+}
+
+/**
+ * A copy's bindings, pointing at the copies of their targets; a binding whose target was not
+ * copied is dropped.
+ * @param {Record<string, { nodeId: string, method: string }>|undefined} bindings
+ * @param {Map<string, string>} idMap
+ */
+function remapBindings(bindings, idMap) {
+  /** @type {Record<string, { nodeId: string, method: string }>} */
+  const out = {}
+  for (const [method, target] of Object.entries(bindings ?? {})) {
+    const nodeId = idMap.get(target.nodeId)
+    if (nodeId) out[method] = { nodeId, method: target.method }
+  }
+  return out
 }
 
 /**
@@ -517,6 +549,7 @@ export function cloneSystem(ctx, srcSystemId, { ownerNodeId = null, name } = {})
       id: bpId,
       systemId,
       internalPortId: bp.internalPortId ? (idMap.get(bp.internalPortId) ?? null) : null,
+      bindings: remapBindings(bp.bindings, idMap),
     })
   }
   for (const view of viewsOf(ctx.tx, srcSystemId)) {

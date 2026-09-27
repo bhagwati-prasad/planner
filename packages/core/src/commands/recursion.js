@@ -127,6 +127,7 @@ export const recursionCommands = {
           direction,
           internalPortId: portId,
           description: '',
+          bindings: {},
         })
         mirrorOf.set(key, createMirrorPort(ctx, compositeId, bp))
       }

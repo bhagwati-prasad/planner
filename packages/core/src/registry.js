@@ -37,6 +37,46 @@ export function parseTypeRef(ref) {
 export const typeRefOf = manifest => `${manifest.id}@${manifest.version}`
 
 /**
+ * Checks a manifest's `methods.public` and `methods.private` (spec §8), and that each port
+ * `exposes` only public methods (spec §6, ADR 0010).
+ * @param {unknown} methods
+ * @param {{ name: string, exposes?: unknown }[]} ports
+ * @returns {string[]}
+ */
+function checkMethods(methods, ports) {
+  const errors = []
+  /** @type {Record<string, Record<string, unknown>>} */
+  const groups = { public: {}, private: {} }
+  if (methods !== undefined && !isPlainObject(methods))
+    errors.push('methods must be an object with public and private methods')
+  else
+    for (const scope of /** @type {const} */ (['public', 'private'])) {
+      const group = /** @type {Record<string, unknown>|undefined} */ (methods)?.[scope]
+      if (group === undefined) continue
+      if (!isPlainObject(group)) {
+        errors.push(`methods.${scope} must be an object of method names`)
+        continue
+      }
+      groups[scope] = /** @type {Record<string, unknown>} */ (group)
+      for (const [name, spec] of Object.entries(group))
+        if (!isPlainObject(spec)) errors.push(`methods.${scope}.${name} must be an object`)
+    }
+  for (const name of Object.keys(groups.private))
+    if (name in groups.public) errors.push(`methods: '${name}' is both public and private`)
+  for (const port of ports) {
+    if (port.exposes === undefined) continue
+    if (!Array.isArray(port.exposes) || port.exposes.some(e => typeof e !== 'string')) {
+      errors.push(`port '${port.name}': exposes must be a list of public method names`)
+      continue
+    }
+    for (const name of port.exposes)
+      if (!(name in groups.public))
+        errors.push(`port '${port.name}' exposes '${name}', which is not a public method`)
+  }
+  return errors
+}
+
+/**
  * Validates and normalises a manifest. Throws INVALID with every problem listed in `details`.
  * @param {unknown} input
  * @returns {Manifest}
@@ -92,6 +132,8 @@ export function normalizeManifest(input) {
       errors.push(`ports[${i}].accepts must be a list of connection type names`)
     ports.push({ ...p, name: p.name, direction: p.direction, accepts: p.accepts ?? [] })
   }
+
+  errors.push(...checkMethods(m.methods, ports))
 
   const properties = m.properties ?? {}
   if (!isPlainObject(properties)) errors.push('properties must be an object')
@@ -362,6 +404,7 @@ export function createRegistry({ builtins = true } = {}) {
  * @property {string} name
  * @property {'in'|'out'|'both'} direction
  * @property {string[]} accepts   connection types; empty means any
+ * @property {string[]} [exposes]  the public methods a message on this port can call (spec §6)
  *
  * @typedef {object} Manifest
  * @property {'component'|'connection-type'} kind
@@ -376,6 +419,7 @@ export function createRegistry({ builtins = true } = {}) {
  * @property {boolean} abstract
  * @property {PortSpec[]} ports
  * @property {Record<string, import('./props.js').PropertySchema>} properties
+ * @property {{ public?: Record<string, object>, private?: Record<string, object> }} [methods]  spec §8
  * @property {Record<string, {unit?: string, rollup?: string, description?: string, estimate?: string}>} metrics  `estimate` names the property that estimates the metric until simulation measures it
  * @property {string} [shape]    diagram shape name (strata-graph); defaults by base type
  * @property {string} [iconSvg]  icon markup, attached when a packed bundle is registered (M4)

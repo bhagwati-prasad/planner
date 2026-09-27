@@ -62,10 +62,11 @@ export const FIXTURE_MANIFESTS = [
     version: '1.0.0',
     extends: 'base:service',
     ports: [
-      { name: 'in', direction: 'in', accepts: ['http', 'grpc'] },
+      { name: 'in', direction: 'in', accepts: ['http', 'grpc'], exposes: ['handle'] },
       { name: 'out', direction: 'out', accepts: ['http', 'grpc'] },
       { name: 'db', direction: 'out', accepts: ['db-protocol'] },
     ],
+    methods: { public: { handle: {} } },
     properties: {
       serviceTime: { type: 'distribution', unit: 'ms', default: 10, rollup: 'critical-path' },
       maxRps: { type: 'number', unit: 'req/s', default: 1000, rollup: 'min-path' },
