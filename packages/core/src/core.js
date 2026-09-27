@@ -12,9 +12,10 @@ import { createRegistry } from './registry.js'
 import { createUlidFactory } from './ulid.js'
 import { registerCoreCommands } from './commands/index.js'
 import { migrateSnapshot } from './migrations/index.js'
-import { rollup, checkContracts } from './rollup.js'
+import { checkContracts } from './rollup.js'
 import { findProblems } from './validate.js'
 import { planExtract, planInline } from './planners.js'
+import { RollupCache } from './rollup-cache.js'
 import { canonicalJson } from './plain.js'
 import { sha256, toHex } from './sha256.js'
 import {
@@ -27,6 +28,7 @@ import {
   edgesOf,
   effectiveProps,
   explainProps,
+  exposedMethods,
   manifestOf,
   nodesOf,
   pathsTo,
@@ -71,6 +73,8 @@ export class Core {
   #registry
   /** @type {() => string} */
   #newId
+  /** @type {RollupCache} */
+  #rollups
 
   /** @param {CoreOptions} options */
   constructor(
@@ -100,6 +104,8 @@ export class Core {
       services: { registry },
     })
     registerCoreCommands(this.#bus)
+    this.#rollups = new RollupCache(this.#store, registry)
+    this.#emitter.on('change', ({ op }) => this.#rollups.invalidate(op))
   }
 
   // --- identity and state ------------------------------------------------------------------
@@ -267,6 +273,15 @@ export class Core {
   /** @param {string|object} entity a node or an edge */ effectiveProps(entity) {
     return effectiveProps(this.#registry, this.#propsArg(entity))
   }
+  /**
+   * The public methods a port exposes (spec §6): those its component's manifest lists, or, on a
+   * System component, the methods bound on the boundary port it mirrors.
+   * @param {string|{ nodeId: string, name: string, boundaryPortId?: string|null }} port
+   */
+  exposedMethods(port) {
+    const entity = typeof port === 'string' ? this.#store.require('port', port) : port
+    return exposedMethods(this.#store, this.#registry, entity)
+  }
   /** @param {string|object} entity a node or an edge */ explainProps(entity) {
     return explainProps(this.#registry, this.#propsArg(entity))
   }
@@ -281,12 +296,14 @@ export class Core {
   // --- derived values and problems -----------------------------------------------------------
 
   /**
+   * The roll-up of `key` over a system (spec §7). Results are memoised per system and frozen: a
+   * change inside a system invalidates only its own and its ancestors' roll-ups (eng §9).
    * @param {string} systemId
    * @param {string} key
    * @param {import('./rollup.js').RollupOptions} [options]
    */
   rollup(systemId, key, options) {
-    return rollup(this.#store, this.#registry, systemId, key, options)
+    return this.#rollups.get(systemId, key, options)
   }
 
   /** @param {string} systemId @param {import('./rollup.js').RollupOptions} [options] */
