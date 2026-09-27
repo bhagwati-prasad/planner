@@ -37,7 +37,7 @@ test('normalises defaults and resolves ports from the shape', () => {
     portsOf: node => (node.id === 'b' ? [{ id: 'in', side: 'left' }] : []),
   })
   const a = m.nodes.get('a')
-  assert.deepEqual([a.w, a.h, a.shape], [DEFAULT_NODE_SIZE.w, DEFAULT_NODE_SIZE.h, 'box'])
+  assert.deepEqual([a.w, a.h, a.shape], [DEFAULT_NODE_SIZE.w, DEFAULT_NODE_SIZE.h, 'card'])
   assert.deepEqual(m.nodes.get('b').ports, [{ id: 'in', side: 'left' }])
   assert.deepEqual(
     m.edges.get('ab').target,

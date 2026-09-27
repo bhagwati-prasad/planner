@@ -24,7 +24,7 @@ export {
   visibleRect,
   IDENTITY,
 } from './viewport.js'
-export { wrapText, estimateMeasure } from './text.js'
+export { wrapText, truncateText, estimateMeasure } from './text.js'
 export { GraphModel, DEFAULT_NODE_SIZE, FRAME_KINDS, ANNOTATION_KINDS } from './data.js'
 export { TOKENS, LIGHT, DARK, themeStyle, themeTokens } from './theme.js'
 export { create, Graph } from './dom/graph.js'

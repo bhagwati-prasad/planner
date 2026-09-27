@@ -14,7 +14,7 @@
  * @property {number} y
  * @property {number} [w]
  * @property {number} [h]
- * @property {string} [shape]     registered shape name (default 'box')
+ * @property {string} [shape]     registered shape name (default 'card', the component of design system §6)
  * @property {string} [label]
  * @property {string} [sublabel]  secondary line, e.g. the component type
  * @property {string} [icon]      SVG markup; sanitised before use
@@ -161,7 +161,7 @@ export class GraphModel {
       if (!unique('node', n) || !finite('node', n, ['x', 'y', 'w', 'h'])) continue
       const size = sizeOf(n)
       const node = /** @type {any} */ ({
-        shape: 'box',
+        shape: 'card',
         label: '',
         ...n,
         w: n.w ?? size.w,

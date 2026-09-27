@@ -67,7 +67,7 @@ const DEFAULTS = Object.freeze({
   /** @type {'light'|'dark'|Record<string, string>} */
   theme: 'light',
   showGrid: true,
-  portRadius: 4.5,
+  portRadius: 4,
   /** @type {null | ((source: EndInfo, target: EndInfo) => boolean)} */
   canConnect: null,
   /** @type {string} */
@@ -79,6 +79,8 @@ const DEFAULTS = Object.freeze({
 })
 
 const MOVABLE = new Set(['node', 'frame', 'annotation'])
+/** Ports are hit within 12 px of their centre: a 24 px target (design system §6). */
+const PORT_HIT_RADIUS = 12
 const HANDLE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 let instances = 0
 
@@ -255,7 +257,10 @@ export class Graph {
   setData(data) {
     this.#model = new GraphModel(data ?? {}, {
       portsOf: n => this.#shapeOf(n).ports?.(n) ?? [],
-      sizeOf: n => this.#shapeOf(n).size ?? DEFAULT_NODE_SIZE,
+      sizeOf: n => {
+        const size = this.#shapeOf(n).size
+        return (typeof size === 'function' ? size(n) : size) ?? DEFAULT_NODE_SIZE
+      },
     })
     for (const id of this.#selection) if (!this.#model.kindOf(id)) this.#selection.delete(id)
     for (const id of this.#routes.keys()) if (!this.#model.edges.has(id)) this.#routes.delete(id)
@@ -1040,8 +1045,8 @@ export class Graph {
 
   #shapeOf(node) {
     return (
-      this.#shapes.get(node.shape ?? 'box') ??
-      /** @type {import('./shapes.js').ShapeDef} */ (this.#shapes.get('box'))
+      this.#shapes.get(node.shape ?? 'card') ??
+      /** @type {import('./shapes.js').ShapeDef} */ (this.#shapes.get('card'))
     )
   }
 
@@ -1703,6 +1708,7 @@ export class Graph {
       .attr('class', 'sg-node')
       .attr('data-id', d => d.id)
     enter.append('g').attr('class', 'sg-body')
+    enter.append('g').attr('class', 'sg-content')
     enter.append('g').attr('class', 'sg-decor')
     enter.append('g').attr('class', 'sg-ports')
     if (interactive) this.#bindItem(enter, 'node')
@@ -1756,25 +1762,33 @@ export class Graph {
     all.each((d, i, groups) => {
       const g = this.#d3.select(groups[i])
       const r = this.#itemRect(d.id)
+      // The full name, as a tooltip (design system §6: titles are truncated on the card).
+      g.selectChildren('title')
+        .data(d.label ? [d.label] : [])
+        .join(enter => enter.insert('title', ':first-child'))
+        .text(t => t)
       this.#renderNodeBody(g, d, r)
 
       // Ports
       const anchors = portAnchors({ x: 0, y: 0, w: r.w, h: r.h }, d.ports)
       const ports = d.ports.map(p => ({ ...p, node: d.id, a: anchors.get(p.id) }))
+      // Each port draws at 8 px and is hit within 24 px (design system §6).
       const psel = g
         .select('.sg-ports')
-        .selectChildren('circle.sg-port')
+        .selectChildren('g.sg-port')
         .data(ports, p => p.id)
       psel.exit().remove()
-      const penter = psel.enter().append('circle').attr('class', 'sg-port')
+      const penter = psel.enter().append('g').attr('class', 'sg-port')
       penter.append('title')
+      penter.append('circle').attr('class', 'sg-port-hit').attr('r', PORT_HIT_RADIUS)
+      penter.append('circle').attr('class', 'sg-port-dot')
       if (portDrag && !d.ghost) penter.call(portDrag)
-      penter
+      const pall = penter
         .merge(psel)
-        .attr('cx', p => p.a.x)
-        .attr('cy', p => p.a.y)
-        .attr('r', this.#opts.portRadius)
+        .attr('transform', p => `translate(${p.a.x},${p.a.y})`)
         .attr('data-port', p => p.id)
+      pall.select('.sg-port-dot').attr('r', this.#opts.portRadius)
+      pall
         .classed('sg-port-target', p => !!target && target.node === d.id && target.port === p.id)
         .select('title')
         .text(p => p.label ?? p.id)
@@ -1811,6 +1825,11 @@ export class Graph {
     })
   }
 
+  /**
+   * The node's body through its shape's `render`, and the label and icon the graph draws for
+   * shapes that do not draw their own. Both update in place (spec §10); a node whose shape
+   * changes starts from an empty body.
+   */
   #renderNodeBody(g, d, r) {
     const key = JSON.stringify([
       d.shape,
@@ -1820,56 +1839,77 @@ export class Graph {
       d.sublabel,
       d.icon,
       d.style,
+      d.badges,
+      !!d.composite,
       this.#themeVersion,
     ])
     const node = g.node()
     if (node.__sgKey === key) return
     node.__sgKey = key
     const body = g.select('.sg-body')
-    body.selectAll('*').remove()
+    const shapeName = d.shape ?? 'card'
+    if (node.__sgShape !== shapeName) body.selectChildren().remove()
+    node.__sgShape = shapeName
     const shape = this.#shapeOf(d)
     const dd = { ...d, w: r.w, h: r.h }
-    shape.render(body, dd, { theme: this.#tokens, radius: Number(this.#tokens.radius) || 0 })
+    shape.render(body, dd, {
+      theme: this.#tokens,
+      radius: Number(this.#tokens.radius) || 0,
+      fontSize: this.#fontSize,
+      measure: this.#measure,
+      measureBold: this.#measureBold,
+      icon: markup => this.#icon(markup)?.cloneNode(true) ?? null,
+    })
     const style = d.style ?? {}
     body
       .selectAll('.sg-shape')
       .style('fill', style.fill ?? null)
       .style('stroke', style.stroke ?? null)
       .style('stroke-dasharray', style.dash ?? null)
-    if (style.opacity !== undefined) body.style('opacity', style.opacity)
+    body.style('opacity', style.opacity ?? null)
+
+    // What the graph draws inside the shape's label box: an icon, the label and a sublabel.
+    const content = g.select('.sg-content')
+    const own = shape.label !== false
     let box = shape.labelBox?.(dd) ?? { x: 6, y: 4, w: dd.w - 12, h: dd.h - 8 }
-    if (d.icon) {
-      const icon = this.#icon(d.icon)
-      if (icon) {
-        // Inside the label box, so it stays within curved and slanted outlines too.
-        const size = Math.max(10, Math.min(18, box.h - 4))
-        const el = /** @type {SVGSVGElement} */ (icon.cloneNode(true))
-        el.setAttribute('class', 'sg-icon')
-        el.setAttribute('x', String(box.x))
-        el.setAttribute('y', String(box.h > 40 ? box.y + 2 : box.y + (box.h - size) / 2))
-        el.setAttribute('width', String(size))
-        el.setAttribute('height', String(size))
-        body.node().appendChild(el)
-        box = { ...box, x: box.x + size + 2, w: Math.max(10, box.w - size - 2) }
-      }
-    }
-    if (shape.label === false || !d.label) return
+    const iconSize = Math.max(10, Math.min(18, box.h - 4))
+    const icon = own && d.icon ? this.#icon(d.icon) : null
+    content
+      .selectChildren('svg.sg-icon')
+      .data(icon ? [d.icon] : [], m => m)
+      .join(enter => enter.append(() => /** @type {Element} */ (icon).cloneNode(true)))
+      .attr('class', 'sg-icon')
+      .attr('x', box.x)
+      .attr('y', box.h > 40 ? box.y + 2 : box.y + (box.h - iconSize) / 2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+    // Inside the label box, so it stays within curved and slanted outlines too.
+    if (icon) box = { ...box, x: box.x + iconSize + 2, w: Math.max(10, box.w - iconSize - 2) }
     const lineH = this.#fontSize * 1.25
-    const sub = d.sublabel ? 1 : 0
+    const sub = own && d.label && d.sublabel ? 1 : 0
     const maxLines = Math.max(1, Math.floor(box.h / lineH) - sub)
-    const lines = wrapText(d.label, box.w, this.#measureBold, { maxLines })
-    const total = (lines.length + sub) * lineH
-    let y = box.y + box.h / 2 - total / 2 + lineH / 2
+    const lines = own && d.label ? wrapText(d.label, box.w, this.#measureBold, { maxLines }) : []
     const cx = box.x + box.w / 2
-    const label = body.append('text').attr('class', 'sg-label')
-    for (const line of lines) {
-      label.append('tspan').attr('x', cx).attr('y', y).text(line)
-      y += lineH
-    }
-    if (d.sublabel) {
-      const [text] = wrapText(d.sublabel, box.w, this.#measure, { maxLines: 1 })
-      body.append('text').attr('class', 'sg-sublabel').attr('x', cx).attr('y', y).text(text)
-    }
+    const top = box.y + box.h / 2 - ((lines.length + sub) * lineH) / 2 + lineH / 2
+    content
+      .selectChildren('text.sg-label')
+      .data(lines.length ? [lines] : [])
+      .join('text')
+      .attr('class', 'sg-label')
+      .selectChildren('tspan')
+      .data(l => l)
+      .join('tspan')
+      .attr('x', cx)
+      .attr('y', (_, i) => top + i * lineH)
+      .text(line => line)
+    content
+      .selectChildren('text.sg-sublabel')
+      .data(sub ? wrapText(d.sublabel, box.w, this.#measure, { maxLines: 1 }) : [])
+      .join('text')
+      .attr('class', 'sg-sublabel')
+      .attr('x', cx)
+      .attr('y', top + lines.length * lineH)
+      .text(t => t)
   }
 
   #icon(markup) {
@@ -2259,6 +2299,7 @@ export class Graph {
       .attr('stroke-width', 1.5 / k)
     const connecting = d?.type === 'connect' || d?.type === 'reconnect'
     if (connecting || this.#portTargetShown) {
+      this.#svg.classed('sg-connecting', connecting)
       L.nodes.selectAll('.sg-port').classed('sg-port-target', function () {
         if (!connecting || !d.target) return false
         const nodeId = this.parentNode?.parentNode?.getAttribute('data-id')

@@ -29,6 +29,10 @@ export const TOKENS = Object.freeze({
   region: '--sg-region',
   badge: '--sg-badge',
   badgeText: '--sg-badge-text',
+  iconTile: '--sg-icon-tile',
+  iconGlyph: '--sg-icon-glyph',
+  chip: '--sg-chip',
+  chipText: '--sg-chip-text',
   heatLow: '--sg-heat-low',
   heatHigh: '--sg-heat-high',
   fontFamily: '--sg-font-family',
@@ -61,6 +65,10 @@ export const LIGHT = Object.freeze({
   region: 'rgba(37, 99, 235, 0.08)',
   badge: '#dc2626',
   badgeText: '#ffffff',
+  iconTile: '#F0F2F5',
+  iconGlyph: '#3B424D',
+  chip: '#E4E7EC',
+  chipText: '#3B424D',
   heatLow: '#16a34a',
   heatHigh: '#dc2626',
   fontFamily: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -92,6 +100,10 @@ export const DARK = Object.freeze({
   sticky: '#713f12',
   stickyText: '#fef3c7',
   region: 'rgba(96, 165, 250, 0.1)',
+  iconTile: '#22272E',
+  iconGlyph: '#CFD4DC',
+  chip: '#2A3038',
+  chipText: '#CFD4DC',
 })
 
 /**
@@ -131,12 +143,22 @@ export const STYLESHEET = `
 .sg-node .sg-label { fill: ${v('nodeText')}; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
 .sg-node .sg-sublabel { fill: ${v('nodeSubtext')}; font-size: 0.85em; text-anchor: middle; dominant-baseline: central; }
 .sg-node .sg-icon { color: ${v('nodeStroke')}; }
+.sg-node .sg-title, .sg-node .sg-subtitle { text-anchor: start; }
+.sg-icon-tile-bg { fill: ${v('iconTile')}; }
+.sg-node .sg-icon-tile .sg-icon { color: ${v('iconGlyph')}; }
+.sg-stack { fill: none; stroke: ${v('iconGlyph')}; stroke-width: 1.5; stroke-linecap: round; }
+.sg-stratum { fill: ${v('nodeFill')}; stroke: ${v('nodeStroke')}; stroke-width: 1; }
+.sg-card-badge rect { fill: ${v('chip')}; }
+.sg-card-badge text { fill: ${v('chipText')}; font-size: 0.8em; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
 .sg-node.sg-ghost { opacity: 0.35; pointer-events: none; }
 .sg-node.sg-composite .sg-shape { stroke-width: 2; }
 .sg-node.sg-hover .sg-shape, .sg-node:focus-visible .sg-shape { stroke: ${v('accent')}; }
 .sg-selected .sg-shape, .sg-selected .sg-frame-rect, .sg-selected .sg-note { stroke: ${v('accent')}; stroke-width: 2; }
-.sg-port { fill: ${v('nodeFill')}; stroke: ${v('port')}; stroke-width: 1.25; cursor: crosshair; }
-.sg-port:hover, .sg-port.sg-port-target { fill: ${v('portActive')}; stroke: ${v('portActive')}; }
+.sg-port { cursor: crosshair; }
+.sg-port-hit { fill: transparent; stroke: none; }
+.sg-port-dot { fill: ${v('nodeFill')}; stroke: ${v('port')}; stroke-width: 1.25; opacity: 0; }
+.sg-node:hover .sg-port-dot, .sg-node.sg-selected .sg-port-dot, .sg-node:focus-visible .sg-port-dot, .sg-connecting .sg-port-dot, .sg-port.sg-port-target .sg-port-dot { opacity: 1; }
+.sg-port:hover .sg-port-dot, .sg-port.sg-port-target .sg-port-dot { fill: ${v('portActive')}; stroke: ${v('portActive')}; }
 .sg-port-candidate { stroke: ${v('portActive')}; }
 .sg-edge-path { fill: none; stroke: ${v('edge')}; stroke-width: 1.5; }
 .sg-token { fill: ${v('accent')}; stroke: ${v('accentSoft')}; stroke-width: 2; pointer-events: none; }

@@ -26,6 +26,7 @@ w.sample = () => ({
       y: 120,
       w: 160,
       h: 64,
+      shape: 'box',
       label: 'Payment service',
       sublabel: 'service@1.0.0',
       parent: 'zone',

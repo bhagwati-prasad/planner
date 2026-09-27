@@ -50,3 +50,20 @@ export function wrapText(text, maxWidth, measure, { maxLines = Infinity, ellipsi
  * @param {number} fontSize
  */
 export const estimateMeasure = fontSize => (/** @type {string} */ s) => s.length * fontSize * 0.56
+
+/**
+ * One line of text within `maxWidth`: whole when it fits, otherwise cut at a character and
+ * ended with an ellipsis, as CSS `text-overflow: ellipsis` does (design system §6 titles).
+ * @param {string} text
+ * @param {number} maxWidth
+ * @param {(s: string) => number} measure
+ * @param {string} [ellipsis]
+ * @returns {string}
+ */
+export function truncateText(text, maxWidth, measure, ellipsis = '…') {
+  const s = String(text ?? '')
+  if (measure(s) <= maxWidth) return s
+  let cut = s.length
+  while (cut > 0 && measure(`${s.slice(0, cut).trimEnd()}${ellipsis}`) > maxWidth) cut--
+  return `${s.slice(0, cut).trimEnd()}${ellipsis}`
+}
