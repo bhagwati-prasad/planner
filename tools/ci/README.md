@@ -19,11 +19,12 @@
 
 | Budget | Measures |
 | --- | --- |
-| Core, facade and non-UI packages | `src/` of every package except graph, 3d and ui (the views) and cli and server (Node only) |
+| Core, facade and non-UI packages | `src/` of every package except graph, 3d and ui (the views) and cli and server (Node only), without the console help metadata |
 | strata-graph | `packages/graph/src` |
 | strata-ui | `packages/ui/src` |
 | Simulation worker bundle | The bundle the build makes from `packages/sim/src/worker/main.js`, with everything it imports (reported as not built until the entry exists) |
 | Bundled fonts | every `.woff2` in `packages/ui` and `vendor/` |
+| Console help metadata | `packages/facade/src/help-data.js`, generated from the facade's JSDoc (`tools/help`); text, not code, so it has its own line ([ADR 0013](../../docs/adr/0013-console-help-metadata-has-its-own-budget.md)) |
 
 A budget that existing code already exceeds is recorded in `size-exceptions.json` with the measured size and the task that brings it within budget. The measure may shrink but not grow past the recorded size, and the check fails once the exception is no longer needed, so the file only shrinks. `tools/test/ci.test.js` keeps it to eng §15 budgets with an owner.
 
@@ -34,7 +35,7 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR. Until then, as the human decided on 2026-09-26, a task that grows `core` raises this recorded size to what it ships, and says so in its `plan/LOG.md` line.
 
-Core, facade and the non-UI packages measure 245.5 KB of their 250 KB. Task 0118 took them to 250.7 KB, and 0119 brought them back by shortening local names. As the human decided on 2026-09-27, the same policy applies when a task takes them past 250 KB again: the task records an exception at the size they reach and says so in its `plan/LOG.md` line. It also proposes the task that brings them back within budget, which the exception names as its owner.
+Core, facade and the non-UI packages measure 243.5 KB of their 250 KB, and the console help metadata 19.0 KB of its 25 KB. Task 0118 took them to 250.7 KB, and 0119 brought them back by shortening local names. As the human decided on 2026-09-27, the same policy applies when a task takes them past 250 KB again: the task records an exception at the size they reach and says so in its `plan/LOG.md` line. It also proposes the task that brings them back within budget, which the exception names as its owner.
 
 ## Licences
 

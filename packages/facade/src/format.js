@@ -2,7 +2,7 @@
  * Text renderings of the model for the console and terminal (spec §16: "strata.print(root) —
  * text tree of the system"). Text is one of three interchangeable renderers, beside 2D and 3D.
  */
-import { nodeKind } from '../../core/src/index.js'
+import { nodeKind, SYSTEM_TYPE_REF } from '../../core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE } from './internal.js'
 import {
@@ -20,6 +20,7 @@ import { ProjectHandle } from './projects.js'
 /**
  * @param {unknown} target
  * @param {{ depth?: number, edges?: boolean }} [options]
+ * @internal
  */
 export function formatTarget(target, options = {}) {
   if (target instanceof ProjectHandle) return formatProject(target, options)
@@ -59,6 +60,7 @@ function formatProject(project, options) {
  * @param {Core} core
  * @param {string} systemId
  * @param {{ depth?: number, edges?: boolean }} [options] depth: levels of nodes to show (default all)
+ * @internal
  */
 export function formatSystem(core, systemId, { depth = Infinity, edges = true } = {}) {
   const system = core.require('system', systemId)
@@ -76,11 +78,19 @@ export function formatSystem(core, systemId, { depth = Infinity, edges = true } 
       const last = i === nodes.length - 1
       out.push(prefix + (last ? '└─ ' : '├─ ') + nodeLabel(core, node))
       const inner = prefix + (last ? '   ' : '│  ')
+      if (nodeKind(node) === 'composite')
+        for (const bp of core.boundaryPortsOf(node.innerSystemRef)) {
+          const bound = Object.entries(bp.bindings ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))
+          if (bound.length)
+            out.push(
+              `${inner}  ${bp.name} binds ${bound.map(([method, t]) => `${method} → ${core.get('node', t.nodeId)?.name}.${t.method}`).join(', ')}`
+            )
+        }
       if (edges) {
         for (const port of core.portsOf(node.id)) {
           for (const edge of core.find('edge', 'fromPort', port.id))
             out.push(
-              `${inner}  ${port.name} → ${portLabel(core, edge.toPort)}${edge.connectionType ? `  (${edge.connectionType})` : ''}${edge.label ? `  “${edge.label}”` : ''}`
+              `${inner}  ${port.name} → ${portLabel(core, edge.toPort)}${edge.connectionType ? `  (${edge.connectionType})` : ''}${edge.method ? `  calls ${edge.method}` : ''}${edge.label ? `  “${edge.label}”` : ''}`
             )
         }
       }
@@ -103,11 +113,13 @@ function nodeLabel(core, node) {
   const status = node.status !== 'planned' ? ` · ${node.status}` : ''
   if (nodeKind(node) !== 'composite') return `${node.name}  ${node.typeRef}${status}`
   const child = core.get('system', node.innerSystemRef)
-  const how =
-    node.placement === 'reference'
-      ? `by reference${child && child.name !== node.name ? ` → ${child.name}` : ''}`
+  const opened = node.typeRef !== SYSTEM_TYPE_REF
+  const how = opened
+    ? 'opened as a system'
+    : node.placement === 'reference'
+      ? `by reference${child && child.name !== node.name ? ` → ${child.name}` : ''} · read-only`
       : 'by value'
-  return `▣ ${node.name}  (${how} · ${plural(child ? core.nodesOf(child.id).length : 0, 'node')})${status}`
+  return `▣ ${node.name}  ${opened ? `${node.typeRef}  ` : ''}(${how} · ${plural(child ? core.nodesOf(child.id).length : 0, 'node')})${status}`
 }
 
 /** @param {Core} core @param {any} bp */
@@ -161,6 +173,7 @@ function formatNode(node) {
 /**
  * Plain-text table of row objects.
  * @param {Record<string, unknown>[]} rows
+ * @example formatTable([{ name: 'Orders', nodes: 2 }])
  */
 export function formatTable(rows) {
   if (!rows.length) return '(empty)'

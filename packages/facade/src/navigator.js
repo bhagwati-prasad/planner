@@ -62,6 +62,7 @@ export class Navigator {
   /**
    * Drills into a composite node, or navigates to a system by handle, id or name.
    * @param {NodeHandle|SystemHandle|string} target
+   * @example strata.nav.enter('Payments')
    */
   enter(target) {
     const core = this.#core
@@ -97,7 +98,10 @@ export class Navigator {
     return this.#changed()
   }
 
-  /** Goes up one level; returns the new current system. */
+  /**
+   * Goes up one level; returns the new current system.
+   * @example strata.nav.up()
+   */
   up() {
     if (this.#path.length > 1) {
       this.#path = this.#path.slice(0, -1)
@@ -106,13 +110,19 @@ export class Navigator {
     return this.current
   }
 
-  /** Back to the root system. */
+  /**
+   * Back to the root system.
+   * @example strata.nav.home()
+   */
   home() {
     this.#path = [{ systemId: this.#core.rootSystemId, viaNodeId: null }]
     return this.#changed()
   }
 
-  /** Plain path entries, for persisting per-tab state. */
+  /**
+   * Plain path entries, for persisting per-tab state.
+   * @example const path = strata.nav.toJSON()
+   */
   toJSON() {
     return this.#path.map(entry => ({ ...entry }))
   }
@@ -120,6 +130,7 @@ export class Navigator {
   /**
    * Restores saved path entries; invalid tails are dropped.
    * @param {PathEntry[]} entries
+   * @example strata.nav.restore(path)
    */
   restore(entries) {
     this.#path = entries.map(({ systemId, viaNodeId }) => ({
@@ -131,7 +142,10 @@ export class Navigator {
     return this.current
   }
 
-  /** Drops path entries the model no longer supports (called after every change). */
+  /**
+   * Drops path entries the model no longer supports (called after every change).
+   * @example strata.nav.sync()
+   */
   sync() {
     for (let i = 0; i < this.#path.length; i++) {
       if (!this.#valid(i)) {
