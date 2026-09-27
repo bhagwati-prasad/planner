@@ -76,6 +76,11 @@ test('the workspace loads with every region and the sample project', async () =>
   assert.deepEqual(await breadcrumb(), ['Checkout'])
   assert.match(await textOf('strata-toolbar'), /Checkout/)
   assert.match(await textOf('strata-inspector'), /Checkout\s+System · context · root/)
+  assert.match(
+    await textOf('strata-inspector'),
+    /Availability\s+9\d(\.\d+)?%/,
+    'a percentage roll-up shows in points'
+  )
   assert.ok(!(await textOf('strata-inspector')).includes('null'))
   assert.deepEqual(errors, [])
 })
@@ -106,14 +111,20 @@ test('clicking a library item adds it; the inspector renames it and edits its pr
   assert.match(await textOf('strata-inspector'), /readReplicas[\s\S]*override/)
 
   const storage = inspector.locator('input[data-field="prop:storageUsed"]')
+  assert.equal(await storage.inputValue(), '50 GB', 'sizes show as written, stored in bytes')
+  assert.equal(
+    await inspector.locator('input[data-field="prop:availabilityTarget"]').inputValue(),
+    '99.9',
+    'percentages show in points, stored as fractions'
+  )
   await storage.fill('lots')
   await storage.press('Enter')
   await settle()
   assert.match(await inspector.locator('[role="alert"]').innerText(), /Invalid size/)
   assert.equal(
     await js(() => window.strata.project.node('Reporting DB').props.storageUsed),
-    '50GB',
-    'the invalid value is refused'
+    50_000_000_000,
+    'the invalid value is refused; the default is stored in bytes'
   )
 })
 

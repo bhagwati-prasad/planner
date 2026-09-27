@@ -337,7 +337,8 @@ th { color: var(--st-muted); font-weight: 500; }
   /**
    * Property fields grouped as the manifest groups them, for a node or an edge handle.
    * @param {any} manifest  effective manifest (component or connection type)
-   * @param {Record<string, { value: unknown, source: string }>} explained
+   * @param {Record<string, { value: unknown, input: unknown, source: string }>} explained  `input`
+   *   is the value as a person writes it (a percentage in points, a duration as '4 d')
    * @param {{ set: (props: object) => any, unset: (...keys: string[]) => any }} target
    * @param {boolean} readOnly
    */
@@ -358,7 +359,7 @@ th { color: var(--st-muted); font-weight: 500; }
           this.#field(
             field,
             key,
-            this.#propInput(field, schema, info?.value, v => target.set({ [key]: v })),
+            this.#propInput(field, schema, info?.input, v => target.set({ [key]: v })),
             {
               unit: schema.unit,
               source: info ? info.source : null,
@@ -562,7 +563,9 @@ th { color: var(--st-muted); font-weight: 500; }
             h(
               'td',
               null,
-              `${formatValue(r.value)}${r.unit && typeof r.value === 'number' ? ` ${r.unit}` : ''}`
+              typeof r.value === 'number' && r.unit === '%'
+                ? `${formatValue(r.value * 100)}%` // stored as a fraction (ADR 0008)
+                : `${formatValue(r.value)}${r.unit && typeof r.value === 'number' ? ` ${r.unit}` : ''}`
             )
           )
         )

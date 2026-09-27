@@ -4,6 +4,7 @@
  */
 import { fail } from './errors.js'
 import { defaultProps } from './props.js'
+import { inputValue } from './schema.js'
 
 export const NODE_STATUSES = Object.freeze(['planned', 'existing', 'deprecated'])
 export const LEVEL_TAGS = Object.freeze(['context', 'container', 'component', 'custom'])
@@ -209,19 +210,21 @@ export function effectiveProps(registry, entity) {
 }
 
 /**
- * Every property value with where it came from: 'default' (manifest) or 'override' (entity).
- * Roll-up values for composites are added by the roll-up engine.
+ * Every property value with where it came from: 'default' (manifest) or 'override' (entity),
+ * and `input`, the value as a person writes it (see schema.js inputValue). Roll-up values for
+ * composites are added by the roll-up engine.
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {{ props: Record<string, unknown> }} entity  a node or an edge
  */
 export function explainProps(registry, entity) {
   const manifest = describedBy(registry, entity)
-  /** @type {Record<string, {value: unknown, source: 'default'|'override', unit?: string, group?: string}>} */
+  /** @type {Record<string, {value: unknown, input: unknown, source: 'default'|'override', unit?: string, group?: string}>} */
   const out = {}
   for (const [key, schema] of Object.entries(manifest?.properties ?? {})) {
     if (schema.default !== undefined)
       out[key] = {
         value: schema.default,
+        input: inputValue(schema, schema.default),
         source: 'default',
         unit: schema.unit,
         group: schema.group,
@@ -229,7 +232,13 @@ export function explainProps(registry, entity) {
   }
   for (const [key, value] of Object.entries(entity.props ?? {})) {
     const schema = manifest?.properties?.[key]
-    out[key] = { value, source: 'override', unit: schema?.unit, group: schema?.group }
+    out[key] = {
+      value,
+      input: inputValue(schema, value),
+      source: 'override',
+      unit: schema?.unit,
+      group: schema?.group,
+    }
   }
   return out
 }

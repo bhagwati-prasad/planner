@@ -37,8 +37,11 @@ export const edgeCommands = {
           : nullableString(p.connectionType, 'connectionType')
       )
       p.connectionType = connectionType
-      const props = plainObject(p.props, 'props') ?? {}
-      validateProps(connectionTypeOf(ctx.registry, { connectionType }), props, 'the edge')
+      const props = validateProps(
+        connectionTypeOf(ctx.registry, { connectionType }),
+        plainObject(p.props, 'props') ?? {},
+        'the edge'
+      )
       const id = optionalString(p.id, 'id') ?? ctx.newId()
       ctx.tx.create('edge', {
         id,
@@ -80,8 +83,11 @@ export const edgeCommands = {
     /** @param {any} p @param {Ctx} ctx */
     handler(p, ctx) {
       const edge = ctx.tx.require('edge', requireString(p.id, 'id'))
-      const props = plainObject(p.props, 'props') ?? {}
-      validateProps(connectionTypeOf(ctx.registry, edge), props, edge.label || 'the edge')
+      const props = validateProps(
+        connectionTypeOf(ctx.registry, edge),
+        plainObject(p.props, 'props') ?? {},
+        edge.label || 'the edge'
+      )
       const next = { ...edge.props, ...props }
       for (const key of stringList(p.unset, 'unset') ?? []) delete next[key]
       ctx.tx.update('edge', edge.id, { props: next })

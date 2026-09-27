@@ -15,7 +15,8 @@
  */
 import { fail } from './errors.js'
 import { isPlainObject } from './plain.js'
-import { normalizeValue, ROLLUP_RULES, statistic } from './props.js'
+import { ROLLUP_RULES, statistic } from './props.js'
+import { decimal } from './units.js'
 import {
   boundaryPortsOf,
   edgesOf,
@@ -34,7 +35,7 @@ const DEFAULT_WORST_ORDER = ['up', 'degraded', 'down']
  * @property {string} rule
  * @property {unknown[]} [order]   worst: values from best to worst
  * @property {Record<string, unknown>} [where]  count: node filter { status, tag, kind, extends, owner, type }
- * @property {number} [scale]      product: 100 when values are percentages
+ * @property {number} [scale]      product: what a value of 1 is written as (percentages are fractions)
  * @property {string} [unit]
  *
  * @typedef {object} RollupOptions
@@ -72,8 +73,6 @@ function normalizeRule(spec, schema) {
       'INVALID',
       `Unknown roll-up rule ${JSON.stringify(spec)}; use one of ${ROLLUP_RULES.join(', ')}`
     )
-  if (obj.rule === 'product' && obj.scale === undefined)
-    obj.scale = schema?.type === 'percent' || schema?.unit === '%' ? 100 : 1
   if (obj.unit === undefined && schema?.unit) obj.unit = schema.unit
   return obj
 }
@@ -154,7 +153,8 @@ export function nodeValue(registry, node, key, values, depth = 0) {
   }
   const schema = manifestOf(registry, node)?.properties?.[head]
   let value = props[head]
-  if (rest.length === 0) return schema ? normalizeValue(schema, value) : value
+  // Stored values are canonical (ADR 0008), so nothing converts here.
+  if (rest.length === 0) return value
   if (schema?.type === 'distribution' && rest.length === 1) return statistic(value, rest[0])
   for (const seg of rest) {
     if (value === null || typeof value !== 'object') return undefined
@@ -479,8 +479,11 @@ export function checkContracts(src, registry, systemId, options = {}) {
     }
     const value = result.value
     const unit = target.unit ?? result.unit ?? ''
+    // Percentages are fractions (ADR 0008), shown in points.
     const fmt = v =>
-      `${typeof v === 'number' ? +v.toFixed(3) : JSON.stringify(v)}${unit && unit !== '%' ? ` ${unit}` : unit}`
+      typeof v === 'number' && unit === '%'
+        ? `${+Number(decimal(v, 2)).toFixed(3)}%`
+        : `${typeof v === 'number' ? +v.toFixed(3) : JSON.stringify(v)}${unit ? ` ${unit}` : ''}`
     if (target.equals !== undefined && value !== undefined && value !== target.equals) {
       return {
         key,

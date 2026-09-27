@@ -49,6 +49,7 @@ test('component.add creates ports from the manifest, pins the version and valida
   assert.equal(core.effectiveProps(q).overflowPolicy, 'reject', 'defaults fill in')
   assert.deepEqual(core.explainProps(q).capacity, {
     value: 500,
+    input: 500,
     source: 'override',
     unit: 'messages',
     group: 'Capacity',
@@ -123,7 +124,7 @@ test('node.update and node.setProps', () => {
     type: 'node.setProps',
     payload: { id: q, props: { retention: '7d' }, unset: ['capacity'] },
   })
-  assert.deepEqual(core.node(q).props, { retention: '7d' })
+  assert.deepEqual(core.node(q).props, { retention: 604_800_000 }, 'stored in milliseconds')
   assert.equal(core.effectiveProps(q).capacity, 100000)
   assert.throws(
     () =>

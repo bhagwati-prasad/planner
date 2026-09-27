@@ -181,15 +181,18 @@ export function createMirrorPort(ctx, nodeId, bp) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Checks property values against a manifest (a component or connection type). Without a
- * manifest (not installed) values are kept unchecked.
+ * Checks property values against a manifest (a component or connection type) and returns them
+ * in canonical units (eng §8), leaving `props` as written. Without a manifest (not installed)
+ * values are kept unchecked, as written.
  * @param {import('../registry.js').EffectiveManifest|null} manifest
  * @param {Record<string, unknown>} props
  * @param {string} label
  */
 export function validateProps(manifest, props, label) {
-  if (!manifest) return
+  if (!manifest) return { ...props }
   const known = Object.keys(manifest.properties)
+  /** @type {Record<string, unknown>} */
+  const canonical = {}
   for (const [key, value] of Object.entries(props)) {
     const schema = manifest.properties[key]
     if (!schema)
@@ -197,8 +200,9 @@ export function validateProps(manifest, props, label) {
         'INVALID',
         `Unknown property '${key}' for ${label} (${manifest.typeRef}).${didYouMean(suggest(key, known))}`
       )
-    validateValue(schema, value, `${label}.${key}`)
+    canonical[key] = validateValue(schema, value, `${label}.${key}`)
   }
+  return canonical
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -145,9 +145,11 @@ function formatNode(node) {
     const props = Object.entries(core.explainProps(e.id))
     if (props.length) {
       lines.push('  props')
-      for (const [key, { value, source, unit }] of props) {
+      for (const [key, { input, source, unit }] of props) {
+        // As written: a percentage in points, a duration as '4 d' (ADR 0008).
+        const suffix = unit && typeof input === 'number' ? (unit === '%' ? '%' : ` ${unit}`) : ''
         lines.push(
-          `    ${key} = ${typeof value === 'string' ? value : JSON.stringify(value)}${unit && typeof value === 'number' ? ` ${unit}` : ''}${source === 'default' ? '  (default)' : ''}`
+          `    ${key} = ${typeof input === 'string' ? input : JSON.stringify(input)}${suffix}${source === 'default' ? '  (default)' : ''}`
         )
       }
     }

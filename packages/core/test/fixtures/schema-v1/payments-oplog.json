@@ -1,0 +1,891 @@
+[
+  {
+    "actorId": "tester",
+    "baseRev": 0,
+    "command": "project.init",
+    "id": "01M3BWNZM02XW63KNP8M98F56K",
+    "ids": [
+      "01M3BWNZM02XW63KNP8M98F56G",
+      "01M3BWNZM02XW63KNP8M98F56H",
+      "01M3BWNZM02XW63KNP8M98F56J"
+    ],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56G",
+            "kind": "project",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56H",
+            "kind": "system",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56J",
+            "kind": "view",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 1,
+    "payload": {
+      "name": "Checkout"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 1,
+    "command": "component.add",
+    "id": "01M3BWNZM02XW63KNP8M98F56P",
+    "ids": ["01M3BWNZM02XW63KNP8M98F56M", "01M3BWNZM02XW63KNP8M98F56N"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56G",
+            "kind": "project",
+            "value": {
+              "components": {},
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56G",
+              "name": "Checkout",
+              "rev": 1,
+              "rootSystemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "schemaVersion": 1,
+              "settings": {},
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56M",
+            "kind": "node",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56N",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 2,
+    "payload": {
+      "name": "Web client",
+      "ports": [
+        {
+          "accepts": [],
+          "direction": "out",
+          "name": "out"
+        }
+      ],
+      "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+      "typeRef": "base:client@1.0.0"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 2,
+    "command": "component.add",
+    "id": "01M3BWNZM02XW63KNP8M98F56T",
+    "ids": [
+      "01M3BWNZM02XW63KNP8M98F56Q",
+      "01M3BWNZM02XW63KNP8M98F56R",
+      "01M3BWNZM02XW63KNP8M98F56S"
+    ],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56G",
+            "kind": "project",
+            "value": {
+              "components": {
+                "base:client@1.0.0": {}
+              },
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56G",
+              "name": "Checkout",
+              "rev": 2,
+              "rootSystemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "schemaVersion": 1,
+              "settings": {},
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56Q",
+            "kind": "node",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56R",
+            "kind": "port",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56S",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 3,
+    "payload": {
+      "name": "Gateway",
+      "ports": [
+        {
+          "accepts": [],
+          "direction": "in",
+          "name": "in"
+        },
+        {
+          "accepts": [],
+          "direction": "out",
+          "name": "out"
+        }
+      ],
+      "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+      "typeRef": "base:proxy@1.0.0"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 3,
+    "command": "component.add",
+    "id": "01M3BWNZM02XW63KNP8M98F56Z",
+    "ids": [
+      "01M3BWNZM02XW63KNP8M98F56V",
+      "01M3BWNZM02XW63KNP8M98F56W",
+      "01M3BWNZM02XW63KNP8M98F56X",
+      "01M3BWNZM02XW63KNP8M98F56Y"
+    ],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56G",
+            "kind": "project",
+            "value": {
+              "components": {
+                "base:client@1.0.0": {},
+                "base:proxy@1.0.0": {}
+              },
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56G",
+              "name": "Checkout",
+              "rev": 3,
+              "rootSystemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "schemaVersion": 1,
+              "settings": {},
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56V",
+            "kind": "node",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56W",
+            "kind": "port",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56X",
+            "kind": "port",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56Y",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 4,
+    "payload": {
+      "name": "Payment service",
+      "ports": [
+        {
+          "accepts": ["http", "grpc"],
+          "direction": "in",
+          "name": "in"
+        },
+        {
+          "accepts": ["http", "grpc"],
+          "direction": "out",
+          "name": "out"
+        },
+        {
+          "accepts": ["db-protocol"],
+          "direction": "out",
+          "name": "db"
+        }
+      ],
+      "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+      "typeRef": "test.service@1.0.0"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 4,
+    "command": "component.add",
+    "id": "01M3BWNZM02XW63KNP8M98F572",
+    "ids": ["01M3BWNZM02XW63KNP8M98F570", "01M3BWNZM02XW63KNP8M98F571"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56G",
+            "kind": "project",
+            "value": {
+              "components": {
+                "base:client@1.0.0": {},
+                "base:proxy@1.0.0": {},
+                "test.service@1.0.0": {}
+              },
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56G",
+              "name": "Checkout",
+              "rev": 4,
+              "rootSystemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "schemaVersion": 1,
+              "settings": {},
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F570",
+            "kind": "node",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F571",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 5,
+    "payload": {
+      "name": "Ledger DB",
+      "ports": [
+        {
+          "accepts": ["db-protocol"],
+          "direction": "in",
+          "name": "in"
+        }
+      ],
+      "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+      "typeRef": "test.db@1.0.0"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 5,
+    "command": "component.add",
+    "id": "01M3BWNZM02XW63KNP8M98F577",
+    "ids": [
+      "01M3BWNZM02XW63KNP8M98F573",
+      "01M3BWNZM02XW63KNP8M98F574",
+      "01M3BWNZM02XW63KNP8M98F575",
+      "01M3BWNZM02XW63KNP8M98F576"
+    ],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56G",
+            "kind": "project",
+            "value": {
+              "components": {
+                "base:client@1.0.0": {},
+                "base:proxy@1.0.0": {},
+                "test.db@1.0.0": {},
+                "test.service@1.0.0": {}
+              },
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56G",
+              "name": "Checkout",
+              "rev": 5,
+              "rootSystemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "schemaVersion": 1,
+              "settings": {},
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F573",
+            "kind": "node",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F574",
+            "kind": "port",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F575",
+            "kind": "port",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F576",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 6,
+    "payload": {
+      "name": "Settlement queue",
+      "ports": [
+        {
+          "accepts": ["async-message"],
+          "direction": "in",
+          "name": "in"
+        },
+        {
+          "accepts": ["async-message"],
+          "direction": "out",
+          "name": "out"
+        },
+        {
+          "accepts": ["async-message"],
+          "direction": "out",
+          "name": "dlq"
+        }
+      ],
+      "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+      "typeRef": "acme.message-queue@1.2.0"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 6,
+    "command": "component.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57A",
+    "ids": ["01M3BWNZM02XW63KNP8M98F578", "01M3BWNZM02XW63KNP8M98F579"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56G",
+            "kind": "project",
+            "value": {
+              "components": {
+                "acme.message-queue@1.2.0": {},
+                "base:client@1.0.0": {},
+                "base:proxy@1.0.0": {},
+                "test.db@1.0.0": {},
+                "test.service@1.0.0": {}
+              },
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56G",
+              "name": "Checkout",
+              "rev": 6,
+              "rootSystemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "schemaVersion": 1,
+              "settings": {},
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F578",
+            "kind": "node",
+            "value": null
+          },
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F579",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 7,
+    "payload": {
+      "name": "Bank API",
+      "ports": [
+        {
+          "accepts": [],
+          "direction": "in",
+          "name": "in"
+        }
+      ],
+      "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+      "typeRef": "base:external@1.0.0"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 7,
+    "command": "port.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57C",
+    "ids": ["01M3BWNZM02XW63KNP8M98F57B"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57B",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 8,
+    "payload": {
+      "accepts": ["async-message"],
+      "direction": "in",
+      "name": "events",
+      "nodeId": "01M3BWNZM02XW63KNP8M98F578"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 8,
+    "command": "edge.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57E",
+    "ids": ["01M3BWNZM02XW63KNP8M98F57D"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57D",
+            "kind": "edge",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 9,
+    "payload": {
+      "connectionType": "http",
+      "fromPort": "01M3BWNZM02XW63KNP8M98F56N",
+      "toPort": "01M3BWNZM02XW63KNP8M98F56R"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 9,
+    "command": "edge.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57G",
+    "ids": ["01M3BWNZM02XW63KNP8M98F57F"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57F",
+            "kind": "edge",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 10,
+    "payload": {
+      "connectionType": "http",
+      "fromPort": "01M3BWNZM02XW63KNP8M98F56S",
+      "toPort": "01M3BWNZM02XW63KNP8M98F56W"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 10,
+    "command": "edge.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57J",
+    "ids": ["01M3BWNZM02XW63KNP8M98F57H"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57H",
+            "kind": "edge",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 11,
+    "payload": {
+      "connectionType": "db-protocol",
+      "fromPort": "01M3BWNZM02XW63KNP8M98F56Y",
+      "toPort": "01M3BWNZM02XW63KNP8M98F571"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 11,
+    "command": "port.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57M",
+    "ids": ["01M3BWNZM02XW63KNP8M98F57K"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57K",
+            "kind": "port",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 12,
+    "payload": {
+      "accepts": ["async-message"],
+      "direction": "out",
+      "name": "publish",
+      "nodeId": "01M3BWNZM02XW63KNP8M98F56V"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 12,
+    "command": "edge.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57P",
+    "ids": ["01M3BWNZM02XW63KNP8M98F57N"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57N",
+            "kind": "edge",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 13,
+    "payload": {
+      "connectionType": "async-message",
+      "fromPort": "01M3BWNZM02XW63KNP8M98F57K",
+      "toPort": "01M3BWNZM02XW63KNP8M98F574"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 13,
+    "command": "edge.add",
+    "id": "01M3BWNZM02XW63KNP8M98F57R",
+    "ids": ["01M3BWNZM02XW63KNP8M98F57Q"],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57Q",
+            "kind": "edge",
+            "value": null
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 14,
+    "payload": {
+      "connectionType": "async-message",
+      "fromPort": "01M3BWNZM02XW63KNP8M98F575",
+      "toPort": "01M3BWNZM02XW63KNP8M98F57B"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 14,
+    "command": "node.setProps",
+    "id": "01M3BWNZM02XW63KNP8M98F57S",
+    "ids": [],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F573",
+            "kind": "node",
+            "value": {
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F573",
+              "kind": "atomic",
+              "name": "Settlement queue",
+              "owner": null,
+              "placement": null,
+              "props": {},
+              "rev": 1,
+              "status": "planned",
+              "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "systemRef": null,
+              "tags": [],
+              "typeRef": "acme.message-queue@1.2.0",
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 15,
+    "payload": {
+      "id": "01M3BWNZM02XW63KNP8M98F573",
+      "props": {
+        "capacity": 5000,
+        "retention": "2d"
+      }
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 15,
+    "command": "node.setProps",
+    "id": "01M3BWNZM02XW63KNP8M98F57T",
+    "ids": [],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56V",
+            "kind": "node",
+            "value": {
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56V",
+              "kind": "atomic",
+              "name": "Payment service",
+              "owner": null,
+              "placement": null,
+              "props": {},
+              "rev": 1,
+              "status": "planned",
+              "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "systemRef": null,
+              "tags": [],
+              "typeRef": "test.service@1.0.0",
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 16,
+    "payload": {
+      "id": "01M3BWNZM02XW63KNP8M98F56V",
+      "props": {
+        "availabilityTarget": 99.95,
+        "timeout": "1500ms"
+      }
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 16,
+    "command": "node.setProps",
+    "id": "01M3BWNZM02XW63KNP8M98F57V",
+    "ids": [],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56Q",
+            "kind": "node",
+            "value": {
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56Q",
+              "kind": "atomic",
+              "name": "Gateway",
+              "owner": null,
+              "placement": null,
+              "props": {},
+              "rev": 1,
+              "status": "planned",
+              "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "systemRef": null,
+              "tags": [],
+              "typeRef": "base:proxy@1.0.0",
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 17,
+    "payload": {
+      "id": "01M3BWNZM02XW63KNP8M98F56Q",
+      "props": {
+        "availabilityTarget": 99.9
+      }
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 17,
+    "command": "edge.setProps",
+    "id": "01M3BWNZM02XW63KNP8M98F57W",
+    "ids": [],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F57D",
+            "kind": "edge",
+            "value": {
+              "connectionType": "http",
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "fromPort": "01M3BWNZM02XW63KNP8M98F56N",
+              "id": "01M3BWNZM02XW63KNP8M98F57D",
+              "label": "",
+              "props": {},
+              "rev": 1,
+              "systemId": "01M3BWNZM02XW63KNP8M98F56H",
+              "toPort": "01M3BWNZM02XW63KNP8M98F56R",
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 18,
+    "payload": {
+      "id": "01M3BWNZM02XW63KNP8M98F57D",
+      "props": {
+        "packetLoss": 0.5,
+        "payloadSize": "64KB"
+      }
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  },
+  {
+    "actorId": "tester",
+    "baseRev": 18,
+    "command": "system.update",
+    "id": "01M3BWNZM02XW63KNP8M98F57X",
+    "ids": [],
+    "inverse": {
+      "payload": {
+        "entities": [
+          {
+            "id": "01M3BWNZM02XW63KNP8M98F56H",
+            "kind": "system",
+            "value": {
+              "contract": {},
+              "createdAt": "2026-09-25T09:00:00.000Z",
+              "createdBy": "tester",
+              "description": "",
+              "id": "01M3BWNZM02XW63KNP8M98F56H",
+              "levelTag": "context",
+              "name": "Checkout",
+              "ownerNodeId": null,
+              "rev": 1,
+              "rollups": {},
+              "tags": [],
+              "updatedAt": "2026-09-25T09:00:00.000Z",
+              "updatedBy": "tester"
+            }
+          }
+        ]
+      },
+      "type": "model.restore"
+    },
+    "modelRev": 19,
+    "payload": {
+      "changes": {
+        "contract": {
+          "availabilityTarget": {
+            "min": 99.5,
+            "unit": "%"
+          },
+          "serviceTime.p99": {
+            "max": 200,
+            "unit": "ms"
+          }
+        }
+      },
+      "id": "01M3BWNZM02XW63KNP8M98F56H"
+    },
+    "timestamp": "2026-09-25T09:00:00.000Z",
+    "version": 1
+  }
+]

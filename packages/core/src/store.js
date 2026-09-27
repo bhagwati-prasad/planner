@@ -9,7 +9,8 @@
 import { fail } from './errors.js'
 import { deepEqual, deepFreeze, toPlain } from './plain.js'
 
-export const SCHEMA_VERSION = 1
+/** Version 2 stores property values in canonical units (ADR 0008). */
+export const SCHEMA_VERSION = 2
 
 /**
  * Entity kinds, the snapshot table each is stored under, and the fields indexed for lookups.

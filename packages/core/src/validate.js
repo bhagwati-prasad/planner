@@ -90,7 +90,7 @@ export function findProblems(src, registry, { contracts = true } = {}) {
         )
         continue
       }
-      const checked = checkValue(schema, value, `${node.name}.${key}`)
+      const checked = checkValue(schema, value, `${node.name}.${key}`, { stored: true })
       if (checked.ok === false) {
         add(
           'error',
@@ -170,7 +170,9 @@ export function findProblems(src, registry, { contracts = true } = {}) {
         )
         continue
       }
-      const checked = checkValue(schema, edge.props[key], `${name}.${key}`)
+      const checked = checkValue(schema, edge.props[key], `${name}.${key}`, {
+        stored: true,
+      })
       if (checked.ok === false) {
         add(
           'error',

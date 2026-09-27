@@ -10,6 +10,7 @@ import { CommandBus } from './bus.js'
 import { createRegistry } from './registry.js'
 import { createUlidFactory } from './ulid.js'
 import { registerCoreCommands } from './commands/index.js'
+import { migrateSnapshot } from './migrations/index.js'
 import { rollup, checkContracts } from './rollup.js'
 import { findProblems } from './validate.js'
 import { canonicalJson } from './plain.js'
@@ -42,7 +43,8 @@ import {
  * @property {string} [actorId]   author recorded on every operation and entity
  * @property {import('./types.js').Clock} clock  the clock adapter (eng §6): the real one, or a fake in tests
  * @property {import('./types.js').RandomBytes} [random]  random bytes for ULIDs (default: Web Crypto)
- * @property {Record<string, any>} [snapshot]  model to load, from `snapshot()`
+ * @property {Record<string, any>} [snapshot]  model to load, from `snapshot()`; an older schema
+ *   version is migrated first
  *
  * @typedef {object} NodeFilter
  * @property {string} [systemId]  limit to one system (default: all systems)
@@ -79,7 +81,7 @@ export class Core {
       )
     this.#registry = registry
     this.#store = new Store()
-    if (snapshot) this.#store.load(snapshot)
+    if (snapshot) this.#store.load(migrateSnapshot(snapshot, { registry }))
     this.#bus = new CommandBus({
       store: this.#store,
       emitter: this.#emitter,

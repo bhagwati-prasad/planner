@@ -44,7 +44,7 @@ test('product multiplies availability along paths; the worst path wins', () => {
   core.dispatch({ type: 'node.setProps', payload: { id: b, props: { availabilityTarget: 99 } } })
   const r = core.rollup(root, 'availabilityTarget')
   assert.equal(r.rule, 'product')
-  close(r.value, 99.9 * 0.99 * 0.999)
+  close(r.value, 0.999 * 0.99 * 0.999) // percentages are stored as fractions (ADR 0008)
   assert.deepEqual(r.path, [a, b, d])
   void c
 })
