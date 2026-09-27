@@ -56,7 +56,10 @@ function files(dir, ext) {
 function minified(dirs) {
   const all = dirs.flatMap(dir => files(dir, '.js'))
   if (!all.length) return null
-  return all.reduce((sum, f) => sum + Buffer.byteLength(minify(readFileSync(f, 'utf8'))), 0)
+  return all.reduce(
+    (sum, f) => sum + Buffer.byteLength(minify(readFileSync(f, 'utf8'), { rename: true })),
+    0
+  )
 }
 
 /** Bytes of the files with the extension under the given directories, or null. @param {string[]} dirs @param {string} ext */
@@ -83,7 +86,7 @@ function bundled(root, entry) {
         'utf8'
       )
   const bundle = bundleModules(sources, [entry])
-  return Buffer.byteLength(minify(emitScript(bundle, { entry, format: 'iife' })))
+  return Buffer.byteLength(minify(emitScript(bundle, { entry, format: 'iife' }), { rename: true }))
 }
 
 /** @param {string} root */
