@@ -8,6 +8,14 @@
   "icon": "icon.svg",
   "extends": "base:client",
   "shape": "person",
+  "methods": {
+    "public": {},
+    "private": {
+      "runStep": {},
+      "think": {},
+      "retry": {}
+    }
+  },
   "properties": {
     "population": {
       "type": "integer",

@@ -29,7 +29,7 @@ Rules adopted after code was written start with a bulk suppression (`eslint-supp
 
 | Rule | Files | Removed by |
 | --- | --- | --- |
-| `strata/facade-help` | facade methods without `@example` | 0115 (help metadata) |
+| `strata/facade-help` | facade methods without `@example` | 0120 (help metadata) |
 
 A suppressed file still fails on any violation beyond its recorded count, and ESLint reports suppressions that no longer occur, so the list only shrinks: run `npx eslint . --prune-suppressions` after fixing some. `tools/lint/test/config.test.js` keeps the file limited to the table above.
 

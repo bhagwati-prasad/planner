@@ -5,13 +5,17 @@
  *
  * Every change goes through `project.dispatch`, i.e. through the command bus.
  */
-import { fail, nodeKind } from '../../core/src/index.js'
+import { SYSTEM_TYPE_REF, fail, nodeKind } from '../../core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE, INSPECT, defined } from './internal.js'
 import { pasteClip } from './clipboard.js'
 
 /** @typedef {import('./projects.js').ProjectHandle} ProjectHandle */
 /** @typedef {import('../../core/src/index.js').Core} Core */
+/**
+ * A component method as `methods()` lists it: its declared spec plus these fields.
+ * @typedef {{ name: string, visibility: 'public'|'private', ports: string[], [key: string]: unknown }} MethodInfo
+ */
 
 /** @param {ProjectHandle} project @returns {Core} */
 const coreOf = project => project[CORE]
@@ -179,14 +183,15 @@ export class SystemHandle extends Handle {
    * (the compatible port is picked for you).
    * @param {PortHandle|NodeHandle|string} from
    * @param {PortHandle|NodeHandle|string} to
-   * @param {{ type?: string, props?: object, label?: string, id?: string }} [options]
+   * @param {{ type?: string, method?: string, props?: object, label?: string, id?: string }} [options]
+   *   method: the public method the edge calls, one the target port exposes (spec §6)
    */
-  connect(from, to, { type, props, label, id } = {}) {
+  connect(from, to, { type, method, props, label, id } = {}) {
     this.#writable()
     const [fromPort, toPort] = pickPorts(this, from, to, type)
     const edgeId = this.project.dispatch({
       type: 'edge.add',
-      payload: defined({ fromPort, toPort, connectionType: type, props, label, id }),
+      payload: defined({ fromPort, toPort, connectionType: type, method, props, label, id }),
     })
     return new EdgeHandle(this.project, edgeId, { readOnly: this.#readOnly })
   }
@@ -527,6 +532,98 @@ export class NodeHandle extends Handle {
     return this.update({ name })
   }
 
+  /**
+   * The component's public and private methods (spec §6), public ones with the ports that
+   * expose them. A System component's public methods are those its boundary ports bind.
+   * @returns {Collection & MethodInfo[]}
+   * @example db.methods().filter(m => m.visibility === 'public')
+   */
+  methods() {
+    const core = this[CORE]
+    const ports = core.portsOf(this.id)
+    const exposing = (/** @type {string} */ name) =>
+      ports.filter(p => core.exposedMethods(p).includes(name)).map(p => p.name)
+    /** @type {{ public?: Record<string, object>, private?: Record<string, object> }} */
+    const declared =
+      this.entity.typeRef === SYSTEM_TYPE_REF
+        ? {
+            public: Object.fromEntries(
+              [...new Set(ports.flatMap(p => core.exposedMethods(p)))].map(n => [n, {}])
+            ),
+          }
+        : (this.manifest?.methods ?? {})
+    return /** @type {Collection & MethodInfo[]} */ (
+      Collection.from([
+        ...Object.entries(declared.public ?? {}).map(([name, spec]) => ({
+          name,
+          visibility: /** @type {const} */ ('public'),
+          ports: exposing(name),
+          ...spec,
+        })),
+        ...Object.entries(declared.private ?? {}).map(([name, spec]) => ({
+          name,
+          visibility: /** @type {const} */ ('private'),
+          ports: [],
+          ...spec,
+        })),
+      ])
+    )
+  }
+
+  /**
+   * The component's typed initial state (spec §6): each declared state field's initial value.
+   * @example svc.state() // { backlog: [], circuits: {} }
+   */
+  state() {
+    /** @type {Record<string, { initial?: unknown }>} */
+    const declared = /** @type {any} */ (this.manifest)?.state ?? {}
+    return Object.fromEntries(
+      Object.entries(declared).map(([key, schema]) => [
+        key,
+        structuredClone(schema.initial ?? null),
+      ])
+    )
+  }
+
+  /**
+   * Gives the component an inner system of its own (spec §7): its ports become the inner
+   * system's boundary ports, and it keeps its type and properties as its black-box model.
+   * @returns {SystemHandle}
+   * @example const inner = svc.openAsSystem(); inner.enter()
+   */
+  openAsSystem() {
+    this.#writable()
+    const id = this.project.dispatch({ type: 'component.openAsSystem', payload: { id: this.id } })
+    return new SystemHandle(this.project, id, { via: this.id })
+  }
+
+  /**
+   * Removes the inner system a component was opened with, leaving it a black box.
+   * @example svc.removeInnerSystem()
+   */
+  removeInnerSystem() {
+    this.#writable()
+    this.project.dispatch({ type: 'component.removeInnerSystem', payload: { id: this.id } })
+    return this
+  }
+
+  /**
+   * Follows a public method's bindings down to the component that implements it (spec §7).
+   * @param {string} method
+   * @param {{ port?: string }} [options]  the exposing port, when there are several
+   * @returns {{ node: NodeHandle, method: string, path: { node: NodeHandle, method: string }[] }}
+   * @example payments.resolve('refund').node.name // 'Ledger API'
+   */
+  resolve(method, { port } = {}) {
+    const r = this[CORE].resolveBinding(this.id, method, defined({ port }))
+    const node = (/** @type {string} */ id) => new NodeHandle(this.project, id)
+    return {
+      node: node(r.nodeId),
+      method: r.method,
+      path: r.path.map(hop => ({ node: node(hop.nodeId), method: hop.method })),
+    }
+  }
+
   /** @param {string} name */
   port(name) {
     const ports = this[CORE].portsOf(this.id)
@@ -695,6 +792,10 @@ export class PortHandle extends Handle {
   get accepts() {
     return this[CORE].acceptsOf(this.id)
   }
+  /** The public methods an edge into this port may call (spec §6); a boundary port's are its bound ones. */
+  get exposes() {
+    return this[CORE].exposedMethods(this.id)
+  }
   /** False for extra ports added to a node. */
   get declared() {
     return this.entity.declared
@@ -773,6 +874,10 @@ export class EdgeHandle extends Handle {
   get label() {
     return this.entity.label
   }
+  /** The public method the edge calls, or null when it calls any the target port exposes. */
+  get method() {
+    return this.entity.method ?? null
+  }
   /** The connection type's manifest (inheritance applied), or null when it is not installed. */
   get manifest() {
     return this[CORE].connectionTypeOf(this.id)
@@ -808,12 +913,15 @@ export class EdgeHandle extends Handle {
     return this
   }
 
-  /** @param {{ label?: string, type?: string|null }} changes */
-  update({ label, type }) {
+  /**
+   * @param {{ label?: string, type?: string|null, method?: string|null }} changes
+   *   method: the public method the edge calls (null: any the target port exposes)
+   */
+  update({ label, type, method }) {
     this.#writable()
     this.project.dispatch({
       type: 'edge.update',
-      payload: { id: this.id, changes: defined({ label, connectionType: type }) },
+      payload: { id: this.id, changes: defined({ label, connectionType: type, method }) },
     })
     return this
   }
@@ -850,6 +958,7 @@ export class EdgeHandle extends Handle {
       from: portLabel(this[CORE], e.fromPort),
       to: portLabel(this[CORE], e.toPort),
       type: e.connectionType ?? '',
+      method: e.method ?? '',
       label: e.label,
     }
   }
@@ -904,6 +1013,54 @@ export class BoundaryPortHandle extends Handle {
     this.project.dispatch({
       type: 'boundary.update',
       payload: { id: this.id, changes: { internalPortId } },
+    })
+    return this
+  }
+
+  /** The methods bound on this port, as method → { node, method } (spec §7). */
+  get bindings() {
+    return Object.freeze(
+      Object.fromEntries(
+        Object.entries(this.entity.bindings ?? {}).map(([method, target]) => [
+          method,
+          {
+            node: new NodeHandle(this.project, target.nodeId, { readOnly: this.#readOnly }),
+            method: target.method,
+          },
+        ])
+      )
+    )
+  }
+
+  /**
+   * Binds a public method of the system to a method of a component reachable from this port.
+   * @param {string} method @param {NodeHandle|string} node @param {string} [target] defaults to `method`
+   * @example inner.port('in').bind('refund', 'Ledger', 'reverse')
+   */
+  bind(method, node, target = method) {
+    this.#writable()
+    this.project.dispatch({
+      type: 'boundary.bind',
+      payload: {
+        boundaryPortId: this.id,
+        method,
+        nodeId: resolveNodeId(this.system, node),
+        target,
+      },
+    })
+    return this
+  }
+
+  /**
+   * Removes a method's binding from this port.
+   * @param {string} method
+   * @example inner.port('in').unbind('refund')
+   */
+  unbind(method) {
+    this.#writable()
+    this.project.dispatch({
+      type: 'boundary.unbind',
+      payload: { boundaryPortId: this.id, method },
     })
     return this
   }

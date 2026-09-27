@@ -30,10 +30,18 @@ export const STARTER = [
     category: 'Compute',
     extends: 'base:service',
     ports: [
-      { name: 'in', direction: 'in', accepts: ['http', 'grpc'] },
+      { name: 'in', direction: 'in', accepts: ['http', 'grpc'], exposes: ['health'] },
       { name: 'out', direction: 'out', accepts: ['http', 'grpc'] },
       { name: 'db', direction: 'out', accepts: ['db-protocol'] },
     ],
+    methods: {
+      public: { health: {} },
+      private: { admit: {}, retry: {}, tripCircuit: {}, autoscale: {} },
+    },
+    state: {
+      backlog: { type: 'queue', of: 'request', initial: [] },
+      circuits: { type: 'map', of: 'string', initial: {} },
+    },
     properties: {
       latency: {
         type: 'distribution',
@@ -49,7 +57,26 @@ export const STARTER = [
     version: '1.0.0',
     category: 'Data',
     extends: 'base:store',
-    ports: [{ name: 'in', direction: 'in', accepts: ['db-protocol'] }],
+    ports: [
+      {
+        name: 'in',
+        direction: 'in',
+        accepts: ['db-protocol'],
+        exposes: ['query', 'insert', 'update', 'delete', 'begin', 'commit', 'rollback'],
+      },
+    ],
+    methods: {
+      public: {
+        query: {},
+        insert: {},
+        update: {},
+        delete: {},
+        begin: {},
+        commit: {},
+        rollback: {},
+      },
+      private: { acquireConnection: {}, lock: {}, replicate: {}, failover: {} },
+    },
     properties: {
       latency: {
         type: 'distribution',

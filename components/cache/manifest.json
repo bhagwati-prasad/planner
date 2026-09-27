@@ -8,6 +8,25 @@
   "icon": "icon.svg",
   "extends": "base:cache",
   "shape": "component",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [],
+      "exposes": ["get", "set", "delete"]
+    }
+  ],
+  "methods": {
+    "public": {
+      "get": {},
+      "set": {},
+      "delete": {}
+    },
+    "private": {
+      "evict": {},
+      "expire": {}
+    }
+  },
   "properties": {
     "capacityMemory": {
       "type": "bytes",

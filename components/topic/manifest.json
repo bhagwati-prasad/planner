@@ -8,6 +8,27 @@
   "icon": "icon.svg",
   "extends": "base:topic",
   "shape": "queue",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": ["async-message"],
+      "exposes": ["publish", "subscribe", "poll", "commit"]
+    }
+  ],
+  "methods": {
+    "public": {
+      "publish": {},
+      "subscribe": {},
+      "poll": {},
+      "commit": {}
+    },
+    "private": {
+      "assignPartitions": {},
+      "compact": {},
+      "trimRetention": {}
+    }
+  },
   "properties": {
     "partitions": {
       "type": "integer",

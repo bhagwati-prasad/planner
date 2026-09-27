@@ -12,9 +12,27 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["db-protocol"]
+      "accepts": ["db-protocol"],
+      "exposes": ["query", "insert", "update", "delete", "begin", "commit", "rollback"]
     }
   ],
+  "methods": {
+    "public": {
+      "query": {},
+      "insert": {},
+      "update": {},
+      "delete": {},
+      "begin": {},
+      "commit": {},
+      "rollback": {}
+    },
+    "private": {
+      "acquireConnection": {},
+      "lock": {},
+      "replicate": {},
+      "failover": {}
+    }
+  },
   "properties": {
     "vcpu": {
       "type": "integer",

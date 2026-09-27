@@ -12,13 +12,23 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["http", "grpc", "websocket"]
+      "accepts": ["http", "grpc", "websocket"],
+      "exposes": ["forward"]
     },
     {
       "name": "out",
       "direction": "out"
     }
   ],
+  "methods": {
+    "public": {
+      "forward": {}
+    },
+    "private": {
+      "pickTarget": {},
+      "healthCheck": {}
+    }
+  },
   "properties": {
     "layer": {
       "type": "enum",

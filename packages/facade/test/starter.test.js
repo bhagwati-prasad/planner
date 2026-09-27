@@ -178,3 +178,50 @@ test('edge properties of a missing connection type are kept and reported', async
     ['MISSING_CONNECTION_TYPE']
   )
 })
+
+test('every starter component declares the methods of spec §9, and its in ports expose the public ones', async () => {
+  // Spec §9, "State and methods": public methods, then private methods.
+  const catalogue = {
+    'message-queue': ['publish receive ack nack', 'expire redeliver sendToDlq'],
+    topic: ['publish subscribe poll commit', 'assignPartitions compact trimRetention'],
+    'worker-pool': ['status', 'poll process retry'],
+    service: ['health', 'admit retry tripCircuit autoscale'],
+    function: ['invoke', 'coldStart reap'],
+    'relational-db': [
+      'query insert update delete begin commit rollback',
+      'acquireConnection lock replicate failover',
+    ],
+    'nosql-db': ['get put delete query', 'route throttle replicate'],
+    cache: ['get set delete', 'evict expire'],
+    'object-storage': ['put get delete list', 'throttle applyLifecycle'],
+    'search-index': ['index search delete', 'refresh merge'],
+    'load-balancer': ['forward', 'pickTarget healthCheck'],
+    'api-gateway': ['forward', 'authenticate rateLimit transform cacheLookup'],
+    cdn: ['get', 'fetchFromOrigin evict'],
+    dns: ['resolve', 'healthCheck failover'],
+    client: ['', 'runStep think retry'],
+    'identity-provider': ['issueToken validateToken revoke', 'mfaChallenge'],
+    scheduler: ['trigger pause resume', 'tick dispatch'],
+    'third-party-api': ['call', 'throttle'],
+    'external-system': ['call', ''],
+  }
+  const p = await starterStrata().projects.create('methods')
+  for (const [name, [pub, priv]] of Object.entries(catalogue)) {
+    const node = p.root.add(name)
+    const methods = node.methods()
+    const names = (/** @type {string} */ visibility) =>
+      methods.filter(m => m.visibility === visibility).map(m => m.name)
+    assert.deepEqual(names('public'), pub.split(' ').filter(Boolean), `${name} public`)
+    assert.deepEqual(names('private'), priv.split(' ').filter(Boolean), `${name} private`)
+    for (const port of node.ports().filter(pt => pt.direction === 'in'))
+      assert.deepEqual(port.exposes, names('public'), `${name}.${port.name} exposes`)
+  }
+  const edge = p.root.connect(
+    p.root.node('Service').port('out'),
+    p.root.node('Relational DB').port('in'),
+    {
+      method: 'insert',
+    }
+  )
+  assert.equal(edge.method, 'insert')
+})

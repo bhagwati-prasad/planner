@@ -12,9 +12,21 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["http"]
+      "accepts": ["http"],
+      "exposes": ["index", "search", "delete"]
     }
   ],
+  "methods": {
+    "public": {
+      "index": {},
+      "search": {},
+      "delete": {}
+    },
+    "private": {
+      "refresh": {},
+      "merge": {}
+    }
+  },
   "properties": {
     "shards": {
       "type": "integer",

@@ -8,6 +8,27 @@
   "icon": "icon.svg",
   "extends": "base:queue",
   "shape": "queue",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": ["async-message"],
+      "exposes": ["publish", "receive", "ack", "nack"]
+    }
+  ],
+  "methods": {
+    "public": {
+      "publish": {},
+      "receive": {},
+      "ack": {},
+      "nack": {}
+    },
+    "private": {
+      "expire": {},
+      "redeliver": {},
+      "sendToDlq": {}
+    }
+  },
   "properties": {
     "ingressMode": {
       "type": "enum",

@@ -12,13 +12,24 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["async-message"]
+      "accepts": ["async-message"],
+      "exposes": ["status"]
     },
     {
       "name": "out",
       "direction": "out"
     }
   ],
+  "methods": {
+    "public": {
+      "status": {}
+    },
+    "private": {
+      "poll": {},
+      "process": {},
+      "retry": {}
+    }
+  },
   "properties": {
     "consumers": {
       "type": "integer",
