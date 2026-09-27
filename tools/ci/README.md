@@ -34,6 +34,8 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` (about 138 KB) comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR. Until then, as the human decided on 2026-09-26, a task that grows `core` raises this recorded size to what it ships, and says so in its `plan/LOG.md` line.
 
+Core, facade and the non-UI packages are close to their 250 KB. As the human decided on 2026-09-27, the same policy applies when a task takes them past it: the task records an exception at the size they reach and says so in its `plan/LOG.md` line. It also proposes the task that brings them back within budget, which the exception names as its owner.
+
 ## Licences
 
 `licence.js` checks what comes from elsewhere; Strata's own code is proprietary (eng §1). Every package in `package-lock.json` must declare a licence on the permissive allow-list in `licence.js` (for an SPDX `OR`, one side is enough). Every folder in `vendor/` must be a library eng §16 approves (D3, Three.js, IBM Plex) and hold a licence file with the licence eng §1 names: ISC, MIT and OFL-1.1.

@@ -1,7 +1,7 @@
 # 0008 Store property values in canonical units
 
-Status: Proposed
-Date: 2026-09-26
+Status: Accepted
+Date: 2026-09-27
 
 ## Context and problem
 
@@ -24,7 +24,7 @@ Task 0108 added the conversions (`core/src/units.js`), and `checkValue` (0107) r
 
 ## Decision outcome
 
-Proposed: option 1, because it is what eng §8 already requires, it removes conversion from every reader, and the formatter can write any canonical value back in the design system's style (`formatQuantity`).
+Chosen option: 1, store canonical values, decided by the human on 2026-09-27. It is what eng §8 already requires, it removes conversion from every reader, and the formatter can write any canonical value back in the design system's style (`formatQuantity`).
 
 ## Consequences
 
@@ -34,7 +34,7 @@ Proposed: option 1, because it is what eng §8 already requires, it removes conv
 - Bad: saved projects need a snapshot migration, `migrations/v1-to-v2.js`, with fixtures in `test/fixtures/schema-v1/`. Values whose component type is missing (placeholders) stay as written and are reported as problems.
 - Bad: component behaviour code (M03 and later) receives milliseconds, bytes and fractions. The plugin API documentation has to say so before its first release.
 - Open question: money has no property type yet. `monthlyCost` is a `number` with unit `USD`. A `money` type storing `{ amountMicros, currency }` would change the plugin API, and is a separate decision.
-- Follow-up task (to add to M01 after 0108, if accepted): convert on write in the property commands and the registry, and add the snapshot migration and its fixtures. Then remove `normalizeValue` from the readers, and make roll-ups treat percentages as fractions.
+- Follow-up task: [0116](../../plan/M01-core/0116-canonical-property-values.md) converts on write in the property commands and the registry, and adds the snapshot migration and its fixtures. It then removes `normalizeValue` from the readers, and makes roll-ups treat percentages as fractions.
 
 ## Pros and cons of the options
 
