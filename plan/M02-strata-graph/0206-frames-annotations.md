@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M02 strata-graph](../ROADMAP.md#m02-strata-graph) | R0 | todo | [0204](../M02-strata-graph/0204-selection-intents.md) |
+| [M02 strata-graph](../ROADMAP.md#m02-strata-graph) | R0 | done | [0204](../M02-strata-graph/0204-selection-intents.md) |
 
 ## Read first
 
@@ -17,14 +17,14 @@ Group frames, the level frame with boundary ports, zones, trust boundaries, note
 
 Write these tests first, in `packages/graph/test/annotations.spec.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] The level frame draws boundary ports on its edge with labels outside
-- [ ] Moving a frame moves its contents in one intent
-- [ ] Annotations render above components and are included in exports
+- [x] The level frame draws boundary ports on its edge with labels outside
+- [x] Moving a frame moves its contents in one intent
+- [x] Annotations render above components and are included in exports
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

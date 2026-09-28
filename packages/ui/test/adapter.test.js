@@ -62,6 +62,11 @@ test('inside a composite: a system frame, boundary ports on its edge, mapping ed
   assert.equal(bpNode.shape, 'boundary-port')
   assert.equal(bpNode.x + bpNode.w / 2, frame.x, 'an input boundary port sits on the left edge')
   assert.deepEqual(
+    [bpNode.side, bpNode.w, bpNode.h],
+    ['left', 12, 12],
+    'a 12 px half-disc on the frame side the graph draws it against'
+  )
+  assert.deepEqual(
     bpNode.ports.map(p => [p.side, p.direction]),
     [['right', 'out']],
     'inside, traffic comes out of it'

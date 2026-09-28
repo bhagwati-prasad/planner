@@ -100,6 +100,29 @@ function slide(anchor, by) {
   return { ...anchor, [along]: anchor[along] + by }
 }
 const HANDLE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const FRAME_RADIUS = 6
+
+/**
+ * The stratum colour of a level (design system §3): the root is 0, and deeper levels cycle
+ * through 1 to 6.
+ * @param {number} [level]
+ */
+const stratum = (level = 0) => (level > 0 ? ((Math.round(level) - 1) % 6) + 1 : 0)
+
+/**
+ * The 3 px stratum band along the top edge of a level frame with rounded corners (§5).
+ * @param {Rect} r
+ */
+function bandPath(r) {
+  const R = FRAME_RADIUS
+  const inset = R - Math.sqrt(R * R - (R - 3) * (R - 3))
+  const y = r.y + 3
+  return `M${r.x + inset},${y}A${R},${R} 0 0 1 ${r.x + R},${r.y}H${r.x + r.w - R}A${R},${R} 0 0 1 ${r.x + r.w - inset},${y}Z`
+}
+
+/** A 10 × 12 padlock outline with its top-left corner at (x, y). */
+const lockPath = (/** @type {number} */ x, /** @type {number} */ y) =>
+  `M${x + 2.5},${y + 5}V${y + 3}a2.5,2.5 0 0 1 5,0V${y + 5}M${x + 1},${y + 5}h8v6h-8Z`
 /** Boxes are never resized below this, in world units. */
 const MIN_SIZE = 16
 let instances = 0
@@ -1879,13 +1902,25 @@ export class Graph {
         .attr('y', r.y)
         .attr('width', r.w)
         .attr('height', r.h)
-        .attr('rx', 8)
+        .attr('rx', FRAME_RADIUS)
         .style('stroke', d.style?.stroke ?? null)
         .style('fill', d.style?.fill ?? null)
+      // The level frame's stratum band (design system §5) and a trust boundary's lock (§6).
+      g.selectChildren('path.sg-stratum-band')
+        .data(d.kind === 'system' ? [stratum(d.level)] : [])
+        .join('path')
+        .attr('class', n => `sg-stratum-band sg-level-${n}`)
+        .attr('d', bandPath(r))
+      const trust = d.kind === 'trust-boundary'
+      g.selectChildren('path.sg-lock')
+        .data(trust ? [r] : [])
+        .join('path')
+        .attr('class', 'sg-lock')
+        .attr('d', b => lockPath(b.x + 10, b.y + 7))
       g.select('.sg-frame-label')
-        .attr('x', r.x + 10)
-        .attr('y', r.y + 7)
-        .text(d.label ?? '')
+        .attr('x', r.x + (trust ? 26 : 10))
+        .attr('y', r.y + (d.kind === 'system' ? 12 : 8))
+        .text(trust ? `Trust boundary${d.label ? `: ${d.label}` : ''}` : (d.label ?? ''))
       g.select('.sg-frame-title').attr('x', r.x).attr('y', r.y).attr('width', r.w)
     })
   }
@@ -2391,6 +2426,7 @@ export class Graph {
         d.form,
         r,
         d.text,
+        d.size,
         d.style,
         d.target,
         this.#themeVersion,
@@ -2408,10 +2444,16 @@ export class Graph {
               })()
             : d.target
         if (to) {
+          // A leader ending in a 4 px dot at the target (design system §6).
           const from = boundaryAnchor(r, to)
           g.append('path')
             .attr('class', 'sg-leader')
             .attr('d', `M${from.x},${from.y} L${to.x},${to.y}`)
+          g.append('circle')
+            .attr('class', 'sg-leader-dot')
+            .attr('cx', to.x)
+            .attr('cy', to.y)
+            .attr('r', 2)
         }
       }
       if (d.kind === 'shape' && d.form === 'ellipse') {
@@ -2441,11 +2483,17 @@ export class Graph {
         .style('fill', d.style?.fill ?? null)
         .style('stroke', d.style?.stroke ?? null)
       if (d.text) {
+        // Free text comes in body or title size (design system §6).
+        const title = d.kind === 'text' && d.size === 'title'
+        const scale = title ? (parseFloat(this.#tokens.fontSizeTitle) || 16) / this.#fontSize : 1
+        const measure = t => this.#measure(t) * scale
         const pad = 8
-        const lineH = this.#fontSize * 1.3
+        const lineH = this.#fontSize * scale * 1.3
         const maxLines = Math.max(1, Math.floor((r.h - 2 * pad) / lineH))
-        const lines = wrapText(d.text, r.w - 2 * pad, this.#measure, { maxLines })
-        const text = g.append('text').attr('class', 'sg-annotation-text')
+        const lines = wrapText(d.text, r.w - 2 * pad, measure, { maxLines })
+        const text = g
+          .append('text')
+          .attr('class', title ? 'sg-annotation-text sg-text-title' : 'sg-annotation-text')
         lines.forEach((line, n) =>
           text
             .append('tspan')

@@ -44,6 +44,19 @@ export function part(sel, tag, name, cls = 'sg-shape') {
 /** @param {any} sel @param {string} d */
 const path = (sel, d) => part(sel, 'path', 'outline').attr('d', d)
 
+/**
+ * A boundary port on each side of a level frame, in its 12 × 12 box: the half-disc (flat side on
+ * the frame edge through the box's centre), where its label goes outside the frame, and the side
+ * its connection faces.
+ */
+const BP_SIDES =
+  /** @type {Record<string, { disc: string, label: [number, number, string, string], inward: import('../geometry.js').Side }>} */ ({
+    left: { disc: 'M6,0A6,6 0 0 1 6,12Z', label: [0, 6, 'end', 'central'], inward: 'right' },
+    right: { disc: 'M6,12A6,6 0 0 1 6,0Z', label: [12, 6, 'start', 'central'], inward: 'left' },
+    top: { disc: 'M12,6A6,6 0 0 1 0,6Z', label: [6, -4, 'middle', 'auto'], inward: 'bottom' },
+    bottom: { disc: 'M0,6A6,6 0 0 1 12,6Z', label: [6, 16, 'middle', 'hanging'], inward: 'top' },
+  })
+
 /** Badges shown on a card: up to three, then "+N" for the rest (design system §6). */
 const MAX_BADGES = 3
 
@@ -319,23 +332,32 @@ export const BUILTIN_SHAPES = {
     },
   },
 
-  /** A system's boundary port drawn on its frame edge. */
+  /**
+   * A system's boundary port on its level frame (design system §6): a 12 px half-disc whose flat
+   * side lies on the frame's edge and which bulges into the level, labelled outside the frame.
+   * `side` names the frame's side it sits on; the host centres it on that edge.
+   */
   'boundary-port': {
     render(sel, d) {
-      part(sel, 'rect', 'outline')
-        .attr('width', d.w)
-        .attr('height', d.h)
-        .attr('rx', Math.min(d.w, d.h) / 2)
+      const side = BP_SIDES[d.side] ? d.side : 'left'
+      part(sel, 'path', 'disc', 'sg-bp-disc').attr('d', BP_SIDES[side].disc)
+      const [x, y, anchor, baseline] = BP_SIDES[side].label
+      part(sel, 'text', 'label', 'sg-bp-label')
+        .attr('x', x)
+        .attr('y', y)
+        .attr('text-anchor', anchor)
+        .attr('dominant-baseline', baseline)
+        .text(d.label ?? '')
     },
     ports: d => [
       {
         id: 'port',
-        side: d.side ?? (d.direction === 'out' ? 'left' : 'right'),
+        side: BP_SIDES[d.side]?.inward ?? 'right',
         offset: 0.5,
         direction: d.direction ?? 'both',
       },
     ],
-    size: { w: 72, h: 28 },
-    labelBox: d => ({ x: 4, y: 0, w: d.w - 8, h: d.h }),
+    size: { w: 12, h: 12 },
+    label: false,
   },
 }

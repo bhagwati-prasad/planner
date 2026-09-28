@@ -43,7 +43,8 @@ function isAsync(edge) {
 
 const FRAME_PADDING = 60
 const MIN_FRAME = { w: 480, h: 320 }
-const BP_SIZE = { w: 96, h: 28 }
+/** Boundary ports are 12 px half-discs on the frame edge (design system §6). */
+const BP_SIZE = { w: 12, h: 12 }
 const GHOST_GAP = 200
 const AUTO = { columns: 4, dx: 220, dy: 140, gap: 80 }
 
@@ -290,6 +291,7 @@ function placeBoundaryPorts(frame, bps, nodes, edges) {
         w: BP_SIZE.w,
         h: BP_SIZE.h,
         shape: 'boundary-port',
+        side,
         label: item.e.name,
         locked: true,
         title: `Boundary port ${item.e.name} (${item.e.direction})`,
