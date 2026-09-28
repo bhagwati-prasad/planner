@@ -28,6 +28,36 @@ export const HARNESS = '/tools/testing/browser/harness.html'
 export const test = base.extend({
   mode: ['served', { option: true }],
 
+  // In CI, Firefox sometimes never reports a served page's load event, so page.goto times out on
+  // pages no change touched (#15, #17, #18). Navigations wait for the document to commit and then
+  // for the page itself to say it has loaded. A page that really stalls still fails, and the
+  // error names the resources it started, so the CI log shows what stalled.
+  page: async ({ page }, use) => {
+    const goto = page.goto.bind(page)
+    const patched = /** @type {any} */ (page)
+    patched.goto = async (
+      /** @type {string} */ url,
+      /** @type {{ timeout?: number }} */ options = {}
+    ) => {
+      const response = await goto(url, { ...options, waitUntil: 'commit' })
+      await page
+        .waitForFunction(() => document.readyState === 'complete', null, {
+          timeout: options.timeout,
+        })
+        .catch(async err => {
+          const state = await page
+            .evaluate(() => ({
+              readyState: document.readyState,
+              resources: performance.getEntriesByType('resource').map(r => r.name),
+            }))
+            .catch(() => null)
+          throw new Error(`${url} did not finish loading: ${JSON.stringify(state)}\n${err.message}`)
+        })
+      return response
+    }
+    await use(page)
+  },
+
   urlFor: async ({ mode, baseURL }, use) => {
     await use(path =>
       mode === 'file'
