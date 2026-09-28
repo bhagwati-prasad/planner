@@ -30,8 +30,9 @@ A budget that existing code already exceeds is recorded in `size-exceptions.json
 
 | Budget | Recorded | Removed by |
 | --- | --- | --- |
-| strata-graph | 90.3 KB of 60 KB | 0207 (level of detail and performance). The minifier lowered it from 99.5 KB: to 88.5 KB by dropping unneeded line breaks and spaces, then to 75.8 KB by shortening local names (0119). The scene of 0201 (eng §12 layers, per-element state keys, the dot grid) raised it to 76.9 KB, the component card and port hit areas of 0202 to 80.7 KB, the node states of 0209 to 87.9 KB, and the connection kinds of 0203 to 90.3 KB, as the human decided on 2026-09-27: a task that grows the package raises this recorded size to what it ships and says so in its `plan/LOG.md` line |
 | Simulation worker bundle | 154.4 KB of 120 KB | 0402 (worker host). Shortening local names (0119) lowered it from 168.6 KB to 138.3 KB; method bindings (0111), extract planning (0112) and memoised roll-ups (0113) raised it as core grew |
+
+strata-graph had an exception here until [ADR 0014](../../docs/adr/0014-strata-graph-budget-of-110-kb.md) set its budget at 110 KB and strata-ui's at 240 KB, as the human decided on 2026-09-28. It was over 60 KB before M02's tasks began (75.8 KB after 0119 shortened local names). The scene, cards, node states, edges, interaction, guides, frames and annotations of 0201 to 0206 then took it to 97.6 KB.
 
 The worker's own code is small. It reaches `core` through `core`'s `index.js`, which eng §4 requires, and the bundler has no tree-shaking, so all of `core` comes with it. Fixing it means either re-export pruning in the bundler or a leaner worker entry into `core`, which needs an ADR. Until then, as the human decided on 2026-09-26, a task that grows `core` raises this recorded size to what it ships, and says so in its `plan/LOG.md` line.
 

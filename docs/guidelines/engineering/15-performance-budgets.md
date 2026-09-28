@@ -5,8 +5,8 @@ Budgets are measured on the reference machine: a 2023 mid-range laptop with 8 co
 | Measure | Budget |
 | --- | --- |
 | Core, facade and non-UI packages (minified) | 250 KB |
-| strata-graph (minified) | 60 KB |
-| strata-ui (minified) | 290 KB |
+| strata-graph (minified) | 110 KB |
+| strata-ui (minified) | 240 KB |
 | Simulation worker bundle (minified) | 120 KB |
 | Bundled fonts (woff2, Latin subset) | 120 KB |
 | Console help metadata (minified) | 25 KB |
@@ -20,7 +20,7 @@ Budgets are measured on the reference machine: a 2023 mid-range laptop with 8 co
 | IndexedDB flush after a command | 500 ms |
 | Idle heap, 2,000-node project | 300 MB |
 
-D3 is excluded from the JS budgets and Three.js is lazy-loaded, matching spec §21. The console help metadata (`packages/facade/src/help-data.js`, generated from the facade's JSDoc) is text, not code, so it has its own line and does not count toward the core budget ([ADR 0013](../../adr/0013-console-help-metadata-has-its-own-budget.md)).
+D3 is excluded from the JS budgets and Three.js is lazy-loaded, matching spec §21. The console help metadata (`packages/facade/src/help-data.js`, generated from the facade's JSDoc) is text, not code, so it has its own line and does not count toward the core budget ([ADR 0013](../../adr/0013-console-help-metadata-has-its-own-budget.md)). strata-graph has 110 KB and strata-ui 240 KB, so core, strata-graph and strata-ui still sum to the 600 KB of spec §21 ([ADR 0014](../../adr/0014-strata-graph-budget-of-110-kb.md)).
 
 ---
 Part of the [Strata Engineering Guidelines](README.md).

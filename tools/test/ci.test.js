@@ -160,8 +160,8 @@ describe('size check', () => {
   it('reads every size budget from eng §15', () => {
     assert.deepEqual(budgets(), [
       { label: 'Core, facade and non-UI packages (minified)', bytes: 250_000 },
-      { label: 'strata-graph (minified)', bytes: 60_000 },
-      { label: 'strata-ui (minified)', bytes: 290_000 },
+      { label: 'strata-graph (minified)', bytes: 110_000 },
+      { label: 'strata-ui (minified)', bytes: 240_000 },
       { label: 'Simulation worker bundle (minified)', bytes: 120_000 },
       { label: 'Bundled fonts (woff2, Latin subset)', bytes: 120_000 },
       { label: 'Console help metadata (minified)', bytes: 25_000 },
@@ -188,7 +188,7 @@ describe('size check', () => {
   it('fails when a fixture bundle exceeds its eng §15 budget', () => {
     const fixture = tree({
       'packages/core/src/index.js': moduleOf(1_000),
-      'packages/graph/src/index.js': moduleOf(61_000),
+      'packages/graph/src/index.js': moduleOf(111_000),
       'packages/ui/src/index.js': moduleOf(1_000),
     })
     const result = checkSizes({ root: fixture.root, exceptions: {} })
@@ -196,7 +196,7 @@ describe('size check', () => {
     assert.equal(result.problems.length, 1)
     assert.match(
       result.problems[0],
-      /strata-graph \(minified\) is 61\.\d KB, over its 60 KB budget/
+      /strata-graph \(minified\) is 111\.\d KB, over its 110 KB budget/
     )
   })
 
@@ -236,16 +236,16 @@ describe('size check', () => {
   })
 
   it('lets a recorded exception stay over budget but grow no further', () => {
-    const fixture = tree({ 'packages/graph/src/index.js': moduleOf(70_000) })
+    const fixture = tree({ 'packages/graph/src/index.js': moduleOf(120_000) })
     const graph = 'strata-graph (minified)'
     const at = (/** @type {number} */ bytes) =>
       checkSizes({ root: fixture.root, exceptions: { [graph]: { bytes, owner: '0207' } } })
-    assert.equal(at(80_000).ok, true)
-    const grown = at(69_000)
+    assert.equal(at(130_000).ok, true)
+    const grown = at(119_000)
     assert.equal(grown.ok, false)
     assert.match(
       grown.problems[0],
-      /strata-graph \(minified\) is 70\.\d KB, over the 69 KB recorded/
+      /strata-graph \(minified\) is 120\.\d KB, over the 119 KB recorded/
     )
   })
 
