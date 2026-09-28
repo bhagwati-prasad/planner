@@ -14,6 +14,7 @@ export const TOKENS = Object.freeze({
   nodeText: '--sg-node-text',
   nodeSubtext: '--sg-node-subtext',
   edge: '--sg-edge',
+  edgeHover: '--sg-edge-hover',
   edgeLabel: '--sg-edge-label',
   edgeLabelBackground: '--sg-edge-label-background',
   port: '--sg-port',
@@ -41,6 +42,7 @@ export const TOKENS = Object.freeze({
   heatLow: '--sg-heat-low',
   heatHigh: '--sg-heat-high',
   fontFamily: '--sg-font-family',
+  fontFamilyMono: '--sg-font-family-mono',
   fontSize: '--sg-font-size',
   fontSizeSmall: '--sg-font-size-small',
   radius: '--sg-radius',
@@ -60,6 +62,7 @@ export const LIGHT = Object.freeze({
   nodeText: '#1B1F25',
   nodeSubtext: '#4F5866',
   edge: '#626C7C',
+  edgeHover: '#3B424D',
   edgeLabel: '#4F5866',
   edgeLabelBackground: '#FFFFFF',
   port: '#7F8999',
@@ -87,6 +90,7 @@ export const LIGHT = Object.freeze({
   heatLow: '#16a34a',
   heatHigh: '#dc2626',
   fontFamily: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  fontFamilyMono: "'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace",
   fontSize: '13px',
   fontSizeSmall: '12px',
   radius: '6',
@@ -103,6 +107,7 @@ export const DARK = Object.freeze({
   nodeText: '#E6E9EE',
   nodeSubtext: '#AEB6C2',
   edge: '#8A94A3',
+  edgeHover: '#CFD4DC',
   edgeLabel: '#AEB6C2',
   edgeLabelBackground: '#1B1F25',
   port: '#626C7C',
@@ -210,11 +215,19 @@ export const STYLESHEET = `
 .sg-edge-path { fill: none; stroke: ${v('edge')}; stroke-width: 1.5; }
 .sg-token { fill: ${v('accent')}; stroke: ${v('accentSoft')}; stroke-width: 2; pointer-events: none; }
 .sg-edge-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
-.sg-edge.sg-hover .sg-edge-path { stroke: ${v('accent')}; }
-.sg-edge.sg-selected .sg-edge-path { stroke: ${v('accent')}; stroke-width: 2.25; }
+.sg-edge.sg-hover .sg-edge-path { stroke: ${v('edgeHover')}; }
+.sg-edge.sg-selected .sg-edge-path { stroke: ${v('accent')}; stroke-width: 2; }
+/* Connection kinds (design system §6): line style carries the kind, so it reads in greyscale */
+.sg-edge.sg-kind-async .sg-edge-path { stroke-dasharray: 6 4; }
+.sg-edge.sg-kind-batch .sg-edge-path { stroke-dasharray: 2 4; }
 .sg-edge-label-bg { fill: ${v('edgeLabelBackground')}; }
-.sg-edge-label { fill: ${v('edgeLabel')}; font-size: 0.9em; text-anchor: middle; dominant-baseline: central; }
-.sg-arrow { fill: ${v('edge')}; }
+.sg-edge-label { fill: ${v('edgeLabel')}; font-size: ${v('fontSizeSmall')}; text-anchor: middle; dominant-baseline: central; }
+.sg-method { font-family: ${v('fontFamilyMono')}; }
+.sg-arrow, .sg-dot { fill: ${v('edge')}; }
+.sg-arrow-open { fill: ${v('background')}; stroke: ${v('edge')}; stroke-width: 1.2; }
+.sg-chevron { fill: none; stroke: ${v('edge')}; stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+.sg-arrow.sg-marker-active, .sg-dot.sg-marker-active { fill: ${v('accent')}; }
+.sg-arrow-open.sg-marker-active, .sg-chevron.sg-marker-active { stroke: ${v('accent')}; }
 .sg-frame-rect { fill: ${v('frameFill')}; stroke: ${v('frameStroke')}; stroke-width: 1.25; stroke-dasharray: 6 4; pointer-events: visibleStroke; }
 .sg-frame.sg-kind-trust-boundary .sg-frame-rect { stroke: ${v('trustBoundary')}; stroke-dasharray: 10 4 2 4; }
 .sg-frame.sg-kind-system .sg-frame-rect { stroke-dasharray: none; stroke-width: 2; }

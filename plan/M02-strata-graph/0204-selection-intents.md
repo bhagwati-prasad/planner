@@ -11,7 +11,7 @@
 
 ## Goal
 
-Click, Shift, Mod and marquee selection; drag to move; drag from port to port to connect; everything emitted as intents and never applied internally.
+Click, Shift, Mod and marquee selection; drag to move; drag from port to port to connect; everything emitted as intents and never applied internally. A selected edge's mid-point "add waypoint" handle currently sits on its label pill (the 0203 snapshot of a selected edge shows it); move it clear of the label here.
 
 ## Tests to write first
 

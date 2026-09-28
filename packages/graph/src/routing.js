@@ -20,7 +20,7 @@ import {
 
 export const ROUTINGS = Object.freeze(['straight', 'orthogonal', 'curved'])
 
-const DEFAULTS = { stub: 20, margin: 12, bendPenalty: 24, maxObstacles: 80, reach: 240, radius: 6 }
+const DEFAULTS = { stub: 20, margin: 12, bendPenalty: 24, maxObstacles: 80, reach: 240, radius: 8 }
 
 /**
  * @typedef {object} RouteInput
