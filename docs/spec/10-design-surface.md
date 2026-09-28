@@ -19,7 +19,7 @@ g.setOverlay('heatmap', { values, scale })                     // simulation col
 const svg = g.exportSVG(); const png = await g.exportPNG({ scale: 2 })
 ```
 
-Internals: `d3-zoom` for pan and zoom, `d3-drag` for moves and connections, `d3-quadtree` for hit-testing and snapping, `d3-force` and `d3-hierarchy` for auto-layout, plus an in-house layered (Sugiyama-style) layout and orthogonal edge router. Rendering is SVG; above about 1,500 visible elements it switches the node layer to Canvas 2D.
+Internals: `d3-zoom` for pan and zoom, `d3-drag` for moves and connections, a spatial index for hit-testing and snapping ([ADR 0015](../adr/0015-strata-graph-uses-its-own-spatial-index.md)), `d3-force` and `d3-hierarchy` for auto-layout, plus an in-house layered (Sugiyama-style) layout and orthogonal edge router. Rendering is SVG; above about 1,500 visible elements it switches the node layer to Canvas 2D.
 
 ## Canvas features
 
