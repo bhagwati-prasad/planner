@@ -89,6 +89,7 @@ function apply(intent) {
         if (!target) continue
         target.x = item.x
         target.y = item.y
+        if (item.w !== undefined) Object.assign(target, { w: item.w, h: item.h })
         if (item.kind !== 'frame' || item.parent) target.parent = item.parent ?? undefined
       }
       break

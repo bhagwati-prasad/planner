@@ -196,6 +196,28 @@ export function segmentCrossesRect(a, b, r) {
   return strictlyInside(r, mid)
 }
 
+/**
+ * Slides p, a point on the segment a→b, along it to where it leaves r: toward b, or toward a
+ * when b is inside r. p stays where it is when it is outside r or the whole segment is inside.
+ * @param {Point} p @param {Point} a @param {Point} b @param {Rect} r
+ * @returns {Point}
+ */
+export function slideOut(p, a, b, r) {
+  if (!strictlyInside(r, p)) return p
+  for (const end of [b, a]) {
+    const len = Math.hypot(end.x - p.x, end.y - p.y)
+    if (!len || strictlyInside(r, end)) continue
+    const ux = (end.x - p.x) / len
+    const uy = (end.y - p.y) / len
+    const t = Math.min(
+      ux > 0 ? (r.x + r.w - p.x) / ux : ux < 0 ? (r.x - p.x) / ux : Infinity,
+      uy > 0 ? (r.y + r.h - p.y) / uy : uy < 0 ? (r.y - p.y) / uy : Infinity
+    )
+    return { x: p.x + ux * t, y: p.y + uy * t }
+  }
+  return p
+}
+
 /** Rounds a value to a grid step (grid <= 0 leaves it unchanged). @param {number} v @param {number} grid */
 export function snap(v, grid) {
   return grid > 0 ? Math.round(v / grid) * grid : v

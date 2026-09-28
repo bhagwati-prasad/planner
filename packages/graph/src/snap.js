@@ -90,3 +90,40 @@ export function snapMove(moving, others, { grid = 0, threshold = 6, guides = tru
     g.dy !== 0 || g.guides.some(l => l.axis === 'y') ? moving.y + g.dy : snap(moving.y, grid)
   return { x, y, guides: g.guides }
 }
+
+/**
+ * The gap between a moved rectangle and the nearest shape on each guide, which the graph
+ * labels with its distance (design system §6). A gap runs along its guide, from `from` to
+ * `to`; a guide whose shapes all overlap the moved one has none.
+ * @param {Rect} moving after snapping
+ * @param {Rect[]} others
+ * @param {Guide[]} guides
+ * @returns {Guide[]}
+ */
+export function guideGaps(moving, others, guides) {
+  /** @type {Guide[]} */
+  const gaps = []
+  for (const guide of guides) {
+    // Along a vertical guide ('x') gaps are vertical, and the other way round.
+    const [at, size, across, width] =
+      guide.axis === 'x' ? ['y', 'h', 'x', 'w'] : ['x', 'w', 'y', 'h']
+    const lines = (/** @type {Rect} */ r) => [
+      r[across],
+      r[across] + r[width] / 2,
+      r[across] + r[width],
+    ]
+    let best = null
+    for (const o of others) {
+      if (!lines(o).some(v => Math.abs(v - guide.value) < 1e-6)) continue
+      const gap =
+        o[at] + o[size] <= moving[at]
+          ? { from: o[at] + o[size], to: moving[at] }
+          : moving[at] + moving[size] <= o[at]
+            ? { from: moving[at] + moving[size], to: o[at] }
+            : null
+      if (gap && (!best || gap.to - gap.from < best.to - best.from)) best = gap
+    }
+    if (best && best.to > best.from) gaps.push({ axis: guide.axis, value: guide.value, ...best })
+  }
+  return gaps
+}

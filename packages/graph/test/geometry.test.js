@@ -9,12 +9,13 @@ import {
   portAnchors,
   boundaryAnchor,
   segmentCrossesRect,
+  slideOut,
   snap,
   expand,
   center,
 } from '../src/geometry.js'
 import { SpatialIndex } from '../src/spatial.js'
-import { smartGuides, snapMove, snapRect } from '../src/snap.js'
+import { guideGaps, smartGuides, snapMove, snapRect } from '../src/snap.js'
 import { align, distribute } from '../src/arrange.js'
 import { fitTransform, zoomAt, screenToWorld, worldToScreen, visibleRect } from '../src/viewport.js'
 import { wrapText, truncateText, estimateMeasure } from '../src/text.js'
@@ -75,6 +76,29 @@ test('segment and rectangle crossing ignores touching borders', () => {
   assert.ok(segmentCrossesRect({ x: 50, y: 50 }, { x: 50, y: 200 }, r), 'starting inside')
 })
 
+test('a point slides along its segment out of a rectangle, toward the end that is outside', () => {
+  const pill = { x: 80, y: 40, w: 40, h: 20 }
+  const a = { x: 0, y: 50 }
+  const b = { x: 200, y: 50 }
+  assert.deepEqual(slideOut({ x: 100, y: 50 }, a, b, pill), { x: 120, y: 50 }, 'toward b')
+  assert.deepEqual(slideOut({ x: 30, y: 50 }, a, b, pill), { x: 30, y: 50 }, 'already outside')
+  assert.deepEqual(
+    slideOut({ x: 100, y: 50 }, a, { x: 110, y: 50 }, pill),
+    { x: 80, y: 50 },
+    'toward a when b is inside'
+  )
+  assert.deepEqual(
+    slideOut({ x: 100, y: 50 }, { x: 90, y: 50 }, { x: 110, y: 50 }, pill),
+    { x: 100, y: 50 },
+    'stays when the whole segment is inside'
+  )
+  assert.deepEqual(
+    slideOut({ x: 100, y: 50 }, { x: 100, y: 0 }, { x: 100, y: 100 }, pill),
+    { x: 100, y: 60 },
+    'vertical segments too'
+  )
+})
+
 test('spatial index: query, within, nearest, move and delete', () => {
   const index = new SpatialIndex(100)
   index.set('a', box(0, 0))
@@ -106,6 +130,19 @@ test('smart guides align edges and centres within the threshold', () => {
   const centred = smartGuides(box(200, 22, 60, 10), others, 6)
   assert.equal(centred.dy, -2, 'vertical centres line up (25 vs 27)')
   assert.deepEqual(smartGuides(box(500, 500), others, 6), { dx: 0, dy: 0, guides: [] })
+})
+
+test('each guide measures the gap to the nearest shape on it', () => {
+  const others = [box(0, 0, 100, 50), box(0, 200, 100, 50)]
+  const vertical = { axis: /** @type {const} */ ('x'), value: 0, from: 0, to: 250 }
+  assert.deepEqual(guideGaps(box(0, 120, 100, 50), others, [vertical]), [
+    { axis: 'x', value: 0, from: 170, to: 200 },
+  ])
+  const horizontal = { axis: /** @type {const} */ ('y'), value: 0, from: 0, to: 220 }
+  assert.deepEqual(guideGaps(box(160, 0, 60, 50), others, [horizontal]), [
+    { axis: 'y', value: 0, from: 100, to: 160 },
+  ])
+  assert.deepEqual(guideGaps(box(50, 0, 100, 50), others, [horizontal]), [], 'overlapping')
 })
 
 test('snapMove prefers guides, falls back to the grid', () => {

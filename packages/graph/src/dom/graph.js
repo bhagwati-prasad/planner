@@ -13,7 +13,7 @@
  *
  * Intents:
  *   { type: 'select', ids }
- *   { type: 'move', items: [{ id, kind, x, y, parent }] }
+ *   { type: 'move', items: [{ id, kind, x, y, w?, h?, parent }] }   (w, h: a resized group)
  *   { type: 'resize', id, kind, x, y, w, h }
  *   { type: 'connect', source: { node, port }, target: { node, port } }
  *   { type: 'connect-to-point', source: { node, port }, x, y }
@@ -26,10 +26,13 @@
  *
  * Other events: 'transform' (view moved), 'hover' ({ id, kind } or null), 'render' (stats).
  *
- * Gestures: drag a shape to move it (the selection moves together, frames bring their
- * contents; snapping to the grid and smart guides, Alt disables them), drag from a port to
- * connect, drag the background for a selection rectangle (Shift adds), Space+drag or the
- * middle button to pan, the wheel to scroll, Ctrl/⌘+wheel or a pinch to zoom.
+ * Gestures: click selects, Shift+click adds and Ctrl/⌘+click toggles; drag a shape to move it
+ * (the selection moves together, frames bring their contents; it snaps to the grid, and to
+ * smart guides within 6 screen px that are labelled with distances; Alt disables snapping);
+ * drag a handle of a multi-selection's box to resize the group; drag from a port to connect;
+ * drag the background for a selection rectangle (Shift adds); Space+drag or the middle button
+ * to pan, the wheel to scroll, Ctrl/⌘+wheel or a pinch to zoom. Nothing moves until the host
+ * answers an intent with setData.
  * Keyboard: Tab moves between shapes, Enter opens, Space selects, arrows move (Shift ×10),
  * Delete removes, Escape cancels or clears, Ctrl/⌘+A selects all, +/− zoom, 0 fits.
  */
@@ -41,12 +44,13 @@ import {
   portAnchors,
   rectFromPoints,
   intersects,
+  slideOut,
   snap,
   union,
 } from '../geometry.js'
 import { routeEdge } from '../routing.js'
 import { SpatialIndex } from '../spatial.js'
-import { snapMove } from '../snap.js'
+import { guideGaps, snapMove } from '../snap.js'
 import { align as alignItems, distribute as distributeItems } from '../arrange.js'
 import { fitTransform, screenToWorld, visibleRect, zoomAt } from '../viewport.js'
 import { wrapText } from '../text.js'
@@ -96,7 +100,77 @@ function slide(anchor, by) {
   return { ...anchor, [along]: anchor[along] + by }
 }
 const HANDLE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const FRAME_RADIUS = 6
+
+/**
+ * The stratum colour of a level (design system §3): the root is 0, and deeper levels cycle
+ * through 1 to 6.
+ * @param {number} [level]
+ */
+const stratum = (level = 0) => (level > 0 ? ((Math.round(level) - 1) % 6) + 1 : 0)
+
+/**
+ * The 3 px stratum band along the top edge of a level frame with rounded corners (§5).
+ * @param {Rect} r
+ */
+function bandPath(r) {
+  const R = FRAME_RADIUS
+  const inset = R - Math.sqrt(R * R - (R - 3) * (R - 3))
+  const y = r.y + 3
+  return `M${r.x + inset},${y}A${R},${R} 0 0 1 ${r.x + R},${r.y}H${r.x + r.w - R}A${R},${R} 0 0 1 ${r.x + r.w - inset},${y}Z`
+}
+
+/** A 10 × 12 padlock outline with its top-left corner at (x, y). */
+const lockPath = (/** @type {number} */ x, /** @type {number} */ y) =>
+  `M${x + 2.5},${y + 5}V${y + 3}a2.5,2.5 0 0 1 5,0V${y + 5}M${x + 1},${y + 5}h8v6h-8Z`
+/** Boxes are never resized below this, in world units. */
+const MIN_SIZE = 16
 let instances = 0
+
+/**
+ * How a click changes the selection (design system §8): Shift adds, Mod toggles, and a plain
+ * click replaces it.
+ * @param {{ shiftKey?: boolean, ctrlKey?: boolean, metaKey?: boolean }|null|undefined} e
+ * @returns {'add'|'toggle'|null}
+ */
+const selectMode = e => (e?.ctrlKey || e?.metaKey ? 'toggle' : e?.shiftKey ? 'add' : null)
+
+/**
+ * The parts of an edge's label pill: its label, then the method it calls, which draws in mono
+ * (design system §6).
+ * @param {{ label?: unknown, method?: unknown }} edge
+ */
+function labelParts(edge) {
+  return [
+    ...(edge.label ? [{ text: String(edge.label), cls: 'sg-edge-label-text' }] : []),
+    ...(edge.method ? [{ text: String(edge.method), cls: 'sg-method' }] : []),
+  ]
+}
+
+/** Where the resize handle for a direction such as 'nw' or 'e' sits on a rectangle. */
+function handleAt(/** @type {Rect} */ r, /** @type {string} */ dir) {
+  const x = dir.includes('w') ? r.x : dir.includes('e') ? r.x + r.w : r.x + r.w / 2
+  const y = dir.includes('n') ? r.y : dir.includes('s') ? r.y + r.h : r.y + r.h / 2
+  return { x, y }
+}
+
+/**
+ * A rectangle with the sides a handle direction names dragged by (dx, dy): snapped to a grid
+ * of `g` (0 for none), the opposite sides fixed, and never smaller than MIN_SIZE.
+ * @param {Rect} r @param {string} dir @param {number} dx @param {number} dy @param {number} g
+ * @returns {Rect}
+ */
+function dragSides(r, dir, dx, dy, g) {
+  let x1 = r.x
+  let y1 = r.y
+  let x2 = r.x + r.w
+  let y2 = r.y + r.h
+  if (dir.includes('w')) x1 = Math.min(snap(r.x + dx, g), x2 - MIN_SIZE)
+  if (dir.includes('e')) x2 = Math.max(snap(r.x + r.w + dx, g), x1 + MIN_SIZE)
+  if (dir.includes('n')) y1 = Math.min(snap(r.y + dy, g), y2 - MIN_SIZE)
+  if (dir.includes('s')) y2 = Math.max(snap(r.y + r.h + dy, g), y1 + MIN_SIZE)
+  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
+}
 
 /**
  * @typedef {{ node: string, port: string|null, spec?: import('../geometry.js').PortSpec }} EndInfo
@@ -961,7 +1035,7 @@ export class Graph {
         if (focusedNode) {
           event.preventDefault()
           const id = focusedNode.getAttribute('data-id')
-          this.#clickSelect(id, event.shiftKey || event.ctrlKey || event.metaKey)
+          this.#clickSelect(id, selectMode(event))
           return
         }
         this.#spaceDown = true
@@ -1133,6 +1207,7 @@ export class Graph {
     if (d?.type === 'move' && d.moved && d.idSet?.has(id))
       return { ...r, x: r.x + d.delta.x, y: r.y + d.delta.y }
     if (d?.type === 'resize' && d.id === id && d.rect) return d.rect
+    if (d?.type === 'group-resize' && d.rects?.has(id)) return d.rects.get(id)
     return r
   }
 
@@ -1206,11 +1281,13 @@ export class Graph {
     const m = this.#model
     const ids = [...this.#selection].filter(id => MOVABLE.has(/** @type {string} */ (m.kindOf(id))))
     const items = ids.map(id => ({ id, .../** @type {Rect} */ (m.rectOf(id)) }))
-    const placed = fn(items).filter(p => {
+    // Every item of the arrangement, when any of them moves: the host applies it as one step.
+    const placed = fn(items)
+    const moved = placed.some(p => {
       const r = m.rectOf(p.id)
       return r && (r.x !== p.x || r.y !== p.y)
     })
-    if (!placed.length) return
+    if (!moved) return
     this.#emitIntent({
       type: 'move',
       items: placed.map(p => ({
@@ -1243,13 +1320,11 @@ export class Graph {
     this.#emit('intent', intent)
   }
 
-  #clickSelect(id, additive) {
-    let ids
-    if (additive)
-      ids = this.#selection.has(id)
-        ? [...this.#selection].filter(x => x !== id)
-        : [...this.#selection, id]
-    else ids = [id]
+  /** @param {string} id @param {'add'|'toggle'|null} mode from selectMode */
+  #clickSelect(id, mode) {
+    const s = this.#selection
+    if (mode === 'add' && s.has(id)) return
+    const ids = !mode ? [id] : s.has(id) ? [...s].filter(x => x !== id) : [...s, id]
     this.#emitIntent({ type: 'select', ids })
   }
 
@@ -1279,7 +1354,7 @@ export class Graph {
           id: d.id,
           start: { x: event.x, y: event.y },
           moved: false,
-          additive: e.shiftKey || e.ctrlKey || e.metaKey,
+          mode: selectMode(e),
           delta: { x: 0, y: 0 },
           guides: [],
         }
@@ -1310,6 +1385,7 @@ export class Graph {
     let x = proposed.x
     let y = proposed.y
     d.guides = []
+    d.gaps = []
     if (this.#opts.snap && !event.sourceEvent?.altKey) {
       const k = this.#transform.k
       const near = this.#index
@@ -1323,6 +1399,7 @@ export class Graph {
       x = snapped.x
       y = snapped.y
       d.guides = snapped.guides
+      d.gaps = guideGaps({ ...proposed, x, y }, near, snapped.guides)
     }
     d.delta = { x: x - d.primary.x, y: y - d.primary.y }
     this.#render()
@@ -1333,25 +1410,36 @@ export class Graph {
     if (d?.type !== 'move') return
     this.#drag = null
     if (!d.moved) {
-      this.#clickSelect(d.id, d.additive)
+      this.#clickSelect(d.id, d.mode)
       this.#render()
       return
     }
-    const m = this.#model
     if (d.delta.x !== 0 || d.delta.y !== 0) {
-      const movingFrames = new Set(d.ids.filter(id => m.kindOf(id) === 'frame'))
-      const items = d.ids.map(id => {
-        const r = /** @type {Rect} */ (m.rectOf(id))
-        const item = /** @type {any} */ (m.get(id))
-        const next = { x: r.x + d.delta.x, y: r.y + d.delta.y }
-        const carried = item.parent && d.idSet.has(item.parent)
-        const exclude = new Set(movingFrames)
-        const parent = carried ? item.parent : m.frameAt(center({ ...r, ...next }), exclude)
-        return { id, kind: m.kindOf(id), x: next.x, y: next.y, parent: parent ?? null }
-      })
-      this.#emitIntent({ type: 'move', items })
+      const to = r => ({ ...r, x: r.x + d.delta.x, y: r.y + d.delta.y })
+      this.#emitIntent({ type: 'move', items: this.#placed(d.ids, to, false) })
     }
     this.#render()
+  }
+
+  /**
+   * Items of a move intent for boxes going to new rectangles. A box whose parent goes with it
+   * keeps that parent; any other lands in the frame under its centre.
+   * @param {string[]} ids
+   * @param {(r: Rect, id: string) => Rect} to the new rectangle of each box
+   * @param {boolean} sized whether the items carry their new sizes
+   */
+  #placed(ids, to, sized) {
+    const m = this.#model
+    const idSet = new Set(ids)
+    const frames = ids.filter(id => m.kindOf(id) === 'frame')
+    return ids.map(id => {
+      const next = to(/** @type {Rect} */ (m.rectOf(id)), id)
+      const item = /** @type {any} */ (m.get(id))
+      const carried = item.parent && idSet.has(item.parent)
+      const parent = carried ? item.parent : m.frameAt(center(next), new Set(frames))
+      const size = sized ? { w: next.w, h: next.h } : {}
+      return { id, kind: m.kindOf(id), x: next.x, y: next.y, ...size, parent: parent ?? null }
+    })
   }
 
   #portDragBehavior() {
@@ -1501,20 +1589,8 @@ export class Graph {
       .on('drag', event => {
         const d = this.#drag
         if (d?.type !== 'resize') return
-        const { rect0, dir } = d
         const g = this.#opts.snap && !event.sourceEvent?.altKey ? this.#opts.grid : 0
-        const min = 16
-        let x1 = rect0.x
-        let y1 = rect0.y
-        let x2 = rect0.x + rect0.w
-        let y2 = rect0.y + rect0.h
-        const dx = event.x - d.start.x
-        const dy = event.y - d.start.y
-        if (dir.includes('w')) x1 = Math.min(snap(rect0.x + dx, g), x2 - min)
-        if (dir.includes('e')) x2 = Math.max(snap(rect0.x + rect0.w + dx, g), x1 + min)
-        if (dir.includes('n')) y1 = Math.min(snap(rect0.y + dy, g), y2 - min)
-        if (dir.includes('s')) y2 = Math.max(snap(rect0.y + rect0.h + dy, g), y1 + min)
-        d.rect = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
+        d.rect = dragSides(d.rect0, d.dir, event.x - d.start.x, event.y - d.start.y, g)
         this.#render()
       })
       .on('end', () => {
@@ -1534,6 +1610,64 @@ export class Graph {
               h,
             })
           }
+        }
+        this.#render()
+      }))
+  }
+
+  /**
+   * Dragging a handle of a multi-selection's box scales every box in it away from the opposite
+   * side, and the drop is one move intent whose items carry their new sizes.
+   */
+  #groupResizeDragBehavior() {
+    if (this.#behaviors.groupResize) return this.#behaviors.groupResize
+    const d3 = this.#d3
+    return (this.#behaviors.groupResize = d3
+      .drag()
+      .filter(event => event.button === 0 && !this.#opts.readOnly)
+      .container(() => this.#root.node())
+      .subject(event => ({ x: event.x, y: event.y }))
+      .on('start', (event, h) => {
+        event.sourceEvent?.stopPropagation()
+        const rects0 = new Map(h.ids.map(id => [id, this.#model.rectOf(id)]))
+        this.#drag = {
+          type: 'group-resize',
+          dir: h.dir,
+          start: { x: event.x, y: event.y },
+          ids: h.ids,
+          rects0,
+          box0: union([...rects0.values()]),
+          rects: null,
+        }
+      })
+      .on('drag', event => {
+        const d = this.#drag
+        if (d?.type !== 'group-resize') return
+        const g = this.#opts.snap && !event.sourceEvent?.altKey ? this.#opts.grid : 0
+        const b0 = d.box0
+        const b = dragSides(b0, d.dir, event.x - d.start.x, event.y - d.start.y, g)
+        const sx = b0.w ? b.w / b0.w : 1
+        const sy = b0.h ? b.h / b0.h : 1
+        d.rects = new Map()
+        for (const [id, r] of d.rects0)
+          d.rects.set(id, {
+            x: Math.round(b.x + (r.x - b0.x) * sx),
+            y: Math.round(b.y + (r.y - b0.y) * sy),
+            w: Math.max(MIN_SIZE, Math.round(r.w * sx)),
+            h: Math.max(MIN_SIZE, Math.round(r.h * sy)),
+          })
+        this.#render()
+      })
+      .on('end', () => {
+        const d = this.#drag
+        this.#drag = null
+        if (d?.type === 'group-resize' && d.rects) {
+          const same = (a, b) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h
+          if (d.ids.some(id => !same(d.rects.get(id), d.rects0.get(id))))
+            this.#emitIntent({
+              type: 'move',
+              items: this.#placed(d.ids, (_, id) => d.rects.get(id), true),
+            })
         }
         this.#render()
       }))
@@ -1768,13 +1902,25 @@ export class Graph {
         .attr('y', r.y)
         .attr('width', r.w)
         .attr('height', r.h)
-        .attr('rx', 8)
+        .attr('rx', FRAME_RADIUS)
         .style('stroke', d.style?.stroke ?? null)
         .style('fill', d.style?.fill ?? null)
+      // The level frame's stratum band (design system §5) and a trust boundary's lock (§6).
+      g.selectChildren('path.sg-stratum-band')
+        .data(d.kind === 'system' ? [stratum(d.level)] : [])
+        .join('path')
+        .attr('class', n => `sg-stratum-band sg-level-${n}`)
+        .attr('d', bandPath(r))
+      const trust = d.kind === 'trust-boundary'
+      g.selectChildren('path.sg-frame-lock')
+        .data(trust ? [r] : [])
+        .join('path')
+        .attr('class', 'sg-frame-lock')
+        .attr('d', b => lockPath(b.x + 10, b.y + 7))
       g.select('.sg-frame-label')
-        .attr('x', r.x + 10)
-        .attr('y', r.y + 7)
-        .text(d.label ?? '')
+        .attr('x', r.x + (trust ? 26 : 10))
+        .attr('y', r.y + (d.kind === 'system' ? 12 : 8))
+        .text(trust ? `Trust boundary${d.label ? `: ${d.label}` : ''}` : (d.label ?? ''))
       g.select('.sg-frame-title').attr('x', r.x).attr('y', r.y).attr('width', r.w)
     })
   }
@@ -2117,7 +2263,7 @@ export class Graph {
           if (event.button !== 0) return
           event.stopPropagation()
           self.#svg.node().focus({ preventScroll: true })
-          self.#clickSelect(d.id, event.shiftKey || event.ctrlKey || event.metaKey)
+          self.#clickSelect(d.id, selectMode(event))
         })
         .on('dblclick', (event, d) => {
           event.stopPropagation()
@@ -2206,27 +2352,17 @@ export class Graph {
             ? String(wMin + (wMax - wMin) * normalise(wv, wDomain))
             : (d.style?.width ?? null)
         )
-      // The label pill: the edge's label, then the method it calls in mono (design system §6).
-      const parts = [
-        ...(d.label ? [{ text: String(d.label), cls: 'sg-edge-label-text' }] : []),
-        ...(d.method ? [{ text: String(d.method), cls: 'sg-method' }] : []),
-      ]
+      const parts = labelParts(d)
       const lg = g.select('.sg-edge-label-group').attr('display', parts.length ? null : 'none')
-      if (parts.length) {
+      const pill = this.#pill(d, route)
+      if (pill) {
         const gap = parts.length > 1 ? 6 : 0
-        const textWidth = parts.reduce(
-          (sum, p) =>
-            sum + (p.cls === 'sg-method' ? this.#measureMono(p.text) : this.#measureSmall(p.text)),
-          0
-        )
-        const w = textWidth + gap + 14
-        const h = this.#fontSize + 8
         lg.select('.sg-edge-label-bg')
-          .attr('x', route.label.x - w / 2)
-          .attr('y', route.label.y - h / 2)
-          .attr('width', w)
-          .attr('height', h)
-          .attr('rx', h / 2)
+          .attr('x', pill.x)
+          .attr('y', pill.y)
+          .attr('width', pill.w)
+          .attr('height', pill.h)
+          .attr('rx', pill.h / 2)
         lg.select('.sg-edge-label')
           .attr('x', route.label.x)
           .attr('y', route.label.y)
@@ -2239,6 +2375,24 @@ export class Graph {
           .text(p => p.text)
       }
     })
+  }
+
+  /**
+   * Where an edge's label pill is drawn, or null when it has no label.
+   * @param {any} edge @param {{ label: { x: number, y: number } }} route
+   * @returns {Rect|null}
+   */
+  #pill(edge, route) {
+    const parts = labelParts(edge)
+    if (!parts.length) return null
+    const text = parts.reduce(
+      (sum, p) =>
+        sum + (p.cls === 'sg-method' ? this.#measureMono(p.text) : this.#measureSmall(p.text)),
+      0
+    )
+    const w = text + (parts.length > 1 ? 6 : 0) + 14
+    const h = this.#fontSize + 8
+    return { x: route.label.x - w / 2, y: route.label.y - h / 2, w, h }
   }
 
   #renderAnnotations(layer, annotations, interactive, dim) {
@@ -2272,6 +2426,7 @@ export class Graph {
         d.form,
         r,
         d.text,
+        d.size,
         d.style,
         d.target,
         this.#themeVersion,
@@ -2289,10 +2444,16 @@ export class Graph {
               })()
             : d.target
         if (to) {
+          // A leader ending in a 4 px dot at the target (design system §6).
           const from = boundaryAnchor(r, to)
           g.append('path')
             .attr('class', 'sg-leader')
             .attr('d', `M${from.x},${from.y} L${to.x},${to.y}`)
+          g.append('circle')
+            .attr('class', 'sg-leader-dot')
+            .attr('cx', to.x)
+            .attr('cy', to.y)
+            .attr('r', 2)
         }
       }
       if (d.kind === 'shape' && d.form === 'ellipse') {
@@ -2322,11 +2483,17 @@ export class Graph {
         .style('fill', d.style?.fill ?? null)
         .style('stroke', d.style?.stroke ?? null)
       if (d.text) {
+        // Free text comes in body or title size (design system §6).
+        const title = d.kind === 'text' && d.size === 'title'
+        const scale = title ? (parseFloat(this.#tokens.fontSizeTitle) || 16) / this.#fontSize : 1
+        const measure = t => this.#measure(t) * scale
         const pad = 8
-        const lineH = this.#fontSize * 1.3
+        const lineH = this.#fontSize * scale * 1.3
         const maxLines = Math.max(1, Math.floor((r.h - 2 * pad) / lineH))
-        const lines = wrapText(d.text, r.w - 2 * pad, this.#measure, { maxLines })
-        const text = g.append('text').attr('class', 'sg-annotation-text')
+        const lines = wrapText(d.text, r.w - 2 * pad, measure, { maxLines })
+        const text = g
+          .append('text')
+          .attr('class', title ? 'sg-annotation-text sg-text-title' : 'sg-annotation-text')
         lines.forEach((line, n) =>
           text
             .append('tspan')
@@ -2336,6 +2503,23 @@ export class Graph {
         )
       }
     })
+  }
+
+  /** Whether the box with this id may be resized: not read-only, locked, hidden or a ghost. */
+  #resizable(/** @type {string} */ id) {
+    const m = this.#model
+    const kind = m.kindOf(id)
+    const item = /** @type {any} */ (m.get(id))
+    return (
+      !this.#opts.readOnly &&
+      !!item &&
+      !!kind &&
+      MOVABLE.has(kind) &&
+      !m.isLocked(item) &&
+      !item.ghost &&
+      !item.readOnly &&
+      !m.isHidden(item)
+    )
   }
 
   /** Selection handles, guides and the connection preview; cheap enough to redraw often. */
@@ -2362,36 +2546,30 @@ export class Graph {
       .attr('y1', g => (g.axis === 'x' ? g.from : g.value))
       .attr('y2', g => (g.axis === 'x' ? g.to : g.value))
       .attr('stroke-width', 1 / k)
+    // Each guide's gap to its nearest shape, labelled at 11 px (design system §6).
+    const gaps = d?.type === 'move' ? (d.gaps ?? []) : []
+    L.guides
+      .selectChildren('text.sg-guide-label')
+      .data(gaps)
+      .join('text')
+      .attr('class', 'sg-guide-label')
+      .filter((g, i, nodes) => stale(nodes[i], [g, k]))
+      .attr('x', g => (g.axis === 'x' ? g.value + 4 / k : (g.from + g.to) / 2))
+      .attr('y', g => (g.axis === 'x' ? (g.from + g.to) / 2 : g.value - 4 / k))
+      .attr('text-anchor', g => (g.axis === 'x' ? 'start' : 'middle'))
+      .attr('dominant-baseline', g => (g.axis === 'x' ? 'central' : 'auto'))
+      .attr('stroke-width', 3 / k)
+      .style('font-size', `${11 / k}px`)
+      .text(g => String(Math.round(g.to - g.from)))
 
     // Resize handles for a single selected box
     const single = this.#selection.size === 1 ? [...this.#selection][0] : null
     const kind = single ? m.kindOf(single) : null
-    const item = single ? /** @type {any} */ (m.get(single)) : null
-    const resizable =
-      !this.#opts.readOnly &&
-      item &&
-      kind &&
-      MOVABLE.has(kind) &&
-      !m.isLocked(item) &&
-      !item.ghost &&
-      !item.readOnly &&
-      !m.isHidden(item) &&
-      d?.type !== 'move'
+    const resizable = !!single && this.#resizable(single) && d?.type !== 'move'
     const handles = []
     if (resizable) {
       const r = this.#itemRect(/** @type {string} */ (single))
-      const pos = {
-        nw: [r.x, r.y],
-        n: [r.x + r.w / 2, r.y],
-        ne: [r.x + r.w, r.y],
-        e: [r.x + r.w, r.y + r.h / 2],
-        se: [r.x + r.w, r.y + r.h],
-        s: [r.x + r.w / 2, r.y + r.h],
-        sw: [r.x, r.y + r.h],
-        w: [r.x, r.y + r.h / 2],
-      }
-      for (const dir of HANDLE_DIRS)
-        handles.push({ id: single, dir, x: pos[dir][0], y: pos[dir][1] })
+      for (const dir of HANDLE_DIRS) handles.push({ id: single, dir, ...handleAt(r, dir) })
     }
     const hsel = L.handles.selectChildren('rect.sg-handle').data(handles, h => h.dir)
     hsel.exit().remove()
@@ -2442,17 +2620,15 @@ export class Graph {
         })
       )
       const control = [pts[0], ...waypoints, pts[pts.length - 1]]
+      // An insert handle that would sit on the label pill moves along its segment, clear of it.
+      const pill = this.#pill(edge, route)
+      const clear = pill && expand(pill, 8 / k)
       for (let index = 0; index < control.length - 1; index++) {
         const a = control[index]
         const b = control[index + 1]
-        edgeHandles.push({
-          edge: edge.id,
-          role: 'insert',
-          index,
-          x: (a.x + b.x) / 2,
-          y: (a.y + b.y) / 2,
-          key: `i${index}`,
-        })
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+        const at = clear ? slideOut(mid, a, b, clear) : mid
+        edgeHandles.push({ edge: edge.id, role: 'insert', index, ...at, key: `i${index}` })
       }
     }
     const esel = L.handles.selectChildren('circle.sg-edge-handle').data(edgeHandles, h => h.key)
@@ -2563,24 +2739,39 @@ export class Graph {
         .text(f.reason)
     })
 
-    // One box around a multi-selection (its handles are 0204's), and dashed outlines where
-    // dragged nodes started.
-    const boxes = [...this.#selection]
-      .filter(id => m.kindOf(id) !== 'edge')
-      .map(id => this.#itemRect(id))
-      .filter(Boolean)
-    const group = boxes.length > 1 && d?.type !== 'move' ? union(boxes) : null
+    // One box around a multi-selection, with handles that resize the group when every box in
+    // it can be resized, and dashed outlines where dragged nodes started.
+    const ids = [...this.#selection].filter(id => m.kindOf(id) !== 'edge' && m.rectOf(id))
+    const group =
+      ids.length > 1 && d?.type !== 'move'
+        ? expand(union(ids.map(id => this.#itemRect(id))), 8 / k)
+        : null
     L.handles
       .selectChildren('rect.sg-selection-box')
       .data(group ? [group] : [])
       .join('rect')
       .attr('class', 'sg-selection-box')
       .filter((/** @type {any} */ b, i, nodes) => stale(nodes[i], [b, k]))
-      .attr('x', (/** @type {any} */ b) => b.x - 8 / k)
-      .attr('y', (/** @type {any} */ b) => b.y - 8 / k)
-      .attr('width', (/** @type {any} */ b) => b.w + 16 / k)
-      .attr('height', (/** @type {any} */ b) => b.h + 16 / k)
+      .attr('x', (/** @type {any} */ b) => b.x)
+      .attr('y', (/** @type {any} */ b) => b.y)
+      .attr('width', (/** @type {any} */ b) => b.w)
+      .attr('height', (/** @type {any} */ b) => b.h)
       .attr('stroke-width', 1 / k)
+    const groupHandles =
+      group && ids.every(id => this.#resizable(id))
+        ? HANDLE_DIRS.map(dir => ({ dir, ids, ...handleAt(group, dir) }))
+        : []
+    L.handles
+      .selectChildren('rect.sg-group-handle')
+      .data(groupHandles, (/** @type {any} */ h) => h.dir)
+      .join(enter => enter.append('rect').call(this.#groupResizeDragBehavior()))
+      .filter((/** @type {any} */ h, i, nodes) => stale(nodes[i], [h, k]))
+      .attr('class', (/** @type {any} */ h) => `sg-group-handle sg-handle-${h.dir}`)
+      .attr('x', (/** @type {any} */ h) => h.x - size / 2)
+      .attr('y', (/** @type {any} */ h) => h.y - size / 2)
+      .attr('width', size)
+      .attr('height', size)
+      .attr('stroke-width', 1.5 / k)
     const origins =
       d?.type === 'move' && d.moved
         ? d.ids

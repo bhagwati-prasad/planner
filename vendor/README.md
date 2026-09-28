@@ -8,7 +8,7 @@ Third-party code shipped with Strata, so the offline app works from `file://` wi
 | Three.js | 0.186.1 | `three/three.module.js`, `three/three.core.js` (ES modules) | MIT (`three/LICENSE`) | npm `three@0.186.1`, `build/three.module.js` and `build/three.core.js`, unmodified |
 | IBM Plex | 1.1.0 (Sans), 2.5.0 (Mono) | `plex/IBMPlexSans-Regular-Latin1.woff2`, `plex/IBMPlexSans-SemiBold-Latin1.woff2`, `plex/IBMPlexMono-Regular-Latin1.woff2` (fonts) | OFL-1.1 (`plex/LICENSE.txt`) | npm `@ibm/plex-sans@1.1.0` and `@ibm/plex-mono@2.5.0`, `fonts/split/woff2/` and `LICENSE.txt`, unmodified |
 
-IBM Plex is a font, not code: design system §2 sets it for all interface text, and its Latin-1 files keep text measuring and rendering the same on every machine. The browser test harnesses load it through `tools/testing/browser/fonts.css` (task 0210); the app bundles it with the design tokens (0501).
+IBM Plex is a font, not code: design system §2 sets it for all interface text, and its Latin-1 files keep text measuring and rendering the same on every machine. The browser test harnesses load it through `tools/testing/browser/fonts.js` (task 0210); the app bundles it with the design tokens (0501).
 
 Three.js no longer ships a classic-script build, so `npm run build` bundles its ES modules with the Strata bundler into `dist/vendor/three.js`. That is a classic script which defines `globalThis.THREE` and is loaded lazily by strata-3d. D3's UMD build is copied as it is. The build copies each licence next to its script (`dist/vendor/LICENSE-d3`, `dist/vendor/LICENSE-three`).
 

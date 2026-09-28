@@ -49,7 +49,7 @@ Package specs that need a harness of their own, such as strata-graph's `packages
 
 ### Fonts and visual snapshots
 
-Both harnesses link `browser/fonts.css` and wait for `browser/fonts.js` to load IBM Plex from `vendor/plex` before they report ready, so text measures and renders the same on every machine. A visual test is tagged `@visual` and compares a screenshot:
+Both harnesses wait for `browser/fonts.js` to load IBM Plex from `vendor/plex` before they report ready, so text measures and renders the same on every machine. It fetches the font files and adds them as `FontFace`s made from their bytes, never through `@font-face`: Firefox holds a page's load event while a stylesheet font loads, and in CI some harness pages never finished loading that way. A visual test is tagged `@visual` and compares a screenshot:
 
 ```js
 test('the card in dark theme', { tag: '@visual' }, async ({ page }) => {

@@ -33,6 +33,17 @@ export const TOKENS = Object.freeze({
   sticky: '--sg-sticky',
   stickyText: '--sg-sticky-text',
   region: '--sg-region',
+  regionStroke: '--sg-region-stroke',
+  zone: '--sg-zone',
+  border: '--sg-border',
+  leader: '--sg-leader',
+  stratumBasalt: '--sg-stratum-basalt',
+  stratumSandstone: '--sg-stratum-sandstone',
+  stratumShale: '--sg-stratum-shale',
+  stratumClay: '--sg-stratum-clay',
+  stratumLichen: '--sg-stratum-lichen',
+  stratumTuff: '--sg-stratum-tuff',
+  stratumChert: '--sg-stratum-chert',
   badge: '--sg-badge',
   badgeText: '--sg-badge-text',
   iconTile: '--sg-icon-tile',
@@ -45,12 +56,14 @@ export const TOKENS = Object.freeze({
   fontFamilyMono: '--sg-font-family-mono',
   fontSize: '--sg-font-size',
   fontSizeSmall: '--sg-font-size-small',
+  fontSizeTitle: '--sg-font-size-title',
+  fontSizeTitleSmall: '--sg-font-size-title-small',
   radius: '--sg-radius',
 })
 
 /**
- * The light theme. Canvas, nodes, ports, edges, selection, focus and status colours follow the
- * semantic tokens of design system §3; frames, zones and annotations keep theirs until 0206.
+ * The light theme: the semantic tokens of design system §3 for the canvas, nodes, ports, edges,
+ * selection, focus, status, frames, zones and annotations, and its stratum palette for depth.
  */
 export const LIGHT = Object.freeze({
   background: '#F3F5F7',
@@ -73,14 +86,25 @@ export const LIGHT = Object.freeze({
   danger: '#B42335',
   warning: '#D99A2B',
   glyph: '#626C7C',
-  frameStroke: '#a8a29e',
-  frameFill: 'rgba(120, 113, 108, 0.04)',
-  frameText: '#57534e',
-  trustBoundary: '#dc2626',
+  frameStroke: '#E4E7EC',
+  frameFill: 'none',
+  frameText: '#4F5866',
+  trustBoundary: '#4F5866',
   guide: '#7A45C2',
-  sticky: '#fef3c7',
-  stickyText: '#422006',
-  region: 'rgba(37, 99, 235, 0.08)',
+  sticky: '#FFF4CF',
+  stickyText: '#1B1F25',
+  region: '#EEF0FE',
+  regionStroke: '#95A1F4',
+  zone: '#F0F2F5',
+  border: '#CFD4DC',
+  leader: '#8A94A3',
+  stratumBasalt: '#8A94A3',
+  stratumSandstone: '#C39A6B',
+  stratumShale: '#7B8BA3',
+  stratumClay: '#B26E55',
+  stratumLichen: '#8A9C66',
+  stratumTuff: '#B0829A',
+  stratumChert: '#5F9794',
   badge: '#D0394B',
   badgeText: '#FFFFFF',
   iconTile: '#F0F2F5',
@@ -93,6 +117,8 @@ export const LIGHT = Object.freeze({
   fontFamilyMono: "'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace",
   fontSize: '13px',
   fontSizeSmall: '12px',
+  fontSizeTitle: '16px',
+  fontSizeTitleSmall: '14px',
   radius: '6',
 })
 /** The dark theme, over the light one (design system §3). */
@@ -118,14 +144,21 @@ export const DARK = Object.freeze({
   danger: '#F0808C',
   warning: '#E7B458',
   glyph: '#8A94A3',
-  frameStroke: '#78716c',
-  frameFill: 'rgba(245, 245, 244, 0.03)',
-  frameText: '#d6d3d1',
-  trustBoundary: '#f87171',
+  frameStroke: '#2A3038',
+  frameText: '#AEB6C2',
+  trustBoundary: '#8A94A3',
   guide: '#B38BEB',
-  sticky: '#713f12',
-  stickyText: '#fef3c7',
-  region: 'rgba(96, 165, 250, 0.1)',
+  sticky: '#3A3320',
+  stickyText: '#F2E7C4',
+  region: '#1E2556',
+  zone: '#2A3038',
+  border: '#3B424D',
+  stratumSandstone: '#D8B48A',
+  stratumShale: '#9AA9C0',
+  stratumClay: '#D08E75',
+  stratumLichen: '#A9BA84',
+  stratumTuff: '#CBA0B6',
+  stratumChert: '#82B6B3',
   iconTile: '#22272E',
   iconGlyph: '#CFD4DC',
   chip: '#2A3038',
@@ -228,26 +261,44 @@ export const STYLESHEET = `
 .sg-chevron { fill: none; stroke: ${v('edge')}; stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
 .sg-arrow.sg-marker-active, .sg-dot.sg-marker-active { fill: ${v('accent')}; }
 .sg-arrow-open.sg-marker-active, .sg-chevron.sg-marker-active { stroke: ${v('accent')}; }
-.sg-frame-rect { fill: ${v('frameFill')}; stroke: ${v('frameStroke')}; stroke-width: 1.25; stroke-dasharray: 6 4; pointer-events: visibleStroke; }
-.sg-frame.sg-kind-trust-boundary .sg-frame-rect { stroke: ${v('trustBoundary')}; stroke-dasharray: 10 4 2 4; }
-.sg-frame.sg-kind-system .sg-frame-rect { stroke-dasharray: none; stroke-width: 2; }
-.sg-frame-label { fill: ${v('frameText')}; font-weight: 600; font-size: 0.95em; dominant-baseline: hanging; }
+.sg-frame-rect { fill: ${v('frameFill')}; stroke: ${v('frameStroke')}; stroke-width: 1; pointer-events: visibleStroke; }
+.sg-frame.sg-kind-zone .sg-frame-rect { fill: ${v('zone')}; fill-opacity: 0.6; }
+.sg-frame.sg-kind-trust-boundary .sg-frame-rect { stroke: ${v('trustBoundary')}; stroke-width: 1.5; stroke-dasharray: 6 4; }
+.sg-frame.sg-kind-system .sg-frame-rect { stroke: ${v('border')}; }
+.sg-frame-label { fill: ${v('frameText')}; font-weight: 600; font-size: ${v('fontSizeTitleSmall')}; dominant-baseline: hanging; }
+.sg-kind-zone .sg-frame-label, .sg-kind-trust-boundary .sg-frame-label { font-weight: 500; font-size: ${v('fontSizeSmall')}; }
+.sg-frame-lock { fill: none; stroke: ${v('trustBoundary')}; stroke-width: 1.25; stroke-linejoin: round; pointer-events: none; }
+.sg-stratum-band { pointer-events: none; }
+.sg-stratum-band.sg-level-0 { fill: ${v('stratumBasalt')}; }
+.sg-stratum-band.sg-level-1 { fill: ${v('stratumSandstone')}; }
+.sg-stratum-band.sg-level-2 { fill: ${v('stratumShale')}; }
+.sg-stratum-band.sg-level-3 { fill: ${v('stratumClay')}; }
+.sg-stratum-band.sg-level-4 { fill: ${v('stratumLichen')}; }
+.sg-stratum-band.sg-level-5 { fill: ${v('stratumTuff')}; }
+.sg-stratum-band.sg-level-6 { fill: ${v('stratumChert')}; }
 .sg-frame-title { cursor: move; fill: transparent; pointer-events: all; }
-.sg-note { fill: ${v('sticky')}; stroke: rgba(0,0,0,0.08); }
+.sg-note { fill: ${v('sticky')}; stroke: none; }
+.sg-kind-sticky.sg-selected .sg-note { filter: drop-shadow(0 4px 8px rgba(19, 22, 26, 0.18)); }
+.sg-text-title { font-size: ${v('fontSizeTitle')}; font-weight: 600; }
 .sg-annotation-text { fill: ${v('stickyText')}; dominant-baseline: hanging; }
 .sg-kind-text .sg-note { fill: transparent; stroke: none; }
 .sg-kind-text .sg-annotation-text, .sg-kind-shape .sg-annotation-text, .sg-kind-callout .sg-annotation-text { fill: ${v('nodeText')}; }
-.sg-kind-callout .sg-note, .sg-kind-shape .sg-note { fill: ${v('nodeFill')}; stroke: ${v('nodeStroke')}; }
-.sg-kind-region .sg-note { fill: ${v('region')}; stroke: none; }
+.sg-kind-callout .sg-note, .sg-kind-shape .sg-note { fill: ${v('nodeFill')}; stroke: ${v('border')}; stroke-width: 1; }
+.sg-kind-region .sg-note { fill: ${v('region')}; fill-opacity: 0.5; stroke: ${v('regionStroke')}; stroke-width: 1; stroke-dasharray: 4 3; }
 .sg-kind-region .sg-annotation-text { fill: ${v('frameText')}; }
-.sg-leader { fill: none; stroke: ${v('nodeStroke')}; stroke-width: 1; }
+.sg-leader { fill: none; stroke: ${v('leader')}; stroke-width: 1; }
+.sg-leader-dot { fill: ${v('leader')}; }
+.sg-bp-disc { fill: ${v('port')}; }
+.sg-selected .sg-bp-disc { fill: ${v('accent')}; }
+.sg-bp-label { fill: ${v('nodeSubtext')}; font-size: ${v('fontSizeSmall')}; }
 .sg-badge circle { fill: ${v('badge')}; }
 .sg-badge text { fill: ${v('badgeText')}; font-size: 0.8em; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .sg-heat { pointer-events: none; }
 .sg-guide { stroke: ${v('guide')}; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.sg-guide-label { fill: ${v('guide')}; stroke: ${v('background')}; paint-order: stroke; pointer-events: none; }
 .sg-marquee { fill: ${v('accentSoft')}; fill-opacity: 0.6; stroke: ${v('accent')}; stroke-width: 1; pointer-events: none; }
 .sg-ghost-edge { fill: none; stroke: ${v('accent')}; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
-.sg-handle { fill: ${v('nodeFill')}; stroke: ${v('accent')}; stroke-width: 1.5; }
+.sg-handle, .sg-group-handle { fill: ${v('nodeFill')}; stroke: ${v('accent')}; stroke-width: 1.5; }
 .sg-handle-nw, .sg-handle-se { cursor: nwse-resize; }
 .sg-handle-ne, .sg-handle-sw { cursor: nesw-resize; }
 .sg-handle-n, .sg-handle-s { cursor: ns-resize; }

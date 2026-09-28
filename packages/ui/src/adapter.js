@@ -43,7 +43,8 @@ function isAsync(edge) {
 
 const FRAME_PADDING = 60
 const MIN_FRAME = { w: 480, h: 320 }
-const BP_SIZE = { w: 96, h: 28 }
+/** Boundary ports are 12 px half-discs on the frame edge (design system §6). */
+const BP_SIZE = { w: 12, h: 12 }
 const GHOST_GAP = 200
 const AUTO = { columns: 4, dx: 220, dy: 140, gap: 80 }
 
@@ -290,6 +291,7 @@ function placeBoundaryPorts(frame, bps, nodes, edges) {
         w: BP_SIZE.w,
         h: BP_SIZE.h,
         shape: 'boundary-port',
+        side,
         label: item.e.name,
         locked: true,
         title: `Boundary port ${item.e.name} (${item.e.direction})`,
@@ -411,7 +413,12 @@ export function applyIntent(intent, { strata, system, viewId }) {
       const set = {}
       for (const item of intent.items) {
         const p = parseId(item.id)
-        if (p.kind === 'model' && item.kind === 'node') set[p.id] = { x: item.x, y: item.y }
+        if (p.kind !== 'model' || item.kind !== 'node') continue
+        // A resized group (0204) carries each item's new size.
+        set[p.id] =
+          item.w === undefined
+            ? { x: item.x, y: item.y }
+            : { x: item.x, y: item.y, w: item.w, h: item.h }
       }
       if (viewId && Object.keys(set).length) project.dispatch(layoutCommand(set))
       return {}
