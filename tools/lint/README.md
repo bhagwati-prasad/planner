@@ -21,17 +21,13 @@ The dependency table and the banned globals are read from `docs/guidelines/engin
 - **Floating promises** are found without type information, so the rule is a heuristic. It flags an expression statement that calls an `async` function or `async` method declared in the same file (including `this.#method()`), calls `.then()` with a single argument and nothing after it, or constructs a `Promise`. It misses promises from functions declared in other modules or returned by the platform (`fetch()`, `blob.arrayBuffer()`), promises stored in variables and never awaited, and `.finally()` chains without a `.catch()`. Review still covers those.
 - **Colour literals** are checked in `.css` files and in `static css` class fields. CSS built in other strings (a `const` of CSS text) is not checked.
 - **Import boundaries** apply to `src/`. Tests may import across packages to reuse fixtures.
-- **Help metadata** reads JSDoc; the runtime `strata.help()` catalogue is task 0115.
+- **Help metadata** reads JSDoc; `tools/help/generate.js` turns the same JSDoc into the runtime `strata.help()` catalogue (0120).
 
 ## Existing code
 
-Rules adopted after code was written start with a bulk suppression (`eslint-suppressions.json`, ESLint's own mechanism) instead of scattered disable comments. Each entry counts the known violations of one rule in one file, and is owned by the task that removes it:
+Rules adopted after code was written start with a bulk suppression (`eslint-suppressions.json`, ESLint's own mechanism) instead of scattered disable comments. Each entry counts the known violations of one rule in one file, and is owned by the task that removes it.
 
-| Rule | Files | Removed by |
-| --- | --- | --- |
-| `strata/facade-help` | facade methods without `@example` | 0115 (help metadata) |
-
-A suppressed file still fails on any violation beyond its recorded count, and ESLint reports suppressions that no longer occur, so the list only shrinks: run `npx eslint . --prune-suppressions` after fixing some. `tools/lint/test/config.test.js` keeps the file limited to the table above.
+The file is empty now: task 0120 removed the last entry, the facade methods that had no help metadata (`strata/facade-help`). A suppressed file still fails on any violation beyond its recorded count, and ESLint reports suppressions that no longer occur, so the list only shrinks: run `npx eslint . --prune-suppressions` after fixing some. `tools/lint/test/config.test.js` keeps the file empty; a task that adopts a rule over existing code changes that test to name itself as the owner.
 
 ## Tests
 

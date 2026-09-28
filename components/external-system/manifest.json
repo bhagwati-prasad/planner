@@ -8,6 +8,19 @@
   "icon": "icon.svg",
   "extends": "base:external",
   "shape": "cloud",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [],
+      "exposes": ["call"]
+    }
+  ],
+  "methods": {
+    "public": {
+      "call": {}
+    }
+  },
   "properties": {
     "latency": {
       "type": "distribution",

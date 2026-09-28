@@ -31,6 +31,7 @@ export class ComponentsApi {
    * Registers a bare manifest (no behaviour code).
    * @param {unknown} manifest
    * @param {{ replace?: boolean }} [options]
+   * @example strata.components.register({ id: 'acme.cache', name: 'Cache', version: '1.0.0', extends: 'base:store' })
    */
   register(manifest, options) {
     const m = this.#registry.register(manifest, options)
@@ -47,6 +48,7 @@ export class ComponentsApi {
    * @param {ComponentBundle|string} input
    * @param {{ replace?: boolean }} [options]
    * @returns {InstalledComponent}
+   * @example strata.components.install(bundleText)
    */
   install(input, { replace = false } = {}) {
     const bundle = deepFreeze(structuredClone(readBundle(input)))
@@ -73,6 +75,7 @@ export class ComponentsApi {
    * with the same packer as `strata pack`. Nothing is installed.
    * @param {{ path: string, content: string|Uint8Array }[]} files
    * @param {{ inflateRaw?: (data: Uint8Array) => Uint8Array|Promise<Uint8Array> }} [options]
+   * @example const { bundle, problems } = await strata.components.pack(files)
    */
   pack(files, options) {
     return packUpload(files, options)
@@ -83,6 +86,7 @@ export class ComponentsApi {
    * @param {{ path: string, content: string|Uint8Array }[]} files
    * @param {{ replace?: boolean, inflateRaw?: (data: Uint8Array) => Uint8Array|Promise<Uint8Array> }} [options]
    * @returns {Promise<{ component: InstalledComponent|null, problems: import('../../plugins/src/index.js').Problem[] }>}
+   * @example await strata.components.upload([{ path: 'queue.strata.js', content: text }])
    */
   async upload(files, { replace, inflateRaw } = {}) {
     const result = await packUpload(files, { inflateRaw })
@@ -94,6 +98,7 @@ export class ComponentsApi {
    * Removes a component type (one version, or every version when none is given). Nodes that
    * use it keep their properties and show as placeholders until it is installed again.
    * @param {string} ref id or id@version
+   * @example strata.components.uninstall('acme.queue@1.2.0')
    */
   uninstall(ref) {
     const { id, version } = parseTypeRef(ref)
@@ -114,24 +119,32 @@ export class ComponentsApi {
    * The packed bundle of an installed component, or null for built-in types and bare manifests.
    * @param {string} name id, id@version or short name
    * @returns {ComponentBundle|null}
+   * @example strata.components.bundle('acme.queue')
    */
   bundle(name) {
     const m = this.#registry.find(name)
     return m ? (this.#bundles.get(typeRefOf(m)) ?? null) : null
   }
 
-  /** A manifest with inheritance applied. @param {string} name id, id@version or short name */
+  /**
+   * A manifest with inheritance applied. @param {string} name id, id@version or short name
+   * @example strata.components.get('service').properties
+   */
   get(name) {
     return this.#registry.resolve(typeRefOf(this.#registry.require(name)))
   }
 
-  /** Every version registered for an id. @param {string} id */
+  /**
+   * Every version registered for an id. @param {string} id
+   * @example strata.components.versions('acme.queue')
+   */
   versions(id) {
     return this.#registry.versions(id)
   }
 
   /**
    * Connection types (http, grpc, async-message, ...) with inheritance applied, latest versions.
+   * @example strata.components.connectionTypes().map(t => t.id)
    */
   connectionTypes() {
     return Collection.from(
@@ -145,6 +158,7 @@ export class ComponentsApi {
   /**
    * The latest version of every registered type.
    * @param {{ kind?: 'component'|'connection-type' }} [options]  only types of this kind
+   * @example console.table(strata.components.list({ kind: 'component' }))
    */
   list({ kind } = {}) {
     return Collection.from(

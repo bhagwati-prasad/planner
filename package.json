@@ -22,7 +22,8 @@
     "format": "node tools/checks.js format",
     "format:check": "node tools/checks.js format:check",
     "lint": "node tools/checks.js lint",
-    "vendor:verify": "node tools/vendor/verify.js"
+    "vendor:verify": "node tools/vendor/verify.js",
+    "generate:help": "node tools/help/generate.js"
   },
   "bin": {
     "strata": "packages/cli/bin/strata.js"

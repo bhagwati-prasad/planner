@@ -6,3 +6,4 @@ The public `strata` API (`createStrata(adapters)`), composed from the packages b
 - Specification: spec §18
 - Entry point: `src/index.js`, the only file other packages may import (eng §4)
 - Tests: `test/`, run with `npm test`
+- Generated: `src/help-data.js`, the metadata behind `strata.help()`, from the JSDoc of the exported classes; run `npm run generate:help` after changing a method (`tools/help/README.md`)

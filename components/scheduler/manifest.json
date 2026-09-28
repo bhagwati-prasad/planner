@@ -8,6 +8,17 @@
   "icon": "icon.svg",
   "extends": "base:timer",
   "shape": "ellipse",
+  "methods": {
+    "public": {
+      "trigger": {},
+      "pause": {},
+      "resume": {}
+    },
+    "private": {
+      "tick": {},
+      "dispatch": {}
+    }
+  },
   "properties": {
     "cron": {
       "type": "string",

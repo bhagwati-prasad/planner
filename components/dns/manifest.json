@@ -8,6 +8,23 @@
   "icon": "icon.svg",
   "extends": "base:proxy",
   "shape": "hexagon",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "accepts": [],
+      "exposes": ["resolve"]
+    }
+  ],
+  "methods": {
+    "public": {
+      "resolve": {}
+    },
+    "private": {
+      "healthCheck": {},
+      "failover": {}
+    }
+  },
   "properties": {
     "recordTtl": {
       "type": "duration",

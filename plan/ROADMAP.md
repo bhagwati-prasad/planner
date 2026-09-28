@@ -55,8 +55,8 @@ The headless heart: immutable state, commands, undo, op log, graph invariants, r
 - [x] [0112 Extract as system and inline system](M01-core/0112-extract-inline.md) (after 0111)
 - [x] [0113 Roll-up engine](M01-core/0113-rollups.md) (after 0111)
 - [x] [0114 The recursive payments fixture](M01-core/0114-recursive-fixture.md) (after 0112, 0113)
-- [ ] [0115 Facade handles for recursion](M01-core/0115-facade.md) (after 0114, 0106)
-- [ ] [0120 Help metadata for every facade method](M01-core/0120-facade-help.md) (after 0115)
+- [x] [0115 Facade handles for recursion](M01-core/0115-facade.md) (after 0114, 0106)
+- [x] [0120 Help metadata for every facade method](M01-core/0120-facade-help.md) (after 0115)
 
 ### M02 strata-graph
 

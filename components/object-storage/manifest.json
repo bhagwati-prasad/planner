@@ -12,9 +12,22 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["http", "file-batch"]
+      "accepts": ["http", "file-batch"],
+      "exposes": ["put", "get", "delete", "list"]
     }
   ],
+  "methods": {
+    "public": {
+      "put": {},
+      "get": {},
+      "delete": {},
+      "list": {}
+    },
+    "private": {
+      "throttle": {},
+      "applyLifecycle": {}
+    }
+  },
   "properties": {
     "firstByteLatency": {
       "type": "distribution",

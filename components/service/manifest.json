@@ -12,13 +12,25 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["http", "grpc", "websocket"]
+      "accepts": ["http", "grpc", "websocket"],
+      "exposes": ["health"]
     },
     {
       "name": "out",
       "direction": "out"
     }
   ],
+  "methods": {
+    "public": {
+      "health": {}
+    },
+    "private": {
+      "admit": {},
+      "retry": {},
+      "tripCircuit": {},
+      "autoscale": {}
+    }
+  },
   "properties": {
     "concurrency": {
       "type": "integer",

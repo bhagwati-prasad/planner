@@ -5,18 +5,22 @@
  *
  * Every change goes through `project.dispatch`, i.e. through the command bus.
  */
-import { fail, nodeKind } from '../../core/src/index.js'
+import { SYSTEM_TYPE_REF, fail, nodeKind } from '../../core/src/index.js'
 import { Collection } from './collection.js'
 import { CORE, INSPECT, defined } from './internal.js'
 import { pasteClip } from './clipboard.js'
 
 /** @typedef {import('./projects.js').ProjectHandle} ProjectHandle */
 /** @typedef {import('../../core/src/index.js').Core} Core */
+/**
+ * A component method as `methods()` lists it: its declared spec plus these fields.
+ * @typedef {{ name: string, visibility: 'public'|'private', ports: string[], [key: string]: unknown }} MethodInfo
+ */
 
 /** @param {ProjectHandle} project @returns {Core} */
 const coreOf = project => project[CORE]
 
-class Handle {
+export class Handle {
   #project
   #id
 
@@ -38,17 +42,33 @@ class Handle {
     return coreOf(this.#project)
   }
 
-  /** @param {unknown} other */
+  /**
+   * True when both handles name the same entity of the same project.
+   * @param {unknown} other
+   * @example strata.$.equals(svc)
+   */
   equals(other) {
     return other instanceof Handle && other.id === this.#id && other.project === this.#project
   }
 
+  /**
+   * The handle as plain data (its row), for JSON.stringify.
+   * @example JSON.stringify(svc)
+   */
   toJSON() {
     return this.toRow()
   }
+  /**
+   * A row describing the entity, for console.table.
+   * @example console.table([svc.toRow()])
+   */
   toRow() {
     return { id: this.#id }
   }
+  /**
+   * A short label such as Node<Orders>.
+   * @example String(svc)
+   */
   toString() {
     return `${this.constructor.name.replace('Handle', '')}<${this.#id}>`
   }
@@ -133,6 +153,7 @@ export class SystemHandle extends Handle {
    * Adds a component.
    * @param {string} type component id or short name, e.g. 'service' or 'acme.message-queue@1.2.0'
    * @param {{ name?: string, props?: object, tags?: string[], owner?: string|null, status?: string, description?: string, at?: {x: number, y: number}, id?: string }} [options]
+   * @example const svc = root.add('service', { name: 'Orders', props: { concurrency: 64 } })
    */
   add(type, { at, ...fields } = {}) {
     this.#writable()
@@ -151,6 +172,7 @@ export class SystemHandle extends Handle {
    * Places another system inside this one as a composite node.
    * @param {SystemHandle|string} system handle, id or name
    * @param {{ placement?: 'reference'|'value', name?: string, at?: {x: number, y: number} }} [options]
+   * @example root.place('Auth', { placement: 'value' })
    */
   place(system, { placement = 'reference', name, at } = {}) {
     this.#writable()
@@ -179,14 +201,16 @@ export class SystemHandle extends Handle {
    * (the compatible port is picked for you).
    * @param {PortHandle|NodeHandle|string} from
    * @param {PortHandle|NodeHandle|string} to
-   * @param {{ type?: string, props?: object, label?: string, id?: string }} [options]
+   * @param {{ type?: string, method?: string, props?: object, label?: string, id?: string }} [options]
+   *   method: the public method the edge calls, one the target port exposes (spec §6)
+   * @example root.connect(svc.port('db'), db.port('in'), { type: 'db-protocol', method: 'insert' })
    */
-  connect(from, to, { type, props, label, id } = {}) {
+  connect(from, to, { type, method, props, label, id } = {}) {
     this.#writable()
     const [fromPort, toPort] = pickPorts(this, from, to, type)
     const edgeId = this.project.dispatch({
       type: 'edge.add',
-      payload: defined({ fromPort, toPort, connectionType: type, props, label, id }),
+      payload: defined({ fromPort, toPort, connectionType: type, method, props, label, id }),
     })
     return new EdgeHandle(this.project, edgeId, { readOnly: this.#readOnly })
   }
@@ -196,6 +220,7 @@ export class SystemHandle extends Handle {
    * entered through its new composite node.
    * @param {Iterable<NodeHandle|string>} nodes
    * @param {{ name?: string }} [options]
+   * @example const orders = root.extract([svc.id, db.id], { name: 'Orders System' })
    */
   extract(nodes, { name } = {}) {
     this.#writable()
@@ -210,6 +235,7 @@ export class SystemHandle extends Handle {
   /**
    * Inline system: dissolves a composite back into this system. Returns the nodes it brought in.
    * @param {NodeHandle|string} node
+   * @example root.inline('Orders System')
    */
   inline(node) {
     this.#writable()
@@ -227,6 +253,7 @@ export class SystemHandle extends Handle {
    * @param {import('./clipboard.js').Clip} clip
    * @param {{ at?: { x: number, y: number } }} [options] where the clip's top-left lands
    * @returns {Collection & { skipped: { name: string, reason: string }[] }}
+   * @example root.paste(strata.copy([svc]), { at: { x: 400, y: 100 } })
    */
   paste(clip, options) {
     this.#writable()
@@ -240,6 +267,7 @@ export class SystemHandle extends Handle {
    * Publishes an internal port as a boundary port of this system.
    * @param {PortHandle|string} port port handle, id or 'Node.port'
    * @param {{ name?: string, direction?: 'in'|'out'|'both' }} [options]
+   * @example orders.expose('Orders.in', { name: 'api' })
    */
   expose(port, { name, direction } = {}) {
     this.#writable()
@@ -266,6 +294,7 @@ export class SystemHandle extends Handle {
   /**
    * A node of this system by id or name.
    * @param {string} idOrName
+   * @example root.node('Orders')
    */
   node(idOrName) {
     return this.#node(resolveNodeId(this, idOrName))
@@ -274,6 +303,7 @@ export class SystemHandle extends Handle {
   /**
    * Nodes of this system (`{ deep: true }` includes every level below).
    * @param {import('../../core/src/core.js').NodeFilter | ((n: NodeHandle) => boolean)} [filter]
+   * @example root.nodes({ deep: true }).toTable()
    */
   nodes(filter = {}) {
     if (typeof filter === 'function') return Collection.from(this.nodes().filter(filter))
@@ -282,6 +312,10 @@ export class SystemHandle extends Handle {
     )
   }
 
+  /**
+   * Edges of this system.
+   * @example root.edges().toTable()
+   */
   edges() {
     return Collection.from(
       this[CORE].edgesOf(this.id).map(
@@ -290,7 +324,10 @@ export class SystemHandle extends Handle {
     )
   }
 
-  /** Boundary ports: the system's interface when used as a component. */
+  /**
+   * Boundary ports: the system's interface when used as a component.
+   * @example orders.ports().map(bp => bp.name)
+   */
   ports() {
     return Collection.from(
       this[CORE].boundaryPortsOf(this.id).map(
@@ -299,7 +336,11 @@ export class SystemHandle extends Handle {
     )
   }
 
-  /** @param {string} name */
+  /**
+   * A boundary port by name or id.
+   * @param {string} name
+   * @example orders.port('in').bind('health', 'Orders')
+   */
   port(name) {
     const bp = this[CORE].boundaryPortsOf(this.id).find(p => p.name === name || p.id === name)
     if (!bp)
@@ -314,18 +355,28 @@ export class SystemHandle extends Handle {
     return new BoundaryPortHandle(this.project, bp.id, { readOnly: this.#readOnly })
   }
 
+  /**
+   * Views of this system.
+   * @example root.views()
+   */
   views() {
     return Collection.from(this[CORE].viewsOf(this.id))
   }
 
-  /** Composite nodes that place this system. */
+  /**
+   * Composite nodes that place this system.
+   * @example auth.parents().map(n => n.name)
+   */
   parents() {
     return Collection.from(
       this[CORE].referencingNodes(this.id).map(n => new NodeHandle(this.project, n.id))
     )
   }
 
-  /** Systems placed directly inside this one. */
+  /**
+   * Systems placed directly inside this one.
+   * @example root.children().map(s => s.name)
+   */
   children() {
     return Collection.from(
       this[CORE].nodesOf(this.id)
@@ -338,18 +389,25 @@ export class SystemHandle extends Handle {
    * Derived value of a property or metric (spec §6 data roll-up).
    * @param {string} key e.g. 'latency.p99', 'monthlyCost'
    * @param {import('../../core/src/rollup.js').RollupOptions & { detail?: boolean }} [options]
+   * @example orders.rollup('latency.p99')
    */
   rollup(key, { detail = false, ...options } = {}) {
     const result = this[CORE].rollup(this.id, key, options)
     return detail ? result : result.value
   }
 
-  /** Declared contract checked against derived values. */
+  /**
+   * Declared contract checked against derived values.
+   * @example console.table(orders.contracts())
+   */
   contracts() {
     return Collection.from(this[CORE].checkContracts(this.id))
   }
 
-  /** Problems in this system and every system below it. */
+  /**
+   * Problems in this system and every system below it.
+   * @example console.table(root.problems())
+   */
   problems() {
     const ids = new Set(this[CORE].subtreeSystemIds(this.id))
     return Collection.from(this[CORE].problems().filter(p => p.systemId && ids.has(p.systemId)))
@@ -358,6 +416,7 @@ export class SystemHandle extends Handle {
   /**
    * Updates system fields.
    * @param {{ name?: string, levelTag?: string|null, description?: string, contract?: object, rollups?: object, tags?: string[] }} changes
+   * @example orders.set({ levelTag: 'container', tags: ['core'] })
    */
   set(changes) {
     this.#writable()
@@ -365,33 +424,53 @@ export class SystemHandle extends Handle {
     return this
   }
 
-  /** @param {string} name */
+  /**
+   * Renames the system.
+   * @param {string} name
+   * @example orders.rename('Orders')
+   */
   rename(name) {
     return this.set({ name })
   }
 
-  /** Drill down: makes this the current system (the UI follows if attached). */
+  /**
+   * Drill down: makes this the current system (the UI follows if attached).
+   * @example orders.enter()
+   */
   enter() {
     this.project.nav.enter(this)
     return this
   }
 
-  /** Deletes a library system that is not placed anywhere. */
+  /**
+   * Deletes a library system that is not placed anywhere.
+   * @example p.system('Auth').delete()
+   */
   delete() {
     this.#writable()
     this.project.dispatch({ type: 'system.delete', payload: { id: this.id } })
   }
 
-  /** Text tree of the system (see also strata.print). @param {{ depth?: number }} [options] */
+  /**
+   * Text tree of the system (see also strata.print). @param {{ depth?: number }} [options]
+   * @example orders.format({ depth: 1 })
+   */
   format(options) {
     return this.project.strata.format(this, options)
   }
 
-  /** Rows describing the nodes, for console.table. */
+  /**
+   * Rows describing the nodes, for console.table.
+   * @example console.table(root.toTable())
+   */
   toTable() {
     return this.nodes().toTable()
   }
 
+  /**
+   * A row describing the system, for console.table.
+   * @example console.table([orders.toRow()])
+   */
   toRow() {
     const e = this.entity
     return {
@@ -404,6 +483,10 @@ export class SystemHandle extends Handle {
     }
   }
 
+  /**
+   * A short label such as System<Orders>.
+   * @example String(orders)
+   */
   toString() {
     const e = this[CORE].get('system', this.id)
     return e
@@ -465,7 +548,10 @@ export class NodeHandle extends Handle {
     return Object.freeze(this[CORE].effectiveProps(this.id))
   }
 
-  /** Every property value with its source: 'default' or 'override'. */
+  /**
+   * Every property value with its source: 'default' or 'override'.
+   * @example svc.explain()
+   */
   explain() {
     return this[CORE].explainProps(this.id)
   }
@@ -501,6 +587,7 @@ export class NodeHandle extends Handle {
   /**
    * Sets property values (validated against the component manifest).
    * @param {Record<string, unknown>} props
+   * @example svc.set({ concurrency: 64 })
    */
   set(props) {
     this.#writable()
@@ -508,26 +595,133 @@ export class NodeHandle extends Handle {
     return this
   }
 
-  /** Resets properties to their defaults. @param {...string} keys */
+  /**
+   * Resets properties to their defaults. @param {...string} keys
+   * @example svc.unset('concurrency')
+   */
   unset(...keys) {
     this.#writable()
     this.project.dispatch({ type: 'node.setProps', payload: { id: this.id, unset: keys } })
     return this
   }
 
-  /** @param {{ name?: string, description?: string, tags?: string[], owner?: string|null, status?: string }} changes */
+  /**
+   * Changes the node's fields.
+   * @param {{ name?: string, description?: string, tags?: string[], owner?: string|null, status?: string }} changes
+   * @example svc.update({ owner: 'payments', tags: ['core'] })
+   */
   update(changes) {
     this.#writable()
     this.project.dispatch({ type: 'node.update', payload: { id: this.id, changes } })
     return this
   }
 
-  /** @param {string} name */
+  /**
+   * Renames the node.
+   * @param {string} name
+   * @example svc.rename('Orders API')
+   */
   rename(name) {
     return this.update({ name })
   }
 
-  /** @param {string} name */
+  /**
+   * The component's public and private methods (spec §6), public ones with the ports that
+   * expose them. A System component's public methods are those its boundary ports bind.
+   * @returns {Collection & MethodInfo[]}
+   * @example db.methods().filter(m => m.visibility === 'public')
+   */
+  methods() {
+    const core = this[CORE]
+    const ports = core.portsOf(this.id)
+    const exposing = (/** @type {string} */ name) =>
+      ports.filter(p => core.exposedMethods(p).includes(name)).map(p => p.name)
+    /** @type {{ public?: Record<string, object>, private?: Record<string, object> }} */
+    const declared =
+      this.entity.typeRef === SYSTEM_TYPE_REF
+        ? {
+            public: Object.fromEntries(
+              [...new Set(ports.flatMap(p => core.exposedMethods(p)))].map(n => [n, {}])
+            ),
+          }
+        : (this.manifest?.methods ?? {})
+    return /** @type {Collection & MethodInfo[]} */ (
+      Collection.from([
+        ...Object.entries(declared.public ?? {}).map(([name, spec]) => ({
+          name,
+          visibility: /** @type {const} */ ('public'),
+          ports: exposing(name),
+          ...spec,
+        })),
+        ...Object.entries(declared.private ?? {}).map(([name, spec]) => ({
+          name,
+          visibility: /** @type {const} */ ('private'),
+          ports: [],
+          ...spec,
+        })),
+      ])
+    )
+  }
+
+  /**
+   * The component's typed initial state (spec §6): each declared state field's initial value.
+   * @example svc.state() // { backlog: [], circuits: {} }
+   */
+  state() {
+    /** @type {Record<string, { initial?: unknown }>} */
+    const declared = /** @type {any} */ (this.manifest)?.state ?? {}
+    return Object.fromEntries(
+      Object.entries(declared).map(([key, schema]) => [
+        key,
+        structuredClone(schema.initial ?? null),
+      ])
+    )
+  }
+
+  /**
+   * Gives the component an inner system of its own (spec §7): its ports become the inner
+   * system's boundary ports, and it keeps its type and properties as its black-box model.
+   * @returns {SystemHandle}
+   * @example const inner = svc.openAsSystem(); inner.enter()
+   */
+  openAsSystem() {
+    this.#writable()
+    const id = this.project.dispatch({ type: 'component.openAsSystem', payload: { id: this.id } })
+    return new SystemHandle(this.project, id, { via: this.id })
+  }
+
+  /**
+   * Removes the inner system a component was opened with, leaving it a black box.
+   * @example svc.removeInnerSystem()
+   */
+  removeInnerSystem() {
+    this.#writable()
+    this.project.dispatch({ type: 'component.removeInnerSystem', payload: { id: this.id } })
+    return this
+  }
+
+  /**
+   * Follows a public method's bindings down to the component that implements it (spec §7).
+   * @param {string} method
+   * @param {{ port?: string }} [options]  the exposing port, when there are several
+   * @returns {{ node: NodeHandle, method: string, path: { node: NodeHandle, method: string }[] }}
+   * @example payments.resolve('refund').node.name // 'Ledger API'
+   */
+  resolve(method, { port } = {}) {
+    const r = this[CORE].resolveBinding(this.id, method, defined({ port }))
+    const node = (/** @type {string} */ id) => new NodeHandle(this.project, id)
+    return {
+      node: node(r.nodeId),
+      method: r.method,
+      path: r.path.map(hop => ({ node: node(hop.nodeId), method: hop.method })),
+    }
+  }
+
+  /**
+   * A port by name or id.
+   * @param {string} name
+   * @example svc.port('db')
+   */
   port(name) {
     const ports = this[CORE].portsOf(this.id)
     const port = ports.find(p => p.name === name) ?? ports.find(p => p.id === name)
@@ -539,6 +733,10 @@ export class NodeHandle extends Handle {
     return new PortHandle(this.project, port.id, { readOnly: this.#readOnly })
   }
 
+  /**
+   * The node's ports.
+   * @example svc.ports().toTable()
+   */
   ports() {
     return Collection.from(
       this[CORE].portsOf(this.id).map(
@@ -551,6 +749,7 @@ export class NodeHandle extends Handle {
    * Adds an extra port beyond those the manifest declares.
    * @param {string} name
    * @param {{ direction: 'in'|'out'|'both', accepts?: string[] }} options
+   * @example svc.addPort('metrics', { direction: 'out' })
    */
   addPort(name, { direction, accepts } = /** @type {any} */ ({})) {
     this.#writable()
@@ -561,7 +760,10 @@ export class NodeHandle extends Handle {
     return new PortHandle(this.project, id, { readOnly: this.#readOnly })
   }
 
-  /** Edges attached to any of this node's ports. */
+  /**
+   * Edges attached to any of this node's ports.
+   * @example svc.edges().toTable()
+   */
   edges() {
     const seen = new Map()
     for (const port of this[CORE].portsOf(this.id)) {
@@ -578,6 +780,7 @@ export class NodeHandle extends Handle {
    * Connects one of this node's ports to another node or port (see SystemHandle.connect).
    * @param {PortHandle|NodeHandle|string} to
    * @param {{ type?: string, props?: object, label?: string }} [options]
+   * @example gw.connect(svc, { type: 'http' })
    */
   connect(to, options) {
     return this.system.connect(this, to, options)
@@ -595,6 +798,7 @@ export class NodeHandle extends Handle {
    * @param {number} x
    * @param {number} y
    * @param {{ view?: string }} [options] view id
+   * @example svc.moveTo(240, 120)
    */
   moveTo(x, y, { view } = {}) {
     this.#writable()
@@ -606,48 +810,74 @@ export class NodeHandle extends Handle {
     return this
   }
 
-  /** Views in which the node is visible. */
+  /**
+   * Views in which the node is visible.
+   * @example svc.views()
+   */
   views() {
     return Collection.from(this[CORE].viewsContaining(this.id))
   }
 
-  /** Composite only: enter the contained system. */
+  /**
+   * Composite only: enter the contained system.
+   * @example payments.enter()
+   */
   enter() {
     const child = this.child
     if (!child) fail('INVALID', `'${this.name}' is not a composite; there is nothing to enter`)
     return child.enter()
   }
 
-  /** Composite only: derived value of its system. @param {string} key @param {object} [options] */
+  /**
+   * Composite only: derived value of its system. @param {string} key @param {object} [options]
+   * @example payments.rollup('monthlyCost')
+   */
   rollup(key, options) {
     const child = this.child
     if (!child) fail('INVALID', `'${this.name}' is atomic; read its properties with .props`)
     return child.rollup(key, options)
   }
 
-  /** Composite by reference only: switch to an editable copy. Returns the copy. */
+  /**
+   * Composite by reference only: switch to an editable copy. Returns the copy.
+   * @example auth.detach()
+   */
   detach() {
     this.#writable()
     this.project.dispatch({ type: 'node.detach', payload: { id: this.id } })
     return this.child
   }
 
-  /** Composite only: dissolve into the parent system. */
+  /**
+   * Composite only: dissolve into the parent system.
+   * @example payments.inline()
+   */
   inline() {
     return this.system.inline(this)
   }
 
-  /** Removes the node from the model and every view. */
+  /**
+   * Removes the node from the model and every view.
+   * @example svc.remove()
+   */
   remove() {
     this.#writable()
     this.project.dispatch({ type: 'node.remove', payload: { id: this.id } })
   }
 
+  /**
+   * Makes this node the selection.
+   * @example svc.select()
+   */
   select() {
     this.project.strata.select(this)
     return this
   }
 
+  /**
+   * A row describing the node, for console.table.
+   * @example console.table([svc.toRow()])
+   */
   toRow() {
     const e = this.entity
     return {
@@ -662,6 +892,10 @@ export class NodeHandle extends Handle {
     }
   }
 
+  /**
+   * A short label such as Node<Orders>.
+   * @example String(svc)
+   */
   toString() {
     const e = this[CORE].get('node', this.id)
     if (!e) return `Node<deleted ${this.id}>`
@@ -695,6 +929,10 @@ export class PortHandle extends Handle {
   get accepts() {
     return this[CORE].acceptsOf(this.id)
   }
+  /** The public methods an edge into this port may call (spec §6); a boundary port's are its bound ones. */
+  get exposes() {
+    return this[CORE].exposedMethods(this.id)
+  }
   /** False for extra ports added to a node. */
   get declared() {
     return this.entity.declared
@@ -706,6 +944,10 @@ export class PortHandle extends Handle {
     return this[CORE].edgesAtPort(this.id).length > 0
   }
 
+  /**
+   * Edges attached to this port.
+   * @example svc.port('db').edges()
+   */
   edges() {
     return Collection.from(
       this[CORE].edgesAtPort(this.id).map(
@@ -714,20 +956,29 @@ export class PortHandle extends Handle {
     )
   }
 
-  /** The atomic port that ultimately handles this one, following boundary ports down. */
+  /**
+   * The atomic port that ultimately handles this one, following boundary ports down.
+   * @example payments.port('in').resolve().node.name
+   */
   resolve() {
     const { port } = this[CORE].resolvePort(this.id)
     return new PortHandle(this.project, port.id)
   }
 
   /**
+   * Connects this port to another port or node.
    * @param {PortHandle|NodeHandle|string} to
    * @param {{ type?: string, props?: object, label?: string }} [options]
+   * @example svc.port('db').connect(db, { type: 'db-protocol' })
    */
   connect(to, options) {
     return this.node.system.connect(this, to, options)
   }
 
+  /**
+   * A row describing the port, for console.table.
+   * @example console.table(svc.ports())
+   */
   toRow() {
     const e = this.entity
     return {
@@ -740,6 +991,10 @@ export class PortHandle extends Handle {
     }
   }
 
+  /**
+   * A short label such as Port<Orders.db>.
+   * @example String(svc.port('db'))
+   */
   toString() {
     const e = this[CORE].get('port', this.id)
     return e
@@ -773,6 +1028,10 @@ export class EdgeHandle extends Handle {
   get label() {
     return this.entity.label
   }
+  /** The public method the edge calls, or null when it calls any the target port exposes. */
+  get method() {
+    return this.entity.method ?? null
+  }
   /** The connection type's manifest (inheritance applied), or null when it is not installed. */
   get manifest() {
     return this[CORE].connectionTypeOf(this.id)
@@ -781,7 +1040,10 @@ export class EdgeHandle extends Handle {
   get props() {
     return Object.freeze(this[CORE].effectiveProps(this.id))
   }
-  /** Every property value with its source ('default' or 'override'). */
+  /**
+   * Every property value with its source ('default' or 'override').
+   * @example edge.explain()
+   */
   explain() {
     return this[CORE].explainProps(this.id)
   }
@@ -794,31 +1056,48 @@ export class EdgeHandle extends Handle {
       )
   }
 
-  /** @param {Record<string, unknown>} props */
+  /**
+   * Sets property values (validated against the connection type).
+   * @param {Record<string, unknown>} props
+   * @example edge.set({ retries: 2 })
+   */
   set(props) {
     this.#writable()
     this.project.dispatch({ type: 'edge.setProps', payload: { id: this.id, props } })
     return this
   }
 
-  /** @param {...string} keys */
+  /**
+   * Resets properties to the connection type's defaults.
+   * @param {...string} keys
+   * @example edge.unset('retries')
+   */
   unset(...keys) {
     this.#writable()
     this.project.dispatch({ type: 'edge.setProps', payload: { id: this.id, unset: keys } })
     return this
   }
 
-  /** @param {{ label?: string, type?: string|null }} changes */
-  update({ label, type }) {
+  /**
+   * Changes the label, the connection type or the method the edge calls.
+   * @param {{ label?: string, type?: string|null, method?: string|null }} changes
+   *   method: the public method the edge calls (null: any the target port exposes)
+   * @example edge.update({ method: 'query' })
+   */
+  update({ label, type, method }) {
     this.#writable()
     this.project.dispatch({
       type: 'edge.update',
-      payload: { id: this.id, changes: defined({ label, connectionType: type }) },
+      payload: { id: this.id, changes: defined({ label, connectionType: type, method }) },
     })
     return this
   }
 
-  /** @param {{ from?: PortHandle|string, to?: PortHandle|string }} ends */
+  /**
+   * Moves either end of the edge to another port.
+   * @param {{ from?: PortHandle|string, to?: PortHandle|string }} ends
+   * @example edge.rewire({ to: 'Replica.in' })
+   */
   rewire({ from, to }) {
     this.#writable()
     const system = new SystemHandle(this.project, this.entity.systemId)
@@ -833,16 +1112,28 @@ export class EdgeHandle extends Handle {
     return this
   }
 
+  /**
+   * Removes the edge.
+   * @example edge.remove()
+   */
   remove() {
     this.#writable()
     this.project.dispatch({ type: 'edge.remove', payload: { id: this.id } })
   }
 
+  /**
+   * Makes this edge the selection.
+   * @example edge.select()
+   */
   select() {
     this.project.strata.select(this)
     return this
   }
 
+  /**
+   * A row describing the edge, for console.table.
+   * @example console.table(root.edges())
+   */
   toRow() {
     const e = this.entity
     return {
@@ -850,10 +1141,15 @@ export class EdgeHandle extends Handle {
       from: portLabel(this[CORE], e.fromPort),
       to: portLabel(this[CORE], e.toPort),
       type: e.connectionType ?? '',
+      method: e.method ?? '',
       label: e.label,
     }
   }
 
+  /**
+   * A short label such as Edge<Orders.db → Orders DB.in>.
+   * @example String(edge)
+   */
   toString() {
     const e = this[CORE].get('edge', this.id)
     return e
@@ -897,7 +1193,10 @@ export class BoundaryPortHandle extends Handle {
       )
   }
 
-  /** Maps the boundary port to another internal port (null unmaps it). @param {PortHandle|string|null} port */
+  /**
+   * Maps the boundary port to another internal port (null unmaps it). @param {PortHandle|string|null} port
+   * @example inner.port('in').map('Rules engine.in')
+   */
   map(port) {
     this.#writable()
     const internalPortId = port === null ? null : resolvePortId(this.system, port)
@@ -908,18 +1207,78 @@ export class BoundaryPortHandle extends Handle {
     return this
   }
 
-  /** @param {string} name */
+  /** The methods bound on this port, as method → { node, method } (spec §7). */
+  get bindings() {
+    return Object.freeze(
+      Object.fromEntries(
+        Object.entries(this.entity.bindings ?? {}).map(([method, target]) => [
+          method,
+          {
+            node: new NodeHandle(this.project, target.nodeId, { readOnly: this.#readOnly }),
+            method: target.method,
+          },
+        ])
+      )
+    )
+  }
+
+  /**
+   * Binds a public method of the system to a method of a component reachable from this port.
+   * @param {string} method @param {NodeHandle|string} node @param {string} [target] defaults to `method`
+   * @example inner.port('in').bind('refund', 'Ledger', 'reverse')
+   */
+  bind(method, node, target = method) {
+    this.#writable()
+    this.project.dispatch({
+      type: 'boundary.bind',
+      payload: {
+        boundaryPortId: this.id,
+        method,
+        nodeId: resolveNodeId(this.system, node),
+        target,
+      },
+    })
+    return this
+  }
+
+  /**
+   * Removes a method's binding from this port.
+   * @param {string} method
+   * @example inner.port('in').unbind('refund')
+   */
+  unbind(method) {
+    this.#writable()
+    this.project.dispatch({
+      type: 'boundary.unbind',
+      payload: { boundaryPortId: this.id, method },
+    })
+    return this
+  }
+
+  /**
+   * Renames the boundary port.
+   * @param {string} name
+   * @example bp.rename('api')
+   */
   rename(name) {
     this.#writable()
     this.project.dispatch({ type: 'boundary.update', payload: { id: this.id, changes: { name } } })
     return this
   }
 
+  /**
+   * Removes the boundary port.
+   * @example bp.remove()
+   */
   remove() {
     this.#writable()
     this.project.dispatch({ type: 'boundary.remove', payload: { id: this.id } })
   }
 
+  /**
+   * A row describing the boundary port, for console.table.
+   * @example console.table(orders.ports())
+   */
   toRow() {
     const e = this.entity
     return {
@@ -930,6 +1289,10 @@ export class BoundaryPortHandle extends Handle {
     }
   }
 
+  /**
+   * A short label such as BoundaryPort<in in>.
+   * @example String(bp)
+   */
   toString() {
     const e = this[CORE].get('boundaryPort', this.id)
     return e ? `BoundaryPort<${e.name} ${e.direction}>` : `BoundaryPort<deleted ${this.id}>`
@@ -940,7 +1303,10 @@ export class BoundaryPortHandle extends Handle {
 // Resolution helpers
 // -------------------------------------------------------------------------------------------
 
-/** @param {Core} core @param {string} portId */
+/**
+ * @param {Core} core @param {string} portId
+ * @internal
+ */
 export function portLabel(core, portId) {
   const port = core.get('port', portId)
   if (!port) return `?${portId}`
@@ -950,6 +1316,7 @@ export function portLabel(core, portId) {
 /**
  * @param {ProjectHandle} project
  * @param {SystemHandle|string} system handle, id or name
+ * @internal
  */
 export function resolveSystemId(project, system) {
   if (system instanceof SystemHandle) return system.id
@@ -972,6 +1339,7 @@ export function resolveSystemId(project, system) {
 /**
  * @param {SystemHandle} system scope for name lookups
  * @param {NodeHandle|string} node handle, id or name
+ * @internal
  */
 export function resolveNodeId(system, node) {
   if (node instanceof NodeHandle) return node.id
@@ -998,6 +1366,7 @@ export function resolveNodeId(system, node) {
 /**
  * @param {SystemHandle} system scope for 'Node.port' lookups
  * @param {PortHandle|string} port handle, id or 'Node.port'
+ * @internal
  */
 export function resolvePortId(system, port) {
   if (port instanceof PortHandle) return port.id

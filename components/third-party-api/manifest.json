@@ -12,9 +12,18 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["http", "grpc"]
+      "accepts": ["http", "grpc"],
+      "exposes": ["call"]
     }
   ],
+  "methods": {
+    "public": {
+      "call": {}
+    },
+    "private": {
+      "throttle": {}
+    }
+  },
   "properties": {
     "latency": {
       "type": "distribution",

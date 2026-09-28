@@ -20,6 +20,7 @@
  * Keeps projects in memory (serialised, so nothing is shared by reference). Useful for tests,
  * scripts and the console before persistence is configured.
  * @returns {StorageAdapter}
+ * @example const strata = createStrata({ clock, storage: createMemoryStorage() })
  */
 export function createMemoryStorage() {
   /** @type {Map<string, string>} */

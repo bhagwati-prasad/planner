@@ -53,6 +53,10 @@ function writtenProps(core, id, props) {
   )
 }
 
+/**
+ * Copies nodes and the edges among them into a clip (see strata.copy).
+ * @internal
+ */
 export function copyNodes(project, ids) {
   const core = project[CORE]
   const nodes = [...new Set(ids)].map(id => core.get('node', id)).filter(Boolean)
@@ -132,6 +136,7 @@ export function copyNodes(project, ids) {
  * @param {Clip} clip
  * @param {{ at?: { x: number, y: number } }} [options] where the clip's top-left lands (default: right of the existing nodes)
  * @returns {{ nodeIds: string[], edgeIds: string[], skipped: { name: string, reason: string }[] }}
+ * @internal
  */
 export function pasteClip(system, clip, { at } = {}) {
   if (!clip || clip.format !== CLIP_FORMAT || !Array.isArray(clip.nodes))

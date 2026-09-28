@@ -12,9 +12,23 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["db-protocol", "http"]
+      "accepts": ["db-protocol", "http"],
+      "exposes": ["get", "put", "delete", "query"]
     }
   ],
+  "methods": {
+    "public": {
+      "get": {},
+      "put": {},
+      "delete": {},
+      "query": {}
+    },
+    "private": {
+      "route": {},
+      "throttle": {},
+      "replicate": {}
+    }
+  },
   "properties": {
     "partitions": {
       "type": "integer",

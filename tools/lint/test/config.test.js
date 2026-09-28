@@ -105,14 +105,9 @@ describe('eslint.config.js', () => {
 })
 
 describe('eslint-suppressions.json', () => {
-  it('holds only the debt that task 0115 (help metadata) removes', async () => {
+  it('suppresses nothing, now that task 0120 gave every facade method its help metadata', async () => {
     const { readFileSync } = await import('node:fs')
     const suppressions = JSON.parse(readFileSync(join(ROOT, 'eslint-suppressions.json'), 'utf8'))
-    const owned = { 'strata/facade-help': '0115' }
-    for (const [file, rules] of Object.entries(suppressions)) {
-      assert.match(file, /^packages\/facade\/src\//, `${file} may not suppress anything`)
-      for (const rule of Object.keys(rules))
-        assert.ok(rule in owned, `${file}: ${rule} is not owned by a later task`)
-    }
+    assert.deepEqual(suppressions, {})
   })
 })

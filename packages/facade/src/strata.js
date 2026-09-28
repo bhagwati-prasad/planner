@@ -158,6 +158,7 @@ export class Strata {
   /**
    * Replaces the selection. Accepts handles, ids and arrays of them; no arguments clears it.
    * @param {...unknown} items
+   * @example strata.select(svc, db); strata.$.ids()
    */
   select(...items) {
     const project = this.#requireProject()
@@ -190,6 +191,7 @@ export class Strata {
    * Copies nodes (default: the selected ones) with the edges between them.
    * @param {Iterable<string|{ id: string }>} [items]
    * @returns {import('./clipboard.js').Clip}
+   * @example const clip = strata.copy([svc, db])
    */
   copy(items) {
     const project = this.#requireProject()
@@ -205,6 +207,7 @@ export class Strata {
    * Pastes the clipboard (or a given clip) into a system (default: the current one) and
    * selects what was pasted.
    * @param {{ clip?: import('./clipboard.js').Clip, into?: SystemHandle, at?: { x: number, y: number } }} [options]
+   * @example strata.paste({ into: p.root, at: { x: 400, y: 100 } })
    */
   paste({ clip = this.#clipboard ?? undefined, into, at } = {}) {
     const project = this.#requireProject()
@@ -219,6 +222,7 @@ export class Strata {
    * Copies nodes and pastes them next to the originals (offset by 40), in the system of the
    * first one. Returns the copies, which become the selection.
    * @param {Iterable<string|{ id: string }>} [items] default: the selection
+   * @example strata.duplicate([svc])
    */
   duplicate(items) {
     const project = this.#requireProject()
@@ -242,29 +246,43 @@ export class Strata {
   /**
    * Applies a command to the active project.
    * @param {{ type: string, payload?: any }} command
+   * @example strata.dispatch({ type: 'node.update', payload: { id: svc.id, changes: { owner: 'payments' } } })
    */
   dispatch(command) {
     return this.#requireProject().dispatch(command)
   }
 
   /**
+   * Groups the commands `fn` dispatches into one undo step.
    * @template T
    * @param {() => T} fn
    * @param {{ label?: string }} [options]
    * @returns {T}
+   * @example strata.transaction(() => { root.add('service'); root.add('cache') }, { label: 'Add a tier' })
    */
   transaction(fn, options) {
     return this.#requireProject().transaction(fn, options)
   }
 
+  /**
+   * Undoes the last operation in the active project.
+   * @example strata.undo()
+   */
   undo() {
     return this.#requireProject().undo()
   }
+  /**
+   * Redoes the last undone operation in the active project.
+   * @example strata.redo()
+   */
   redo() {
     return this.#requireProject().redo()
   }
 
-  /** Commands available in the active project, with signatures. */
+  /**
+   * Commands available in the active project, with signatures.
+   * @example strata.commands().filter(c => c.type.startsWith('edge.'))
+   */
   commands() {
     return this.#requireProject().commands()
   }
@@ -273,15 +291,24 @@ export class Strata {
    * Subscribes to 'change', 'history', 'navigate', 'select', 'project' or '*'.
    * @param {string} event
    * @param {Function} fn
+   * @example const stop = strata.on('change', ({ op }) => console.log(op.type))
    */
   on(event, fn) {
     return this.#emitter.on(event, fn)
   }
-  /** @param {string} event @param {Function} fn */
+  /**
+   * Subscribes to the next occurrence of an event only.
+   * @param {string} event @param {Function} fn
+   * @example strata.once('navigate', ({ breadcrumb }) => console.log(breadcrumb))
+   */
   once(event, fn) {
     return this.#emitter.once(event, fn)
   }
-  /** @param {string} event @param {Function} fn */
+  /**
+   * Unsubscribes a listener.
+   * @param {string} event @param {Function} fn
+   * @example strata.off('change', listener)
+   */
   off(event, fn) {
     this.#emitter.off(event, fn)
   }
@@ -290,6 +317,7 @@ export class Strata {
    * Text rendering of a project, system, node or collection (default: the current system).
    * @param {unknown} [target]
    * @param {{ depth?: number, edges?: boolean }} [options]
+   * @example const text = strata.format(root, { depth: 1 })
    */
   format(target, options) {
     if (target === undefined) {
@@ -304,6 +332,7 @@ export class Strata {
    * Prints `format(target)`.
    * @param {unknown} [target]
    * @param {{ depth?: number, edges?: boolean }} [options]
+   * @example strata.print(root)
    */
   print(target, options) {
     this.#output(this.format(target, options))
@@ -312,16 +341,25 @@ export class Strata {
   /**
    * Prints help: the topic list, or commands with signatures and examples for one topic.
    * @param {string} [topic]
+   * @example strata.help('system')
    */
   help(topic) {
     this.#output(helpText(topic))
   }
 
-  /** @param {string} [topic] */
+  /**
+   * The text strata.help(topic) prints.
+   * @param {string} [topic]
+   * @example strata.helpText('nav')
+   */
   helpText(topic) {
     return helpText(topic)
   }
 
+  /**
+   * Names the active project, such as Strata<checkout>.
+   * @example String(strata)
+   */
   toString() {
     return `Strata<${this.#active ? this.#active.name : 'no project'}>`
   }
@@ -348,7 +386,11 @@ function planned(name, release, what) {
   })
 }
 
-/** @param {StrataOptions} [options] */
+/**
+ * Creates the console API over the adapters the environment provides.
+ * @param {StrataOptions} [options]
+ * @example const strata = createStrata({ clock: () => Date.now() })
+ */
 export function createStrata(options) {
   return new Strata(options)
 }

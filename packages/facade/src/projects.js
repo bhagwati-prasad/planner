@@ -75,17 +75,24 @@ export class ProjectHandle {
   /**
    * A system by id or name, editable (not through any placement).
    * @param {string} idOrName
+   * @example p.system('Payments').add('service')
    */
   system(idOrName) {
     return new SystemHandle(this, resolveSystemId(this, idOrName))
   }
 
-  /** Every system in the project. */
+  /**
+   * Every system in the project.
+   * @example p.systems().map(s => s.name)
+   */
   systems() {
     return Collection.from(this.#core.all('system').map(s => new SystemHandle(this, s.id)))
   }
 
-  /** Library systems: reusable by reference, not owned by any composite. */
+  /**
+   * Library systems: reusable by reference, not owned by any composite.
+   * @example p.library().toTable()
+   */
   library() {
     return Collection.from(this.systems().filter(s => s.isLibrary))
   }
@@ -93,6 +100,7 @@ export class ProjectHandle {
   /**
    * A node anywhere in the project, by id or unique name.
    * @param {string} idOrName
+   * @example p.node('Orders').props
    */
   node(idOrName) {
     if (this.#core.get('node', idOrName)) return new NodeHandle(this, idOrName)
@@ -110,6 +118,7 @@ export class ProjectHandle {
   /**
    * An edge by id, or by label when exactly one edge has it.
    * @param {string} idOrLabel
+   * @example p.edge('checkout call').update({ label: 'checkout' })
    */
   edge(idOrLabel) {
     if (this.#core.get('edge', idOrLabel)) return new EdgeHandle(this, idOrLabel)
@@ -127,6 +136,7 @@ export class ProjectHandle {
   /**
    * Nodes across the project, e.g. `{ extends: 'base:queue' }` or `{ status: 'planned' }`.
    * @param {import('../../core/src/core.js').NodeFilter} [filter]
+   * @example p.nodes({ extends: 'base:queue' })
    */
   nodes(filter) {
     return Collection.from(this.#core.nodes(filter).map(n => new NodeHandle(this, n.id)))
@@ -136,13 +146,18 @@ export class ProjectHandle {
    * Creates a library system (placeable by reference or by value).
    * @param {string} name
    * @param {{ levelTag?: string, description?: string, contract?: object, tags?: string[] }} [options]
+   * @example const auth = p.createSystem('Auth', { levelTag: 'container' })
    */
   createSystem(name, options = {}) {
     const id = this.dispatch({ type: 'system.create', payload: { name, ...options } })
     return new SystemHandle(this, id)
   }
 
-  /** @param {string} name */
+  /**
+   * Renames the project.
+   * @param {string} name
+   * @example p.rename('checkout-v2')
+   */
   rename(name) {
     this.dispatch({ type: 'project.update', payload: { changes: { name } } })
     return this
@@ -151,6 +166,7 @@ export class ProjectHandle {
   /**
    * Applies a command. Every UI action, console call and script goes through here.
    * @param {{ type: string, payload?: any }} command
+   * @example p.dispatch({ type: 'system.update', payload: { id: p.root.id, changes: { name: 'Shop' } } })
    */
   dispatch(command) {
     if (this.#closed) fail('INVALID', `Project '${this.name}' is closed`)
@@ -163,15 +179,24 @@ export class ProjectHandle {
    * @param {() => T} fn
    * @param {{ label?: string }} [options]
    * @returns {T}
+   * @example p.transaction(() => p.root.add('cache'), { label: 'Add a cache' })
    */
   transaction(fn, options) {
     if (this.#closed) fail('INVALID', `Project '${this.name}' is closed`)
     return this.#core.transaction(fn, options)
   }
 
+  /**
+   * Undoes the last operation.
+   * @example p.undo()
+   */
   undo() {
     return !!this.#core.undo()
   }
+  /**
+   * Redoes the last undone operation.
+   * @example p.redo()
+   */
   redo() {
     return !!this.#core.redo()
   }
@@ -181,7 +206,10 @@ export class ProjectHandle {
   get canRedo() {
     return this.#core.canRedo
   }
-  /** Forgets undo and redo history (the operation log is kept). */
+  /**
+   * Forgets undo and redo history (the operation log is kept).
+   * @example p.clearHistory()
+   */
   clearHistory() {
     this.#core.clearHistory()
   }
@@ -191,27 +219,43 @@ export class ProjectHandle {
     return Collection.from(this.#core.oplog)
   }
 
-  /** Problems across the whole project. */
+  /**
+   * Problems across the whole project.
+   * @example console.table(p.problems())
+   */
   problems() {
     return Collection.from(this.#core.problems())
   }
 
-  /** Available commands with signatures. */
+  /**
+   * Available commands with signatures.
+   * @example p.commands().get('edge.add')
+   */
   commands() {
     return Collection.from(this.#core.commands())
   }
 
-  /** JSON-ready copy of the model. */
+  /**
+   * JSON-ready copy of the model.
+   * @example const json = JSON.stringify(p.snapshot())
+   */
   snapshot() {
     return this.#core.snapshot()
   }
 
-  /** Writes the project to the configured storage. */
+  /**
+   * Writes the project to the configured storage.
+   * @example await p.save()
+   */
   async save() {
     await this.#strata.projects.save(this)
     return this
   }
 
+  /**
+   * Closes the project (see strata.projects.close).
+   * @example p.close()
+   */
   close() {
     this.#strata.projects.close(this)
   }
@@ -222,11 +266,19 @@ export class ProjectHandle {
     this.#closed = true
   }
 
-  /** @param {{ depth?: number }} [options] */
+  /**
+   * Text tree of the project: its root system, then its library.
+   * @param {{ depth?: number }} [options]
+   * @example p.format({ depth: 2 })
+   */
   format(options) {
     return this.#strata.format(this, options)
   }
 
+  /**
+   * A row describing the project, for console.table.
+   * @example console.table([p.toRow()])
+   */
   toRow() {
     return {
       id: this.id,
@@ -237,9 +289,17 @@ export class ProjectHandle {
     }
   }
 
+  /**
+   * The row, for JSON.stringify.
+   * @example JSON.stringify(p)
+   */
   toJSON() {
     return this.toRow()
   }
+  /**
+   * A short label such as Project<checkout>.
+   * @example String(p)
+   */
   toString() {
     return `Project<${this.#closed ? 'closed ' : ''}${this.#core.project?.name}>`
   }
@@ -268,6 +328,7 @@ export class ProjectsApi {
    * Creates a project, saves it and makes it active.
    * @param {string} name
    * @param {{ id?: string, activate?: boolean }} [options]
+   * @example const p = await strata.projects.create('checkout')
    */
   async create(name, { id, activate = true } = {}) {
     const { makeCore, emit, open, storage } = this.#hooks
@@ -287,6 +348,7 @@ export class ProjectsApi {
    * Opens a saved project by id or name (already-open projects are just activated).
    * @param {string} nameOrId
    * @param {{ activate?: boolean }} [options]
+   * @example const p = await strata.projects.open('checkout')
    */
   async open(nameOrId, { activate = true } = {}) {
     const { storage, makeCore, emit, open } = this.#hooks
@@ -319,13 +381,19 @@ export class ProjectsApi {
     return project
   }
 
-  /** Saved projects, with whether each is open. */
+  /**
+   * Saved projects, with whether each is open.
+   * @example console.table(await strata.projects.list())
+   */
   async list() {
     const saved = await this.#hooks.storage.list()
     return Collection.from(saved.map(r => ({ ...r, open: this.#hooks.open.has(r.id) })))
   }
 
-  /** Projects open in this session. */
+  /**
+   * Projects open in this session.
+   * @example strata.projects.opened().map(p => p.name)
+   */
   opened() {
     return Collection.from(this.#hooks.open.values())
   }
@@ -338,6 +406,7 @@ export class ProjectsApi {
   /**
    * Makes an open project the active one.
    * @param {ProjectHandle|string} projectOrId
+   * @example strata.projects.use('checkout')
    */
   use(projectOrId) {
     const project = this.#resolveOpen(projectOrId)
@@ -346,7 +415,11 @@ export class ProjectsApi {
     return project
   }
 
-  /** @param {ProjectHandle} project */
+  /**
+   * Writes an open project to storage.
+   * @param {ProjectHandle} project
+   * @example await strata.projects.save(p)
+   */
   async save(project) {
     await this.#hooks.storage.save({
       id: project.id,
@@ -359,6 +432,7 @@ export class ProjectsApi {
   /**
    * Closes an open project (unsaved changes stay unsaved).
    * @param {ProjectHandle|string} projectOrId
+   * @example strata.projects.close('checkout')
    */
   close(projectOrId) {
     const project = this.#resolveOpen(projectOrId)
@@ -372,6 +446,7 @@ export class ProjectsApi {
   /**
    * Deletes a saved project (closing it first). Confirmation is the caller's job.
    * @param {ProjectHandle|string} projectOrId
+   * @example await strata.projects.delete('checkout')
    */
   async delete(projectOrId) {
     let id = projectOrId instanceof ProjectHandle ? projectOrId.id : projectOrId
@@ -400,6 +475,10 @@ export class ProjectsApi {
     return project
   }
 
+  /**
+   * Names the namespace.
+   * @example String(strata.projects)
+   */
   toString() {
     return 'strata.projects'
   }

@@ -70,12 +70,14 @@ test('strata.print(root) renders a text tree', async () => {
       '├─ Edge GW  starter.api-gateway@1.0.0',
       '│    out → Orders System.in  (http)',
       '└─ ▣ Orders System  (by value · 2 nodes)',
+      '     in binds health → Orders.health',
       '   ├─ Orders  starter.service@1.0.0',
       '   │    db → Orders DB.in  (db-protocol)',
       '   └─ Orders DB  starter.relational-db@1.0.0',
     ].join('\n')
   )
-  assert.equal(strata.format(root, { depth: 1 }).split('\n').length, 4)
+  // Depth 1: the root's nodes, their edges and a composite's bindings, but not its inner nodes.
+  assert.equal(strata.format(root, { depth: 1 }).split('\n').length, 5)
   assert.equal(strata.format(), strata.format(root), 'with no target, prints the current system')
   const project = strata.format(strata.project)
   assert.match(project, /^Project checkout · rev \d+ · 2 systems · 4 nodes/)

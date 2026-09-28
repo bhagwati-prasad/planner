@@ -150,7 +150,25 @@ describe('size check', () => {
       { label: 'strata-ui (minified)', bytes: 290_000 },
       { label: 'Simulation worker bundle (minified)', bytes: 120_000 },
       { label: 'Bundled fonts (woff2, Latin subset)', bytes: 120_000 },
+      { label: 'Console help metadata (minified)', bytes: 25_000 },
     ])
+  })
+
+  it('measures the console help metadata on its own line, outside the core measure (ADR 0013)', () => {
+    const fixture = tree({
+      'packages/core/src/index.js': moduleOf(1_000),
+      'packages/facade/src/help-data.js': moduleOf(26_000),
+    })
+    const { rows, problems } = checkSizes({ root: fixture.root, exceptions: {} })
+    const core = rows.find(r => r.label.startsWith('Core'))
+    const help = rows.find(r => r.label.startsWith('Console help'))
+    assert.ok(core?.bytes && core.bytes < 2_000, `core counts ${core?.bytes} bytes`)
+    assert.ok(help?.bytes && help.bytes > 25_000, `help counts ${help?.bytes} bytes`)
+    assert.deepEqual(problems.length, 1)
+    assert.match(
+      problems[0],
+      /Console help metadata \(minified\) is 26\.\d KB, over its 25 KB budget/
+    )
   })
 
   it('fails when a fixture bundle exceeds its eng §15 budget', () => {

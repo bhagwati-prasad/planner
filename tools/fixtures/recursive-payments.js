@@ -113,14 +113,16 @@ export function registerFixtureTypes(registry) {
 
 /**
  * Builds the fixture in a core whose registry has the fixture types, with commands only. The
- * same seed gives the same model, ids included.
- * @param {import('../../packages/core/src/index.js').Core} core
+ * same seed gives the same model, ids included. A project that is already initialised (a facade
+ * project, say) gets the fixture in its root system; otherwise the fixture initialises it.
+ * @param {Pick<import('../../packages/core/src/index.js').Core, 'dispatch'|'portsOf'> & { rootSystemId?: string|null }} core
+ *   a core, or anything that dispatches commands and lists a node's ports the same way
  * @returns {Record<string, any>} the ids of the parts, and `authPath`, the path to the read-only Auth system
  */
 export function buildRecursivePayments(core) {
   /** @param {string} type @param {Record<string, any>} payload */
   const run = (type, payload) => core.dispatch({ type, payload })
-  const { rootSystemId: root } = run('project.init', { name: 'Checkout' })
+  const root = core.rootSystemId ?? run('project.init', { name: 'Checkout' }).rootSystemId
   /** @param {string} systemId @param {string} typeRef @param {string} name @param {Record<string, unknown>} [props] */
   const add = (systemId, typeRef, name, props) =>
     run('component.add', { systemId, typeRef, name, ...(props ? { props } : {}) })

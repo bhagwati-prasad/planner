@@ -12,7 +12,8 @@
     {
       "name": "in",
       "direction": "in",
-      "accepts": ["http"]
+      "accepts": ["http"],
+      "exposes": ["get"]
     },
     {
       "name": "out",
@@ -20,6 +21,15 @@
       "accepts": ["http"]
     }
   ],
+  "methods": {
+    "public": {
+      "get": {}
+    },
+    "private": {
+      "fetchFromOrigin": {},
+      "evict": {}
+    }
+  },
   "properties": {
     "edgeLocations": {
       "type": "integer",

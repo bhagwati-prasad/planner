@@ -19,6 +19,8 @@ export const KB = 1000
 
 /** Packages with their own budget or none: the view layers. D3 and Three.js are excluded (eng §15). */
 const VIEW_PACKAGES = new Set(['graph', '3d', 'ui'])
+/** The console help metadata, generated from the facade's JSDoc, with a budget of its own (ADR 0013). */
+const HELP_DATA = join('packages', 'facade', 'src', 'help-data.js')
 
 /**
  * @typedef {object} Budget
@@ -52,9 +54,13 @@ function files(dir, ext) {
     .map(f => join(dir, f))
 }
 
-/** Minified bytes of the JavaScript under the given directories, or null when there is none. @param {string[]} dirs */
-function minified(dirs) {
-  const all = dirs.flatMap(dir => files(dir, '.js'))
+/**
+ * Minified bytes of the JavaScript under the given directories, or null when there is none.
+ * @param {string[]} dirs
+ * @param {(file: string) => boolean} [keep] which files count
+ */
+function minified(dirs, keep = () => true) {
+  const all = dirs.flatMap(dir => files(dir, '.js')).filter(keep)
   if (!all.length) return null
   return all.reduce(
     (sum, f) => sum + Buffer.byteLength(minify(readFileSync(f, 'utf8'), { rename: true })),
@@ -107,13 +113,18 @@ export const MEASURES = {
     minified(
       packages(root)
         .filter(p => !VIEW_PACKAGES.has(p) && !NODE_PACKAGES.has(p))
-        .map(p => src(root, p))
+        .map(p => src(root, p)),
+      file => file !== join(root, HELP_DATA)
     ),
   'strata-graph (minified)': root => minified([src(root, 'graph')]),
   'strata-ui (minified)': root => minified([src(root, 'ui')]),
   'Simulation worker bundle (minified)': root => bundled(root, 'packages/sim/src/worker/main.js'),
   'Bundled fonts (woff2, Latin subset)': root =>
     raw([join(root, 'packages', 'ui'), join(root, 'vendor')], '.woff2'),
+  'Console help metadata (minified)': root =>
+    existsSync(join(root, HELP_DATA))
+      ? Buffer.byteLength(minify(readFileSync(join(root, HELP_DATA), 'utf8'), { rename: true }))
+      : null,
 }
 
 /** @param {number} bytes */
