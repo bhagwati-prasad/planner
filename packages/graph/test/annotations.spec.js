@@ -155,6 +155,24 @@ test.describe('strata-graph frames and annotations', () => {
     })
   })
 
+  test("a trust boundary's lock leaves a by-reference component's lock in the glyph colour", async ({
+    page,
+  }) => {
+    await open(page, {
+      frames: [{ id: 'trust', kind: 'trust-boundary', x: 24, y: 24, w: 240, h: 120 }],
+      nodes: [card('svc', 48, 64, { parent: 'trust', readOnly: true })],
+    })
+    const strokes = await page.evaluate(() => {
+      const stroke = (/** @type {string} */ sel) => {
+        const el = document.querySelector(`#host ${sel}`)
+        return el ? getComputedStyle(el).stroke : null
+      }
+      return { node: stroke('.sg-node .sg-lock'), frame: stroke('.sg-frame .sg-frame-lock') }
+    })
+    // Design system §3: Basalt 500 for glyphs, Basalt 600 for the trust boundary.
+    expect(strokes).toEqual({ node: 'rgb(98, 108, 124)', frame: 'rgb(79, 88, 102)' })
+  })
+
   test('annotations render above components and are included in exports', async ({ page }) => {
     await open(page, {
       nodes: [card('svc', 40, 40)],

@@ -267,7 +267,7 @@ export const STYLESHEET = `
 .sg-frame.sg-kind-system .sg-frame-rect { stroke: ${v('border')}; }
 .sg-frame-label { fill: ${v('frameText')}; font-weight: 600; font-size: ${v('fontSizeTitleSmall')}; dominant-baseline: hanging; }
 .sg-kind-zone .sg-frame-label, .sg-kind-trust-boundary .sg-frame-label { font-weight: 500; font-size: ${v('fontSizeSmall')}; }
-.sg-lock { fill: none; stroke: ${v('trustBoundary')}; stroke-width: 1.25; pointer-events: none; }
+.sg-frame-lock { fill: none; stroke: ${v('trustBoundary')}; stroke-width: 1.25; stroke-linejoin: round; pointer-events: none; }
 .sg-stratum-band { pointer-events: none; }
 .sg-stratum-band.sg-level-0 { fill: ${v('stratumBasalt')}; }
 .sg-stratum-band.sg-level-1 { fill: ${v('stratumSandstone')}; }

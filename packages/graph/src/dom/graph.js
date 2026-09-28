@@ -1912,10 +1912,10 @@ export class Graph {
         .attr('class', n => `sg-stratum-band sg-level-${n}`)
         .attr('d', bandPath(r))
       const trust = d.kind === 'trust-boundary'
-      g.selectChildren('path.sg-lock')
+      g.selectChildren('path.sg-frame-lock')
         .data(trust ? [r] : [])
         .join('path')
-        .attr('class', 'sg-lock')
+        .attr('class', 'sg-frame-lock')
         .attr('d', b => lockPath(b.x + 10, b.y + 7))
       g.select('.sg-frame-label')
         .attr('x', r.x + (trust ? 26 : 10))
