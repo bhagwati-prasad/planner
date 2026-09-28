@@ -9,6 +9,7 @@ import {
   portAnchors,
   boundaryAnchor,
   segmentCrossesRect,
+  slideOut,
   snap,
   expand,
   center,
@@ -73,6 +74,29 @@ test('segment and rectangle crossing ignores touching borders', () => {
   assert.ok(!segmentCrossesRect({ x: -10, y: 0 }, { x: 110, y: 0 }, r), 'along the top border')
   assert.ok(!segmentCrossesRect({ x: -10, y: -5 }, { x: 110, y: -5 }, r))
   assert.ok(segmentCrossesRect({ x: 50, y: 50 }, { x: 50, y: 200 }, r), 'starting inside')
+})
+
+test('a point slides along its segment out of a rectangle, toward the end that is outside', () => {
+  const pill = { x: 80, y: 40, w: 40, h: 20 }
+  const a = { x: 0, y: 50 }
+  const b = { x: 200, y: 50 }
+  assert.deepEqual(slideOut({ x: 100, y: 50 }, a, b, pill), { x: 120, y: 50 }, 'toward b')
+  assert.deepEqual(slideOut({ x: 30, y: 50 }, a, b, pill), { x: 30, y: 50 }, 'already outside')
+  assert.deepEqual(
+    slideOut({ x: 100, y: 50 }, a, { x: 110, y: 50 }, pill),
+    { x: 80, y: 50 },
+    'toward a when b is inside'
+  )
+  assert.deepEqual(
+    slideOut({ x: 100, y: 50 }, { x: 90, y: 50 }, { x: 110, y: 50 }, pill),
+    { x: 100, y: 50 },
+    'stays when the whole segment is inside'
+  )
+  assert.deepEqual(
+    slideOut({ x: 100, y: 50 }, { x: 100, y: 0 }, { x: 100, y: 100 }, pill),
+    { x: 100, y: 60 },
+    'vertical segments too'
+  )
 })
 
 test('spatial index: query, within, nearest, move and delete', () => {

@@ -117,6 +117,26 @@ test('move, resize and waypoints become view layout commands', async () => {
   assert.equal(p.oplog.at(-1).command, 'view.layout')
 })
 
+test('a move whose items carry sizes resizes them too, in one layout command', async () => {
+  const { strata, p, root, gw, orders } = await ordersProject()
+  const ctx = { strata, system: root, viewId: toGraphData(root).viewId }
+  const before = p.oplog.length
+  applyIntent(
+    {
+      type: 'move',
+      items: [
+        { id: gw.id, kind: 'node', x: 260, y: 140, w: 240, h: 90, parent: null },
+        { id: orders.via.id, kind: 'node', x: 520, y: 140, w: 250, h: 100, parent: null },
+      ],
+    },
+    ctx
+  )
+  const layout = root.views()[0].layout
+  assert.deepEqual(layout[gw.id], { x: 260, y: 140, w: 240, h: 90 })
+  assert.deepEqual(layout[orders.via.id], { x: 520, y: 140, w: 250, h: 100 })
+  assert.equal(p.oplog.length, before + 1)
+})
+
 test('connect maps boundary ports and adds edges between compatible nodes', async () => {
   const { strata, root, orders, svc, gw } = await ordersProject()
   const extra = root.add('starter.service', { name: 'Search' })

@@ -411,7 +411,12 @@ export function applyIntent(intent, { strata, system, viewId }) {
       const set = {}
       for (const item of intent.items) {
         const p = parseId(item.id)
-        if (p.kind === 'model' && item.kind === 'node') set[p.id] = { x: item.x, y: item.y }
+        if (p.kind !== 'model' || item.kind !== 'node') continue
+        // A resized group (0204) carries each item's new size.
+        set[p.id] =
+          item.w === undefined
+            ? { x: item.x, y: item.y }
+            : { x: item.x, y: item.y, w: item.w, h: item.h }
       }
       if (viewId && Object.keys(set).length) project.dispatch(layoutCommand(set))
       return {}

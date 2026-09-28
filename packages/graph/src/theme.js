@@ -247,7 +247,7 @@ export const STYLESHEET = `
 .sg-guide { stroke: ${v('guide')}; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .sg-marquee { fill: ${v('accentSoft')}; fill-opacity: 0.6; stroke: ${v('accent')}; stroke-width: 1; pointer-events: none; }
 .sg-ghost-edge { fill: none; stroke: ${v('accent')}; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
-.sg-handle { fill: ${v('nodeFill')}; stroke: ${v('accent')}; stroke-width: 1.5; }
+.sg-handle, .sg-group-handle { fill: ${v('nodeFill')}; stroke: ${v('accent')}; stroke-width: 1.5; }
 .sg-handle-nw, .sg-handle-se { cursor: nwse-resize; }
 .sg-handle-ne, .sg-handle-sw { cursor: nesw-resize; }
 .sg-handle-n, .sg-handle-s { cursor: ns-resize; }
