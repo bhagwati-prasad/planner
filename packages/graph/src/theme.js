@@ -245,6 +245,7 @@ export const STYLESHEET = `
 .sg-badge text { fill: ${v('badgeText')}; font-size: 0.8em; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .sg-heat { pointer-events: none; }
 .sg-guide { stroke: ${v('guide')}; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.sg-guide-label { fill: ${v('guide')}; stroke: ${v('background')}; paint-order: stroke; pointer-events: none; }
 .sg-marquee { fill: ${v('accentSoft')}; fill-opacity: 0.6; stroke: ${v('accent')}; stroke-width: 1; pointer-events: none; }
 .sg-ghost-edge { fill: none; stroke: ${v('accent')}; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
 .sg-handle, .sg-group-handle { fill: ${v('nodeFill')}; stroke: ${v('accent')}; stroke-width: 1.5; }

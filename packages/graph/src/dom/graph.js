@@ -27,11 +27,12 @@
  * Other events: 'transform' (view moved), 'hover' ({ id, kind } or null), 'render' (stats).
  *
  * Gestures: click selects, Shift+click adds and Ctrl/⌘+click toggles; drag a shape to move it
- * (the selection moves together, frames bring their contents; snapping to the grid and smart
- * guides, Alt disables them); drag a handle of a multi-selection's box to resize the group;
- * drag from a port to connect; drag the background for a selection rectangle (Shift adds);
- * Space+drag or the middle button to pan, the wheel to scroll, Ctrl/⌘+wheel or a pinch to zoom.
- * Nothing moves until the host answers an intent with setData.
+ * (the selection moves together, frames bring their contents; it snaps to the grid, and to
+ * smart guides within 6 screen px that are labelled with distances; Alt disables snapping);
+ * drag a handle of a multi-selection's box to resize the group; drag from a port to connect;
+ * drag the background for a selection rectangle (Shift adds); Space+drag or the middle button
+ * to pan, the wheel to scroll, Ctrl/⌘+wheel or a pinch to zoom. Nothing moves until the host
+ * answers an intent with setData.
  * Keyboard: Tab moves between shapes, Enter opens, Space selects, arrows move (Shift ×10),
  * Delete removes, Escape cancels or clears, Ctrl/⌘+A selects all, +/− zoom, 0 fits.
  */
@@ -49,7 +50,7 @@ import {
 } from '../geometry.js'
 import { routeEdge } from '../routing.js'
 import { SpatialIndex } from '../spatial.js'
-import { snapMove } from '../snap.js'
+import { guideGaps, snapMove } from '../snap.js'
 import { align as alignItems, distribute as distributeItems } from '../arrange.js'
 import { fitTransform, screenToWorld, visibleRect, zoomAt } from '../viewport.js'
 import { wrapText } from '../text.js'
@@ -1257,11 +1258,13 @@ export class Graph {
     const m = this.#model
     const ids = [...this.#selection].filter(id => MOVABLE.has(/** @type {string} */ (m.kindOf(id))))
     const items = ids.map(id => ({ id, .../** @type {Rect} */ (m.rectOf(id)) }))
-    const placed = fn(items).filter(p => {
+    // Every item of the arrangement, when any of them moves: the host applies it as one step.
+    const placed = fn(items)
+    const moved = placed.some(p => {
       const r = m.rectOf(p.id)
       return r && (r.x !== p.x || r.y !== p.y)
     })
-    if (!placed.length) return
+    if (!moved) return
     this.#emitIntent({
       type: 'move',
       items: placed.map(p => ({
@@ -1359,6 +1362,7 @@ export class Graph {
     let x = proposed.x
     let y = proposed.y
     d.guides = []
+    d.gaps = []
     if (this.#opts.snap && !event.sourceEvent?.altKey) {
       const k = this.#transform.k
       const near = this.#index
@@ -1372,6 +1376,7 @@ export class Graph {
       x = snapped.x
       y = snapped.y
       d.guides = snapped.guides
+      d.gaps = guideGaps({ ...proposed, x, y }, near, snapped.guides)
     }
     d.delta = { x: x - d.primary.x, y: y - d.primary.y }
     this.#render()
@@ -2493,6 +2498,21 @@ export class Graph {
       .attr('y1', g => (g.axis === 'x' ? g.from : g.value))
       .attr('y2', g => (g.axis === 'x' ? g.to : g.value))
       .attr('stroke-width', 1 / k)
+    // Each guide's gap to its nearest shape, labelled at 11 px (design system §6).
+    const gaps = d?.type === 'move' ? (d.gaps ?? []) : []
+    L.guides
+      .selectChildren('text.sg-guide-label')
+      .data(gaps)
+      .join('text')
+      .attr('class', 'sg-guide-label')
+      .filter((g, i, nodes) => stale(nodes[i], [g, k]))
+      .attr('x', g => (g.axis === 'x' ? g.value + 4 / k : (g.from + g.to) / 2))
+      .attr('y', g => (g.axis === 'x' ? (g.from + g.to) / 2 : g.value - 4 / k))
+      .attr('text-anchor', g => (g.axis === 'x' ? 'start' : 'middle'))
+      .attr('dominant-baseline', g => (g.axis === 'x' ? 'central' : 'auto'))
+      .attr('stroke-width', 3 / k)
+      .style('font-size', `${11 / k}px`)
+      .text(g => String(Math.round(g.to - g.from)))
 
     // Resize handles for a single selected box
     const single = this.#selection.size === 1 ? [...this.#selection][0] : null

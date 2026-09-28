@@ -68,7 +68,7 @@ The generic D3 diagram library: data in, intents out, fast at 500+ components, w
 - [x] [0209 Node states](M02-strata-graph/0209-node-states.md) (after 0202, 0210)
 - [x] [0203 Edges, arrowheads and routing](M02-strata-graph/0203-edges-routing.md) (after 0202, 0210)
 - [x] [0204 Selection, dragging and connecting as intents](M02-strata-graph/0204-selection-intents.md) (after 0203)
-- [ ] [0205 Snapping, smart guides, align and distribute](M02-strata-graph/0205-snapping-guides.md) (after 0204)
+- [x] [0205 Snapping, smart guides, align and distribute](M02-strata-graph/0205-snapping-guides.md) (after 0204)
 - [ ] [0206 Frames, zones, boundaries and annotations](M02-strata-graph/0206-frames-annotations.md) (after 0204)
 - [ ] [0207 Level of detail and performance](M02-strata-graph/0207-lod-performance.md) (after 0206)
 - [ ] [0208 Overlays and export](M02-strata-graph/0208-overlays-export.md) (after 0207)

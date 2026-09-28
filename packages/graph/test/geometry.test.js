@@ -15,7 +15,7 @@ import {
   center,
 } from '../src/geometry.js'
 import { SpatialIndex } from '../src/spatial.js'
-import { smartGuides, snapMove, snapRect } from '../src/snap.js'
+import { guideGaps, smartGuides, snapMove, snapRect } from '../src/snap.js'
 import { align, distribute } from '../src/arrange.js'
 import { fitTransform, zoomAt, screenToWorld, worldToScreen, visibleRect } from '../src/viewport.js'
 import { wrapText, truncateText, estimateMeasure } from '../src/text.js'
@@ -130,6 +130,19 @@ test('smart guides align edges and centres within the threshold', () => {
   const centred = smartGuides(box(200, 22, 60, 10), others, 6)
   assert.equal(centred.dy, -2, 'vertical centres line up (25 vs 27)')
   assert.deepEqual(smartGuides(box(500, 500), others, 6), { dx: 0, dy: 0, guides: [] })
+})
+
+test('each guide measures the gap to the nearest shape on it', () => {
+  const others = [box(0, 0, 100, 50), box(0, 200, 100, 50)]
+  const vertical = { axis: /** @type {const} */ ('x'), value: 0, from: 0, to: 250 }
+  assert.deepEqual(guideGaps(box(0, 120, 100, 50), others, [vertical]), [
+    { axis: 'x', value: 0, from: 170, to: 200 },
+  ])
+  const horizontal = { axis: /** @type {const} */ ('y'), value: 0, from: 0, to: 220 }
+  assert.deepEqual(guideGaps(box(160, 0, 60, 50), others, [horizontal]), [
+    { axis: 'y', value: 0, from: 100, to: 160 },
+  ])
+  assert.deepEqual(guideGaps(box(50, 0, 100, 50), others, [horizontal]), [], 'overlapping')
 })
 
 test('snapMove prefers guides, falls back to the grid', () => {
