@@ -88,12 +88,15 @@ test.describe('strata-graph shapes and ports', () => {
       const composite = /** @type {Element} */ (
         document.querySelector('#host .sg-node[data-id="bank"]')
       )
-      const outline = composite.querySelector('.sg-shape')?.getBoundingClientRect()
+      // Sizes are geometry (getBBox): Firefox's client rectangles also count the stroke.
+      const outline = /** @type {SVGGraphicsElement|null} */ (
+        composite.querySelector('.sg-shape')
+      )?.getBBox()
       const node = /** @type {Element} */ (document.querySelector('#host .sg-node[data-id="svc"]'))
       const box = (/** @type {string} */ sel) => {
-        const el = node.querySelector(sel)
+        const el = /** @type {SVGGraphicsElement|null} */ (node.querySelector(sel))
         if (!el) return null
-        const r = el.getBoundingClientRect()
+        const r = el.getBBox()
         return { w: Math.round(r.width), h: Math.round(r.height) }
       }
       return {
@@ -127,14 +130,17 @@ test.describe('strata-graph shapes and ports', () => {
       const el = /** @type {Element} */ (
         document.querySelector('#host .sg-node[data-id="svc"] .sg-port[data-port="in"]')
       )
-      const dot = /** @type {Element} */ (el.querySelector('.sg-port-dot') ?? el)
+      const dot = /** @type {SVGGraphicsElement} */ (el.querySelector('.sg-port-dot') ?? el)
+      // The drawn size is geometry (getBBox, at 100% zoom): Firefox's client rectangles also
+      // count the stroke. The centre is the same either way.
+      const size = dot.getBBox()
       const r = dot.getBoundingClientRect()
       const cx = r.x + r.width / 2
       const cy = r.y + r.height / 2
       // The 'in' port sits on the node's left edge, so left of it is empty canvas.
       const hits = (/** @type {number} */ dx) =>
         document.elementFromPoint(cx + dx, cy)?.closest('.sg-port') === el
-      return { drawn: [r.width, r.height], at11: hits(-11), at13: hits(-13) }
+      return { drawn: [size.width, size.height], at11: hits(-11), at13: hits(-13) }
     })
     expect(port.drawn).toEqual([8, 8])
     expect(port.at11).toBe(true)
