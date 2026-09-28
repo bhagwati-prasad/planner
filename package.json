@@ -16,6 +16,7 @@
     "demo": "node examples/console-demo.js",
     "typecheck": "node tools/checks.js typecheck",
     "test:browser": "node scripts/run-browser-tests.js",
+    "bench": "node tools/bench/run.js",
     "serve": "node packages/cli/bin/strata.js serve",
     "strata": "node packages/cli/bin/strata.js",
     "build": "node scripts/build.js",
