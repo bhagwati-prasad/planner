@@ -83,13 +83,20 @@ export const BUILTIN_SHAPES = {
         .attr('rx', 4)
       tile
         .selectChildren('svg.sg-icon')
-        .data(d.icon && ctx.icon(d.icon) ? [d.icon] : [], m => m)
+        .data(d.icon && !d.missing && ctx.icon(d.icon) ? [d.icon] : [], m => m)
         .join(enter => enter.append(m => /** @type {Element} */ (ctx.icon(m))))
         .attr('class', 'sg-icon')
         .attr('x', 4)
         .attr('y', 4)
         .attr('width', 24)
         .attr('height', 24)
+      // A missing component shows a warning glyph in place of its icon.
+      tile
+        .selectChildren('path.sg-warning-glyph')
+        .data(d.missing ? [0] : [])
+        .join('path')
+        .attr('class', 'sg-warning-glyph')
+        .attr('d', 'M16,7 L26,24 H6 Z M16,13 V18.5 M16,21 V21.5')
       tile
         .selectChildren('path.sg-stack')
         .data(d.composite ? [0] : [])
@@ -124,7 +131,11 @@ export const BUILTIN_SHAPES = {
       // Title and subtitle, left-aligned after the tile.
       const x = pad + tileSize + 10
       const title = truncateText(d.label ?? '', d.w - pad - x, ctx.measureBold)
-      const subtitle = truncateText(d.sublabel ?? '', d.w - pad - x, ctx.measure)
+      const subtitle = truncateText(
+        d.missing ? `Missing: ${d.missing}` : (d.sublabel ?? ''),
+        d.w - pad - x,
+        ctx.measure
+      )
       part(sel, 'text', 'title', 'sg-label sg-title')
         .attr('x', x)
         .attr('y', subtitle ? d.h / 2 - 8 : d.h / 2)

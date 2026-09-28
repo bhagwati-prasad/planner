@@ -686,6 +686,21 @@ export class Graph {
     }
     marker(`${this.#uid}-arrow`, 'sg-arrow')
     marker(`${this.#uid}-arrow-active`, 'sg-arrow sg-arrow-active')
+    // Diagonal hatch for a missing component (design system §6).
+    const hatch = svgEl(
+      'pattern',
+      {
+        id: `${this.#uid}-hatch`,
+        patternUnits: 'userSpaceOnUse',
+        width: 8,
+        height: 8,
+        patternTransform: 'rotate(45)',
+      },
+      doc
+    )
+    hatch.appendChild(svgEl('rect', { class: 'sg-hatch-bg', width: 8, height: 8 }, doc))
+    hatch.appendChild(svgEl('line', { class: 'sg-missing-hatch', x1: 0, y1: 0, x2: 0, y2: 8 }, doc))
+    defs.appendChild(hatch)
     if (!forExport)
       for (const which of ['minor', 'major']) {
         const pattern = svgEl(
@@ -1318,6 +1333,7 @@ export class Graph {
         d.pointer = { x: event.x, y: event.y }
         d.moved = true
         d.target = this.#connectTarget(d.pointer, d.source, d.reverse)
+        d.refused = d.target ? null : this.#refusedTarget(d.pointer, d.source, d.reverse)
         this.#renderHandles()
       })
       .on('end', () => {
@@ -1342,18 +1358,46 @@ export class Graph {
   }
 
   /**
+   * Whether a connection from `source` may end on `target`: true, or the reason it may not
+   * ('' when there is none to give). A host's `canConnect` returns true, false, or the reason
+   * as a string.
+   * @returns {true|string}
+   */
+  #verdict(source, target, reverse) {
+    if (target.node === source.node && target.port === source.port) return ''
+    const [s, t] = reverse ? [target, source] : [source, target]
+    if (this.#opts.canConnect) {
+      const v = this.#opts.canConnect(s, t)
+      return typeof v === 'string' ? v : v ? true : ''
+    }
+    if (s.node === t.node) return ''
+    return s.spec?.direction !== 'in' && t.spec?.direction !== 'out' ? true : ''
+  }
+
+  /**
+   * The port of another node under the pointer that a connection may not end on, with the
+   * reason, so it can show the invalid state; null when there is none.
+   */
+  #refusedTarget(point, source, reverse) {
+    const m = this.#model
+    const near = this.#portIndex.nearest(point, 14 / this.#transform.k, key => {
+      const [node] = key.split('\u0000')
+      return node !== source.node && !m.nodes.get(node)?.ghost
+    })
+    if (!near) return null
+    const [node, port] = near.split('\u0000')
+    const target = { node, port, spec: m.nodes.get(node)?.ports.find(q => q.id === port) }
+    const verdict = this.#verdict(source, target, reverse)
+    return verdict === true ? null : { node, port, reason: verdict }
+  }
+
+  /**
    * The port a connection gesture would end on: a port near the pointer, else the first
    * suitable port of the node under it.
    */
   #connectTarget(point, source, reverse) {
     const m = this.#model
-    const allowed = target => {
-      if (target.node === source.node && target.port === source.port) return false
-      const [s, t] = reverse ? [target, source] : [source, target]
-      if (this.#opts.canConnect) return !!this.#opts.canConnect(s, t)
-      if (s.node === t.node) return false
-      return s.spec?.direction !== 'in' && t.spec?.direction !== 'out'
-    }
+    const allowed = target => this.#verdict(source, target, reverse) === true
     const info = key => {
       const [node, port] = key.split('\u0000')
       return { node, port, spec: m.nodes.get(node)?.ports.find(q => q.id === port) }
@@ -1490,6 +1534,7 @@ export class Graph {
           d.pointer = { x: event.x, y: event.y }
           // The moving end must be a target if the fixed end is the source, and vice versa.
           d.target = this.#connectTarget(d.pointer, d.fixed, d.end === 'source')
+          d.refused = d.target ? null : this.#refusedTarget(d.pointer, d.fixed, d.end === 'source')
           this.#renderHandles()
         } else if (d.type === 'waypoints') {
           const g = this.#opts.snap && !event.sourceEvent?.altKey ? this.#opts.grid : 0
@@ -1731,6 +1776,7 @@ export class Graph {
           heat ? heatDomain : null,
           badges?.values?.[d.id] ?? null,
           target?.node === d.id ? target.port : null,
+          this.#dragged(d.id),
           this.#opts.portRadius,
           this.#themeVersion,
         ])
@@ -1742,6 +1788,11 @@ export class Graph {
       })
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed('sg-ghost', d => !!d.ghost)
+      .classed('sg-status-planned', d => d.status === 'planned')
+      .classed('sg-status-deprecated', d => d.status === 'deprecated')
+      .classed('sg-failing', d => !!d.failing)
+      .classed('sg-out-of-scope', d => !!d.outOfScope)
+      .classed('sg-dragging', d => this.#dragged(d.id))
       .classed('sg-composite', d => !!d.composite)
       .classed('sg-locked', d => m.isLocked(d))
       .classed('sg-dimmed', d => !!dim && !dim.has(d.id))
@@ -1763,8 +1814,14 @@ export class Graph {
       const g = this.#d3.select(groups[i])
       const r = this.#itemRect(d.id)
       // The full name, as a tooltip (design system §6: titles are truncated on the card).
+      const changes = Array.isArray(d.runChanges) ? d.runChanges : []
+      const tooltip = [
+        d.label,
+        d.missing ? `Missing: ${d.missing}` : '',
+        ...(changes.length ? ['Run-only changes:', ...changes] : []),
+      ]
       g.selectChildren('title')
-        .data(d.label ? [d.label] : [])
+        .data(d.label ? [tooltip.filter(Boolean).join('\n')] : [])
         .join(enter => enter.insert('title', ':first-child'))
         .text(t => t)
       this.#renderNodeBody(g, d, r)
@@ -1782,6 +1839,7 @@ export class Graph {
       penter.append('title')
       penter.append('circle').attr('class', 'sg-port-hit').attr('r', PORT_HIT_RADIUS)
       penter.append('circle').attr('class', 'sg-port-dot')
+      penter.append('circle').attr('class', 'sg-port-ring').attr('r', 8)
       if (portDrag && !d.ghost) penter.call(portDrag)
       const pall = penter
         .merge(psel)
@@ -1822,7 +1880,78 @@ export class Graph {
         .attr('transform', `translate(${r.w - 2},2)`)
         .select('text')
         .text(v => v)
+      this.#renderNodeStates(decor, d, r)
     })
+  }
+
+  /** True for a node being dragged right now. @param {string} id */
+  #dragged(id) {
+    const d = this.#drag
+    return !!(d?.type === 'move' && d.moved && d.idSet?.has(id))
+  }
+
+  /**
+   * The decorations of design system §6's node states, in node coordinates: the selection halo,
+   * the keyboard focus ring, a lock for a read-only placement, a "Deprecated" chip, an error
+   * badge for a failing component, and a warning dot for run-only changes.
+   * @param {any} decor @param {any} d @param {Rect} r
+   */
+  #renderNodeStates(decor, d, r) {
+    const radius = Number(this.#tokens.radius) || 0
+    for (const cls of ['sg-halo', 'sg-focus-ring'])
+      decor
+        .selectChildren(`rect.${cls}`)
+        .data([cls])
+        .join('rect')
+        .attr('class', cls)
+        .attr('x', -3)
+        .attr('y', -3)
+        .attr('width', r.w + 6)
+        .attr('height', r.h + 6)
+        .attr('rx', radius + 3)
+    decor
+      .selectChildren('path.sg-lock')
+      .data(d.readOnly ? [0] : [])
+      .join('path')
+      .attr('class', 'sg-lock')
+      .attr('transform', `translate(${r.w - 17},${r.h - 17})`)
+      .attr('d', 'M2,6 h8 v6 h-8 Z M4,6 V4 a2,2 0 0 1 4,0 V6')
+    const chipWidth = this.#measure('Deprecated') + 12
+    const chip = decor
+      .selectChildren('g.sg-chip')
+      .data(d.status === 'deprecated' ? ['Deprecated'] : [])
+      .join(enter => {
+        const g = enter.append('g').attr('class', 'sg-chip')
+        g.append('rect').attr('height', 16).attr('rx', 8)
+        g.append('text').attr('y', 8)
+        return g
+      })
+      .attr('transform', 'translate(12,-8)')
+    chip.select('rect').attr('width', chipWidth)
+    chip
+      .select('text')
+      .attr('x', chipWidth / 2)
+      .text(t => t)
+    decor
+      .selectChildren('g.sg-error-badge')
+      .data(d.failing ? ['!'] : [])
+      .join(enter => {
+        const g = enter.append('g').attr('class', 'sg-error-badge')
+        g.append('circle').attr('r', 8)
+        g.append('text')
+        return g
+      })
+      .attr('transform', `translate(${r.w},0)`)
+      .select('text')
+      .text(t => t)
+    decor
+      .selectChildren('circle.sg-run-change')
+      .data(Array.isArray(d.runChanges) && d.runChanges.length ? [0] : [])
+      .join('circle')
+      .attr('class', 'sg-run-change')
+      .attr('cx', r.w - 8)
+      .attr('cy', 8)
+      .attr('r', 3)
   }
 
   /**
@@ -1841,6 +1970,7 @@ export class Graph {
       d.style,
       d.badges,
       !!d.composite,
+      d.missing ?? null,
       this.#themeVersion,
     ])
     const node = g.node()
@@ -1863,7 +1993,7 @@ export class Graph {
     const style = d.style ?? {}
     body
       .selectAll('.sg-shape')
-      .style('fill', style.fill ?? null)
+      .style('fill', d.missing ? `url(#${this.#uid}-hatch)` : (style.fill ?? null))
       .style('stroke', style.stroke ?? null)
       .style('stroke-dasharray', style.dash ?? null)
     body.style('opacity', style.opacity ?? null)
@@ -2159,6 +2289,7 @@ export class Graph {
       MOVABLE.has(kind) &&
       !m.isLocked(item) &&
       !item.ghost &&
+      !item.readOnly &&
       !m.isHidden(item) &&
       d?.type !== 'move'
     const handles = []
@@ -2298,15 +2429,91 @@ export class Graph {
       .attr('d', p => p)
       .attr('stroke-width', 1.5 / k)
     const connecting = d?.type === 'connect' || d?.type === 'reconnect'
+    const refused = connecting ? (d.refused ?? null) : null
     if (connecting || this.#portTargetShown) {
-      this.#svg.classed('sg-connecting', connecting)
-      L.nodes.selectAll('.sg-port').classed('sg-port-target', function () {
-        if (!connecting || !d.target) return false
-        const nodeId = this.parentNode?.parentNode?.getAttribute('data-id')
-        return nodeId === d.target.node && this.getAttribute('data-port') === d.target.port
-      })
+      this.#svg.classed('sg-connecting', connecting).classed('sg-connect-invalid', !!refused)
+      const at = (/** @type {any} */ el, /** @type {any} */ end) =>
+        !!end &&
+        el.parentNode?.parentNode?.getAttribute('data-id') === end.node &&
+        el.getAttribute('data-port') === end.port
+      L.nodes
+        .selectAll('.sg-port')
+        .classed('sg-port-target', function () {
+          return connecting && at(this, d.target)
+        })
+        .classed('sg-port-invalid', function () {
+          return at(this, refused)
+        })
       this.#portTargetShown = connecting
     }
+    // Why a connection is refused, above the refusing node (design system §6: invalid connect
+    // target).
+    const reason = refused?.reason ? [refused] : []
+    const refusal = L.handles
+      .selectChildren('g.sg-refusal')
+      .data(reason)
+      .join(enter => {
+        const g = enter.append('g').attr('class', 'sg-refusal')
+        g.append('rect').attr('rx', 4)
+        g.append('text')
+        return g
+      })
+      .filter((/** @type {any} */ f, i, nodes) => stale(nodes[i], [f.node, f.port, f.reason, k]))
+    refusal.each((/** @type {any} */ f, i, nodes) => {
+      const p = this.#portPoint(f)
+      const top = this.#itemRect(f.node)?.y ?? p.y
+      const w = (this.#measure(f.reason) + 12) / k
+      const h = 20 / k
+      const g = this.#d3
+        .select(nodes[i])
+        .attr('transform', `translate(${p.x + 12 / k},${top - h - 6 / k})`)
+      g.select('rect')
+        .attr('width', w)
+        .attr('height', h)
+        .attr('stroke-width', 1 / k)
+      g.select('text')
+        .attr('x', 6 / k)
+        .attr('y', h / 2)
+        .style('font-size', `${12 / k}px`)
+        .text(f.reason)
+    })
+
+    // One box around a multi-selection (its handles are 0204's), and dashed outlines where
+    // dragged nodes started.
+    const boxes = [...this.#selection]
+      .filter(id => m.kindOf(id) !== 'edge')
+      .map(id => this.#itemRect(id))
+      .filter(Boolean)
+    const group = boxes.length > 1 && d?.type !== 'move' ? union(boxes) : null
+    L.handles
+      .selectChildren('rect.sg-selection-box')
+      .data(group ? [group] : [])
+      .join('rect')
+      .attr('class', 'sg-selection-box')
+      .filter((/** @type {any} */ b, i, nodes) => stale(nodes[i], [b, k]))
+      .attr('x', (/** @type {any} */ b) => b.x - 8 / k)
+      .attr('y', (/** @type {any} */ b) => b.y - 8 / k)
+      .attr('width', (/** @type {any} */ b) => b.w + 16 / k)
+      .attr('height', (/** @type {any} */ b) => b.h + 16 / k)
+      .attr('stroke-width', 1 / k)
+    const origins =
+      d?.type === 'move' && d.moved
+        ? d.ids
+            .filter((/** @type {string} */ id) => m.kindOf(id) === 'node')
+            .map((/** @type {string} */ id) => ({ id, ...m.rectOf(id) }))
+        : []
+    const radius = Number(this.#tokens.radius) || 0
+    L.handles
+      .selectChildren('rect.sg-drag-origin')
+      .data(origins, (/** @type {any} */ o) => o.id)
+      .join('rect')
+      .attr('class', 'sg-drag-origin')
+      .filter((/** @type {any} */ o, i, nodes) => stale(nodes[i], [o, k]))
+      .attr('x', (/** @type {any} */ o) => o.x)
+      .attr('y', (/** @type {any} */ o) => o.y)
+      .attr('width', (/** @type {any} */ o) => o.w)
+      .attr('height', (/** @type {any} */ o) => o.h)
+      .attr('rx', radius)
   }
 
   #portPoint(end) {

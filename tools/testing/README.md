@@ -57,6 +57,6 @@ test('the card in dark theme', { tag: '@visual' }, async ({ page }) => {
 })
 ```
 
-Visual tests run in Chromium only, the reference browser of eng §15, and allow eng §18's 0.1% pixel difference. Baselines are created or updated only after the human approves the screenshots (CLAUDE.md): run the spec with `--update-snapshots` to produce candidates, show them, and commit them once approved.
+Visual tests run in Chromium only, the reference browser of eng §15, and allow eng §18's 0.1% pixel difference. Baselines are created or updated only after the human approves the screenshots (CLAUDE.md), so `playwright.config.js` sets `updateSnapshots: 'none'` and a missing baseline fails. Run the spec with `--update-snapshots=all` to produce candidates (plain `--update-snapshots` keeps a file whose differences fall under Playwright's per-pixel tolerance, dark colours included), show them, and commit them once approved. The first are the node states of 0209 in `packages/graph/test/states.spec.js-snapshots/`.
 
 Run one file with `npx playwright test path/to/file.spec.js`. Set `STRATA_BROWSERS=chromium` to limit a local run to the browsers you have installed; CI installs and runs all three.

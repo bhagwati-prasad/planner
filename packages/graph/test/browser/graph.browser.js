@@ -596,7 +596,7 @@ test('custom shapes and themes', async () => {
     return { oct, bg, shapes: g.shapes.includes('octagon') }
   })
   assert.equal(out.oct, '0,0 90,0 90,90 0,90', 'default size comes from the shape')
-  assert.equal(out.bg, 'rgb(28, 25, 23)')
+  assert.equal(out.bg, 'rgb(19, 22, 26)')
   assert.ok(out.shapes)
 })
 

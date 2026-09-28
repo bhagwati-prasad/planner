@@ -69,6 +69,9 @@ export default defineConfig({
   // Eng §18: visual snapshots allow a 0.1% pixel difference. Baselines are created or updated
   // only after the human approves the screenshots (CLAUDE.md).
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.001 } },
+  // A missing baseline fails instead of being written: only an explicit --update-snapshots run,
+  // after approval, creates one.
+  updateSnapshots: 'none',
   retries: 0,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   outputDir: 'test-results',

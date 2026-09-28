@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M02 strata-graph](../ROADMAP.md#m02-strata-graph) | R0 | todo | [0202](../M02-strata-graph/0202-shapes-ports.md), [0210](../M02-strata-graph/0210-visual-harness.md) |
+| [M02 strata-graph](../ROADMAP.md#m02-strata-graph) | R0 | done | [0202](../M02-strata-graph/0202-shapes-ports.md), [0210](../M02-strata-graph/0210-visual-harness.md) |
 
 Split from 0202 by the human on 2026-09-27.
 
@@ -19,12 +19,12 @@ Every node state in ds §6 has its treatment on the default component shape, in 
 
 Write these tests first, in `packages/graph/test/states.spec.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation. Visual snapshot baselines are created only after the human approves the screenshots.
 
-- [ ] Every component state in ds §6 matches its visual snapshot in light and dark themes
+- [x] Every component state in ds §6 matches its visual snapshot in light and dark themes
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)

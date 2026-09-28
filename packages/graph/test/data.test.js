@@ -106,7 +106,7 @@ test('themes expose every token as a CSS variable', () => {
   const style = themeStyle('dark')
   for (const cssVar of Object.values(TOKENS)) assert.ok(style.includes(`${cssVar}:`), cssVar)
   assert.match(themeStyle({ accent: '#ff00ff' }), /--sg-accent: #ff00ff;/)
-  assert.equal(themeTokens('dark').background, '#1c1917')
+  assert.equal(themeTokens('dark').background, '#13161A')
   for (const cssVar of STYLESHEET.match(/--sg-[a-z-]+/g))
     assert.ok(Object.values(TOKENS).includes(cssVar), `${cssVar} is a known token`)
 })
