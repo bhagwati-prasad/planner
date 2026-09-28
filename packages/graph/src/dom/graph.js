@@ -81,6 +81,20 @@ const DEFAULTS = Object.freeze({
 const MOVABLE = new Set(['node', 'frame', 'annotation'])
 /** Ports are hit within 12 px of their centre: a 24 px target (design system §6). */
 const PORT_HIT_RADIUS = 12
+/** How far apart parallel edges between the same two ends run. */
+const PARALLEL_GAP = 10
+
+/**
+ * An edge end moved along its side (vertically for a side-less end), keeping its direction.
+ * @template {{ x: number, y: number, side?: string|null }} A
+ * @param {A} anchor @param {number} by
+ * @returns {A}
+ */
+function slide(anchor, by) {
+  if (!by) return anchor
+  const along = anchor.side === 'top' || anchor.side === 'bottom' ? 'x' : 'y'
+  return { ...anchor, [along]: anchor[along] + by }
+}
 const HANDLE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 let instances = 0
 
@@ -127,6 +141,10 @@ export class Graph {
   #themeVersion = 0
   #measure
   #measureBold
+  #measureSmall
+  #measureMono
+  /** Offsets of parallel edges, by edge id. @type {Map<string, number>} */
+  #parallel = new Map()
   #fontSize = 12
   #iconCache = new Map()
   #renderedArea = null
@@ -603,6 +621,9 @@ export class Graph {
     this.#fontSize = parseFloat(this.#tokens.fontSize) || 12
     this.#measure = createMeasurer(this.#tokens.fontFamily, this.#fontSize)
     this.#measureBold = createMeasurer(this.#tokens.fontFamily, this.#fontSize, '600')
+    const small = parseFloat(this.#tokens.fontSizeSmall) || this.#fontSize
+    this.#measureSmall = createMeasurer(this.#tokens.fontFamily, small)
+    this.#measureMono = createMeasurer(this.#tokens.fontFamilyMono, small)
   }
 
   #rootStyle() {
@@ -667,25 +688,33 @@ export class Graph {
   /** Marker and pattern definitions (ids are unique per graph). */
   #defs(doc, forExport) {
     const defs = svgEl('defs', {}, doc)
-    const marker = (id, cls) => {
-      const m = svgEl(
-        'marker',
-        {
-          id,
-          viewBox: '0 0 10 10',
-          refX: 9,
-          refY: 5,
-          markerWidth: 7,
-          markerHeight: 7,
-          orient: 'auto-start-reverse',
-        },
-        doc
-      )
-      m.appendChild(svgEl('path', { d: 'M0,0 L10,5 L0,10 z', class: cls }, doc))
-      defs.appendChild(m)
+    // Arrowheads of design system §6, each also in the selected colour ('-active').
+    /** @param {string} name @param {string} tag @param {Record<string, string|number>} attrs @param {number} [refX] */
+    const marker = (name, tag, attrs, refX = 9) => {
+      for (const active of ['', '-active']) {
+        const m = svgEl(
+          'marker',
+          {
+            id: `${this.#uid}-${name}${active}`,
+            viewBox: '0 0 10 10',
+            refX,
+            refY: 5,
+            markerWidth: 7,
+            markerHeight: 7,
+            orient: 'auto-start-reverse',
+          },
+          doc
+        )
+        const cls = `${attrs.class}${active ? ' sg-marker-active' : ''}`
+        m.appendChild(svgEl(tag, { ...attrs, class: cls }, doc))
+        defs.appendChild(m)
+      }
     }
-    marker(`${this.#uid}-arrow`, 'sg-arrow')
-    marker(`${this.#uid}-arrow-active`, 'sg-arrow sg-arrow-active')
+    marker('arrow', 'path', { d: 'M0,0 L10,5 L0,10 z', class: 'sg-arrow' })
+    marker('arrow-open', 'path', { d: 'M1,1 L9,5 L1,9 z', class: 'sg-arrow-open' })
+    marker('chevron', 'path', { d: 'M0,1 L4.5,5 L0,9 M5,1 L9.5,5 L5,9', class: 'sg-chevron' })
+    // The source dot sits just outside the node, which is drawn over the edges.
+    marker('dot', 'circle', { cx: 5, cy: 5, r: 2.7, class: 'sg-dot' }, 7.7)
     // Diagonal hatch for a missing component (design system §6).
     const hatch = svgEl(
       'pattern',
@@ -1080,6 +1109,21 @@ export class Graph {
       for (const [portId, a] of portAnchors(node, node.ports))
         this.#portIndex.set(`${node.id}\u0000${portId}`, { x: a.x, y: a.y, w: 0, h: 0 })
     }
+    // Edges joining the same two ends, either way round, fan out so each stays visible.
+    this.#parallel.clear()
+    /** @type {Map<string, string[]>} */
+    const pairs = new Map()
+    for (const e of m.edges.values()) {
+      if (e.waypoints.length) continue
+      const key = [e.source, e.target]
+        .map(end => `${end.node}\u0000${end.port ?? ''}`)
+        .sort()
+        .join('|')
+      pairs.set(key, [...(pairs.get(key) ?? []), e.id])
+    }
+    for (const ids of pairs.values())
+      if (ids.length > 1)
+        ids.forEach((id, i) => this.#parallel.set(id, (i - (ids.length - 1) / 2) * PARALLEL_GAP))
   }
 
   /** An item's rectangle including any drag or resize in progress. @param {string} id @returns {Rect} */
@@ -1108,8 +1152,12 @@ export class Graph {
     const waypoints = d?.type === 'waypoints' && d.edge === edge.id ? d.waypoints : edge.waypoints
     const sRect = this.#itemRect(edge.source.node)
     const tRect = this.#itemRect(edge.target.node)
-    const source = this.#anchor(edge.source, waypoints[0] ?? center(tRect))
-    const target = this.#anchor(edge.target, waypoints[waypoints.length - 1] ?? center(sRect))
+    const shift = waypoints.length ? 0 : (this.#parallel.get(edge.id) ?? 0)
+    const source = slide(this.#anchor(edge.source, waypoints[0] ?? center(tRect)), shift)
+    const target = slide(
+      this.#anchor(edge.target, waypoints[waypoints.length - 1] ?? center(sRect)),
+      shift
+    )
     const routing = edge.routing ?? this.#opts.routing
     let obstacles = []
     if (routing === 'orthogonal' && !waypoints.length) {
@@ -2128,11 +2176,27 @@ export class Graph {
       const selected = interactive && this.#selection.has(d.id)
       g.select('.sg-edge-hit').attr('d', route.path)
       const wv = widths?.values?.[d.id]
+      // Line and arrowheads by connection kind (design system §6).
+      const kind = d.kind ?? 'sync'
+      const mark = (/** @type {string} */ name) =>
+        `url(#${this.#uid}-${name}${selected ? '-active' : ''})`
+      const head =
+        kind === 'stream'
+          ? 'chevron'
+          : kind === 'async' || kind === 'batch'
+            ? 'arrow-open'
+            : 'arrow'
+      g.classed(`sg-kind-${kind}`, true)
       g.select('.sg-edge-path')
         .attr('d', route.path)
+        .attr('marker-end', d.arrow === false ? null : mark(head))
         .attr(
-          'marker-end',
-          d.arrow === false ? null : `url(#${this.#uid}-arrow${selected ? '-active' : ''})`
+          'marker-start',
+          kind === 'db'
+            ? mark('dot')
+            : kind === 'stream' && d.bidirectional
+              ? mark('chevron')
+              : null
         )
         .style('stroke', d.style?.stroke ?? null)
         .style('stroke-dasharray', d.style?.dash ?? null)
@@ -2142,16 +2206,37 @@ export class Graph {
             ? String(wMin + (wMax - wMin) * normalise(wv, wDomain))
             : (d.style?.width ?? null)
         )
-      const lg = g.select('.sg-edge-label-group').attr('display', d.label ? null : 'none')
-      if (d.label) {
-        const w = this.#measure(d.label) + 8
-        const h = this.#fontSize + 6
+      // The label pill: the edge's label, then the method it calls in mono (design system §6).
+      const parts = [
+        ...(d.label ? [{ text: String(d.label), cls: 'sg-edge-label-text' }] : []),
+        ...(d.method ? [{ text: String(d.method), cls: 'sg-method' }] : []),
+      ]
+      const lg = g.select('.sg-edge-label-group').attr('display', parts.length ? null : 'none')
+      if (parts.length) {
+        const gap = parts.length > 1 ? 6 : 0
+        const textWidth = parts.reduce(
+          (sum, p) =>
+            sum + (p.cls === 'sg-method' ? this.#measureMono(p.text) : this.#measureSmall(p.text)),
+          0
+        )
+        const w = textWidth + gap + 14
+        const h = this.#fontSize + 8
         lg.select('.sg-edge-label-bg')
           .attr('x', route.label.x - w / 2)
           .attr('y', route.label.y - h / 2)
           .attr('width', w)
           .attr('height', h)
-        lg.select('.sg-edge-label').attr('x', route.label.x).attr('y', route.label.y).text(d.label)
+          .attr('rx', h / 2)
+        lg.select('.sg-edge-label')
+          .attr('x', route.label.x)
+          .attr('y', route.label.y)
+          .text(null)
+          .selectAll('tspan')
+          .data(parts)
+          .join('tspan')
+          .attr('class', p => p.cls)
+          .attr('dx', (_, i) => (i ? gap : null))
+          .text(p => p.text)
       }
     })
   }
