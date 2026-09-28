@@ -35,11 +35,18 @@
  * answers an intent with setData.
  * Keyboard: Tab moves between shapes, Enter opens, Space selects, arrows move (Shift ×10),
  * Delete removes, Escape cancels or clears, Ctrl/⌘+A selects all, +/− zoom, 0 fits.
+ *
+ * Scale: the zoom bands of design system §6 decide what is drawn (below 75% no subtitles or
+ * port dots, below 40% no badges or connection labels, below 15% blocks with system names
+ * drawn large). An item with a `rev` is redrawn only when its rev changes. Pans move one
+ * composited layer. Above 1,500 visible components the nodes are drawn on one Canvas 2D image,
+ * and the spatial index finds the component under the pointer.
  */
 import { GraphModel, DEFAULT_NODE_SIZE } from '../data.js'
 import {
   boundaryAnchor,
   center,
+  containsPoint,
   expand,
   portAnchors,
   rectFromPoints,
@@ -53,7 +60,7 @@ import { SpatialIndex } from '../spatial.js'
 import { guideGaps, snapMove } from '../snap.js'
 import { align as alignItems, distribute as distributeItems } from '../arrange.js'
 import { fitTransform, screenToWorld, visibleRect, zoomAt } from '../viewport.js'
-import { wrapText } from '../text.js'
+import { truncateText, wrapText } from '../text.js'
 import { STYLESHEET, TOKENS, themeStyle, themeTokens } from '../theme.js'
 import { BUILTIN_SHAPES } from './shapes.js'
 import { SVG_NS, createMeasurer, sanitizeSvg, svgEl } from './svg.js'
@@ -101,6 +108,8 @@ function slide(anchor, by) {
 }
 const HANDLE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const FRAME_RADIUS = 6
+/** Above this many visible components the node layer is one Canvas 2D image (spec §10). */
+const CANVAS_NODES = 1500
 
 /**
  * The stratum colour of a level (design system §3): the root is 0, and deeper levels cycle
@@ -202,6 +211,16 @@ export class Graph {
   #overlays = new Map()
   /** @type {Transform} */
   #transform = { x: 0, y: 0, k: 1 }
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  #settle
+  /** The zoom the canvas node layer was drawn at; 0 while nodes are SVG. */
+  #canvasK = 0
+  /** @type {string|null} the canvas-drawn component under the pointer */
+  #canvasHover = null
+  /** The patterns the grid last drew, and the area its rectangles cover. */
+  #gridKey = ''
+  /** @type {(Rect & { k: number }) | null} */
+  #gridCover = null
   #size = { width: 0, height: 0 }
   #index = new SpatialIndex(256)
   #portIndex = new SpatialIndex(128)
@@ -677,6 +696,7 @@ export class Graph {
   /** Removes the diagram and its listeners. */
   destroy() {
     cancelAnimationFrame(this.#raf)
+    clearTimeout(this.#settle)
     this.#resizeObserver?.disconnect()
     for (const fn of this.#cleanup) fn()
     this.#svg.on('.zoom', null).on('.drag', null)
@@ -746,10 +766,11 @@ export class Graph {
       if (event.target !== svg && !event.target.classList?.contains('sg-background')) return
       event.preventDefault()
       const world = this.clientToWorld({ x: event.clientX, y: event.clientY })
+      const id = this.#canvasNodeAt(world)
       this.#emitIntent({
         type: 'context',
-        id: null,
-        kind: null,
+        id,
+        kind: id ? 'node' : null,
         clientX: event.clientX,
         clientY: event.clientY,
         x: world.x,
@@ -820,7 +841,8 @@ export class Graph {
   /**
    * The scene layers, in the fixed order of eng §12: grid, zones and frames, edges, nodes,
    * overlays, annotations, comment pins, handles. Frames and regions (zones) share a layer, and
-   * so do the overlays: smart guides and simulation tokens.
+   * so do the overlays: the large system names of the lowest zoom band, smart guides and
+   * simulation tokens.
    */
   #makeLayers(root) {
     const layer = (/** @type {string} */ name) =>
@@ -839,6 +861,7 @@ export class Graph {
       regions: frames.append('g').attr('class', 'sg-regions'),
       edges,
       nodes,
+      names: overlays.append('g').attr('class', 'sg-names'),
       guides: overlays.append('g').attr('class', 'sg-guides'),
       tokens: overlays.append('g').attr('class', 'sg-tokens'),
       annotations,
@@ -852,6 +875,37 @@ export class Graph {
    * each the same size on screen at any zoom. Minor dots fade out below 50% zoom and are gone
    * at 25%; major dots go once they would sit closer than 8 px.
    */
+  /**
+   * A pan moves the scene as one composited layer instead of repainting it, which keeps frames
+   * within eng §15's 16 ms (task 0207). A zoom repaints at once so text stays sharp, and the layer
+   * is released 200 ms after the last pan.
+   * @param {boolean} pan
+   */
+  #panning(pan) {
+    clearTimeout(this.#settle)
+    this.#root?.classed('sg-moving', pan)
+    if (pan) this.#settle = setTimeout(() => this.#root?.classed('sg-moving', false), 200)
+  }
+
+  /**
+   * The zoom bands of design system §6: from 75% everything; below it subtitles and ports go,
+   * below 40% badges and connection labels (icon and title only), and below 15% everything but
+   * the blocks, with system names drawn large over their areas.
+   * @param {number} k
+   */
+  #updateLod(k) {
+    this.#svg
+      .classed('sg-lod-mid', k < 0.75)
+      .classed('sg-lod-low', k < 0.4)
+      .classed('sg-lod-min', k < 0.15)
+    if (k < 0.15) this.#layers.names?.selectAll('.sg-lod-name').style('font-size', this.#nameSize())
+  }
+
+  /** A system name's size in world units, so it draws at the title size on screen. */
+  #nameSize() {
+    return `${(parseFloat(this.#tokens.fontSizeTitle) || 16) / this.#transform.k}px`
+  }
+
   #updateGrid() {
     const { grid, showGrid } = this.#opts
     const g = grid || 10
@@ -859,32 +913,48 @@ export class Graph {
     const layer = this.#layers.grid
     layer.attr('visibility', showGrid ? 'visible' : 'hidden')
     if (!showGrid) return
+    // Rewriting a pattern makes the browser redraw its tile, which costs more than a pan frame
+    // (task 0207), so the patterns change only with the zoom or the grid, and the rectangles
+    // they fill cover the view with a margin and move only when the view leaves it.
     const view = visibleRect(this.#transform, this.#size)
+    const cover = this.#gridCover
+    const inside =
+      cover?.k === k &&
+      view.x >= cover.x &&
+      view.y >= cover.y &&
+      view.x + view.w <= cover.x + cover.w &&
+      view.y + view.h <= cover.y + cover.h
+    const patterns = `${g},${k}`
+    if (inside && this.#gridKey === patterns) return
+    const area = inside && cover ? cover : { ...expand(view, Math.max(view.w, view.h) / 2), k }
+    this.#gridCover = area
     const minorOpacity = Math.min(1, Math.max(0, (k - 0.25) / 0.25))
     const opacity = { minor: minorOpacity, major: g * 10 * k < 8 ? 0 : 1 }
     for (const [which, step, r] of /** @type {const} */ ([
       ['minor', g, 0.75],
       ['major', g * 10, 1.25],
     ])) {
-      this.#svg
-        .select(`#${this.#uid}-grid-${which}`)
-        .attr('x', -step / 2)
-        .attr('y', -step / 2)
-        .attr('width', step)
-        .attr('height', step)
-        .select('circle')
-        .attr('cx', step / 2)
-        .attr('cy', step / 2)
-        .attr('r', r / k)
+      if (this.#gridKey !== patterns)
+        this.#svg
+          .select(`#${this.#uid}-grid-${which}`)
+          .attr('x', -step / 2)
+          .attr('y', -step / 2)
+          .attr('width', step)
+          .attr('height', step)
+          .select('circle')
+          .attr('cx', step / 2)
+          .attr('cy', step / 2)
+          .attr('r', r / k)
       layer
         .select(`.sg-grid-${which}`)
-        .attr('x', view.x)
-        .attr('y', view.y)
-        .attr('width', view.w)
-        .attr('height', view.h)
+        .attr('x', area.x)
+        .attr('y', area.y)
+        .attr('width', area.w)
+        .attr('height', area.h)
         .attr('visibility', opacity[which] > 0 ? 'visible' : 'hidden')
         .style('opacity', opacity[which])
     }
+    this.#gridKey = patterns
   }
 
   /** True when the user asks for reduced motion (eng §12): views jump instead of animating. */
@@ -918,8 +988,11 @@ export class Graph {
       })
       .on('zoom', event => {
         const { x, y, k } = event.transform
+        const was = this.#transform
+        this.#panning(k === was.k && (x !== was.x || y !== was.y))
         this.#transform = { x, y, k }
         this.#root.attr('transform', `translate(${x},${y}) scale(${k})`)
+        this.#updateLod(k)
         this.#updateGrid()
         this.#scheduleCull()
         this.#renderHandles()
@@ -959,6 +1032,21 @@ export class Graph {
       .subject(event => ({ x: event.x, y: event.y }))
       .on('start', event => {
         const e = event.sourceEvent
+        // A component drawn on the canvas layer: the same drag as on an SVG component.
+        const at = screenToWorld(this.#transform, event)
+        const hit = this.#canvasNodeAt(at)
+        if (hit) {
+          this.#drag = {
+            type: 'move',
+            id: hit,
+            start: at,
+            moved: false,
+            mode: selectMode(e),
+            delta: { x: 0, y: 0 },
+            guides: [],
+          }
+          return
+        }
         this.#drag = {
           type: 'marquee',
           start: { x: event.x, y: event.y },
@@ -969,6 +1057,11 @@ export class Graph {
       })
       .on('drag', event => {
         const d = this.#drag
+        if (d?.type === 'move')
+          return this.#moveDrag({
+            ...screenToWorld(this.#transform, event),
+            sourceEvent: event.sourceEvent,
+          })
         if (d?.type !== 'marquee') return
         d.end = { x: event.x, y: event.y }
         if (!d.moved && Math.hypot(d.end.x - d.start.x, d.end.y - d.start.y) < 3) return
@@ -983,6 +1076,7 @@ export class Graph {
       })
       .on('end', () => {
         const d = this.#drag
+        if (d?.type === 'move') return this.#moveEnd()
         this.#drag = null
         this.#marquee.attr('visibility', 'hidden')
         if (d?.type !== 'marquee') return
@@ -997,6 +1091,35 @@ export class Graph {
         this.#emitIntent({ type: 'select', ids })
       })
     this.#svg.call(drag)
+    // Opening and hovering components on the canvas layer.
+    const hitOf = event =>
+      this.#canvasNodeAt(this.clientToWorld({ x: event.clientX, y: event.clientY }))
+    this.#svg
+      .on('dblclick.canvas', event => {
+        const id = hitOf(event)
+        if (id) this.#emitIntent({ type: 'open', id, kind: 'node' })
+      })
+      .on('pointermove.canvas', event => {
+        const id = this.#canvasK ? hitOf(event) : null
+        if (id === this.#canvasHover) return
+        this.#canvasHover = id
+        this.#emit('hover', id ? { id, kind: 'node' } : null)
+      })
+  }
+
+  /**
+   * The topmost component at a world point while components are drawn on the canvas layer,
+   * found through the spatial index and tested against its exact rectangle; otherwise null.
+   * @param {{ x: number, y: number }} p
+   */
+  #canvasNodeAt(p) {
+    if (!this.#canvasK) return null
+    const m = this.#model
+    let hit = null
+    for (const id of this.#index.query({ ...p, w: 0, h: 0 }, i => m.kindOf(i) === 'node'))
+      if (containsPoint(this.#itemRect(id), p) && !m.isHidden(/** @type {any} */ (m.get(id))))
+        hit = id
+    return hit
   }
 
   /** Nodes and annotations touched by the rectangle, frames inside it, edges between selected nodes. */
@@ -1781,7 +1904,9 @@ export class Graph {
     if (!this.#stats.culled && this.#countItems() <= this.#opts.cullThreshold) return
     const view = visibleRect(this.#transform, this.#size)
     const area = this.#renderedArea
+    const blurred = !!this.#canvasK && Math.abs(this.#transform.k / this.#canvasK - 1) > 0.25
     if (
+      !blurred &&
       area &&
       view.x >= area.x &&
       view.y >= area.y &&
@@ -1859,7 +1984,23 @@ export class Graph {
       dim
     )
     this.#renderEdges(L.edges, edges, interactive, dim)
-    this.#renderNodes(L.nodes, nodes, interactive, dim)
+    const canvas = interactive && nodes.length > CANVAS_NODES
+    this.#renderNodes(L.nodes, canvas ? [] : nodes, interactive, dim)
+    if (interactive) this.#drawCanvas(L.nodes, canvas ? nodes : null, area)
+    // System names, drawn large over their areas and above every block below 15% zoom
+    // (design system §6).
+    L.names
+      ?.selectChildren('text.sg-lod-name')
+      .data(
+        nodes.filter(n => n.composite && n.label),
+        d => d.id
+      )
+      .join(enter => enter.append('text').attr('class', 'sg-lod-name'))
+      .filter((d, i, els) => stale(els[i], [d.label, this.#itemRect(d.id), this.#nameSize()]))
+      .style('font-size', this.#nameSize())
+      .attr('x', d => center(this.#itemRect(d.id)).x)
+      .attr('y', d => center(this.#itemRect(d.id)).y)
+      .text(d => d.label)
     this.#renderAnnotations(
       L.annotations,
       annotations.filter(a => a.kind !== 'region'),
@@ -1887,7 +2028,7 @@ export class Graph {
     const all = enter
       .merge(sel)
       .filter((d, i, nodes) =>
-        stale(nodes[i], [d, this.#itemRect(d.id), selected(d), m.isLocked(d), dimmed(d)])
+        stale(nodes[i], [revOf(d), this.#itemRect(d.id), selected(d), m.isLocked(d), dimmed(d)])
       )
     all
       .attr('class', d => `sg-frame sg-kind-${d.kind}`)
@@ -1925,6 +2066,57 @@ export class Graph {
     })
   }
 
+  /**
+   * Above 1,500 visible components the node layer is one Canvas 2D image (spec §10, eng §12). It
+   * covers the rendered area, is drawn at the current zoom, and pointer events reach the
+   * background, where the spatial index finds the component under them (#canvasNodeAt).
+   * @param {any} layer
+   * @param {any[]|null} nodes null when the nodes are SVG
+   * @param {Rect|null} area
+   */
+  #drawCanvas(layer, nodes, area) {
+    const on = !!nodes && !!area
+    this.#canvasK = on ? this.#transform.k : 0
+    const box = layer
+      .selectChildren('foreignObject.sg-node-layer')
+      .data(on ? [area] : [])
+      .join(enter => {
+        const f = enter.append('foreignObject').attr('class', 'sg-node-layer')
+        f.append('xhtml:canvas').attr('class', 'sg-node-canvas')
+        return f
+      })
+    if (!nodes || !area) return
+    const k = this.#transform.k
+    const dpr = Math.min(2, this.#host.ownerDocument?.defaultView?.devicePixelRatio || 1)
+    box.attr('x', area.x).attr('y', area.y).attr('width', area.w).attr('height', area.h)
+    const canvas = /** @type {HTMLCanvasElement} */ (
+      box.select('canvas').style('width', `${area.w}px`).style('height', `${area.h}px`).node()
+    )
+    canvas.width = Math.ceil(area.w * k * dpr)
+    canvas.height = Math.ceil(area.h * k * dpr)
+    const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'))
+    ctx.setTransform(k * dpr, 0, 0, k * dpr, -area.x * k * dpr, -area.y * k * dpr)
+    const t = this.#tokens
+    const radius = Number(t.radius) || 0
+    const titles = k >= 0.15 && k * this.#fontSize >= 4
+    ctx.textBaseline = 'middle'
+    ctx.font = `600 ${this.#fontSize}px ${t.fontFamily}`
+    for (const d of nodes) {
+      const r = this.#itemRect(d.id)
+      const selected = this.#selection.has(d.id)
+      ctx.beginPath()
+      ctx.roundRect(r.x, r.y, r.w, r.h, Math.min(radius, r.w / 2, r.h / 2))
+      ctx.fillStyle = t.nodeFill
+      ctx.fill()
+      ctx.lineWidth = (selected ? 2 : 1) / k
+      ctx.strokeStyle = selected ? t.accent : t.nodeStroke
+      ctx.stroke()
+      if (!titles || !d.label) continue
+      ctx.fillStyle = t.nodeText
+      ctx.fillText(truncateText(d.label, r.w - 16, this.#measureBold), r.x + 8, r.y + r.h / 2)
+    }
+  }
+
   #renderNodes(layer, nodes, interactive, dim) {
     const m = this.#model
     const sel = layer.selectChildren('g.sg-node').data(nodes, d => d.id)
@@ -1960,7 +2152,7 @@ export class Graph {
       .merge(sel)
       .filter((d, i, groups) =>
         stale(groups[i], [
-          d,
+          revOf(d),
           this.#itemRect(d.id),
           interactive,
           interactive && this.#selection.has(d.id),
@@ -2299,7 +2491,7 @@ export class Graph {
       .merge(sel)
       .filter((d, i, groups) =>
         stale(groups[i], [
-          d,
+          revOf(d),
           this.#routeOf(d).path,
           interactive && this.#selection.has(d.id),
           !!(m.nodes.get(d.source.node)?.ghost || m.nodes.get(d.target.node)?.ghost),
@@ -2811,6 +3003,13 @@ export class Graph {
  * @param {any} el
  * @param {unknown[]} state
  */
+/**
+ * What a drawn item's key holds of its data: its rev when the host gives one (eng §12: updates
+ * touch only elements whose rev changed), otherwise all of it.
+ * @param {{ rev?: unknown }} d
+ */
+const revOf = d => (d.rev !== undefined ? d.rev : d)
+
 function stale(el, state) {
   const key = JSON.stringify(state)
   if (el.__sgState === key) return false

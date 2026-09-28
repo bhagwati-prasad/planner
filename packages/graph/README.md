@@ -6,3 +6,11 @@ The generic D3 diagram library: it renders graph data and emits intents, and kno
 - Specification: spec §10
 - Entry point: `src/index.js`, the only file other packages may import (eng §4)
 - Tests: `test/`, run with `npm test`
+
+## Large diagrams
+
+- **Zoom bands.** What is drawn follows the zoom bands of design system §6. The graph sets `sg-lod-mid` below 75%, `sg-lod-low` below 40% and `sg-lod-min` below 15% on its root, and the stylesheet hides parts by those classes.
+- **Revs.** Give nodes, frames and edges a `rev`, and the graph redraws an item only when its rev changes (eng §12). Without one, it compares the item's data.
+- **Culling.** Above `cullThreshold` items (default 600), only items near the view are rendered.
+- **Canvas layer.** Above 1,500 visible components, the node layer is one Canvas 2D image, with rounded blocks and titles. Clicks, drags, double-clicks, context menus and hover reach components through the spatial index ([ADR 0015](../../docs/adr/0015-strata-graph-uses-its-own-spatial-index.md)).
+- **Benchmark.** `npm run bench` measures panning 500 components against eng §15's 16 ms frame budget (`tools/bench/graph-pan.bench.js`).

@@ -2,10 +2,10 @@
 // Loads IBM Plex from vendor/plex before a harness says it is ready, so no test measures or
 // draws text in a fallback font (task 0210).
 //
-// The faces are made from the files' bytes rather than declared with @font-face: Firefox holds a
-// page's load event while a stylesheet font is loading, and in CI some harness pages never
-// finished loading that way. A fetch does not hold the load event. Harness pages are served,
-// never opened from file://, so the fetch always works.
+// The faces are made from the files' bytes rather than declared with @font-face, so no stylesheet
+// font holds the page's load event; a fetch does not. (Firefox's missing load events in CI turned
+// out to reach pages without fonts too: see page.goto in ../playwright.js.) Harness pages are
+// served, never opened from file://, so the fetch always works.
 
 /** The faces the browser tests use: Sans regular and semibold, Mono regular. */
 export const FACES = Object.freeze([

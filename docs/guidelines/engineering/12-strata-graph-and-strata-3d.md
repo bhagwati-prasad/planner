@@ -6,7 +6,7 @@
 - Data joins are keyed by id: `selection.data(nodes, d => d.id).join(enter, update, exit)`.
 - The library owns only transient interaction state, such as a drag in progress. On drag end it emits an intent and waits for `setData`.
 - Scene layers are fixed `<g>` groups in this order: grid, zones and frames, edges, nodes, overlays, annotations, comment pins, handles.
-- Updates touch only elements whose `rev` changed. Hit-testing and snapping use `d3-quadtree`. The node layer switches to Canvas 2D above 1,500 visible elements.
+- Updates touch only elements whose `rev` changed. Hit-testing and snapping use one spatial index of rectangles ([ADR 0015](../../adr/0015-strata-graph-uses-its-own-spatial-index.md)). The node layer switches to Canvas 2D above 1,500 visible elements.
 - Styles are applied through the CSSOM (`selection.style`), never through `style` attributes.
 - Text measurements are cached. Level-of-detail thresholds follow the design system.
 - Transitions honour `prefers-reduced-motion`.
