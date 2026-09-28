@@ -80,7 +80,7 @@ test('theme, routing and export controls', async () => {
   await page.click('#theme')
   assert.equal(
     await page.evaluate(() => getComputedStyle(document.querySelector('.sg-background')).fill),
-    'rgb(28, 25, 23)'
+    'rgb(19, 22, 26)'
   )
   await page.selectOption('#routing', 'curved')
   assert.match(

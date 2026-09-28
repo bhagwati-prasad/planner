@@ -17,7 +17,7 @@ import { SpatialIndex } from '../src/spatial.js'
 import { smartGuides, snapMove, snapRect } from '../src/snap.js'
 import { align, distribute } from '../src/arrange.js'
 import { fitTransform, zoomAt, screenToWorld, worldToScreen, visibleRect } from '../src/viewport.js'
-import { wrapText, estimateMeasure } from '../src/text.js'
+import { wrapText, truncateText, estimateMeasure } from '../src/text.js'
 
 const box = (x, y, w = 100, h = 50) => ({ x, y, w, h })
 
@@ -215,4 +215,12 @@ test('text wraps on words, breaks long words and ellipsises', () => {
   ])
   assert.deepEqual(wrapText('line one\nline two', 200, measure), ['line one', 'line two'])
   assert.ok(estimateMeasure(12)('abc') > 0)
+})
+
+test('a one-line title is cut at a character and ends in an ellipsis', () => {
+  const measure = (/** @type {string} */ s) => s.length * 10
+  assert.equal(truncateText('Payment authorisation', 100, measure), 'Payment a…')
+  assert.equal(truncateText('Orders', 100, measure), 'Orders', 'text that fits is kept whole')
+  assert.equal(truncateText('Payment service', 80, measure), 'Payment…', 'no space before it')
+  assert.equal(truncateText('Anything', 5, measure), '…')
 })

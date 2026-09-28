@@ -265,7 +265,7 @@ test('theme toggle, the console dock and problems', async () => {
           window.strataApp.shell.canvas.graph.element.querySelector('.sg-background')
         ).fill
     ),
-    'rgb(28, 25, 23)'
+    'rgb(19, 22, 26)'
   )
 
   await page.locator('strata-app [role="tab"]', { hasText: 'Console' }).click()

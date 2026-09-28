@@ -67,7 +67,7 @@ const DEFAULTS = Object.freeze({
   /** @type {'light'|'dark'|Record<string, string>} */
   theme: 'light',
   showGrid: true,
-  portRadius: 4.5,
+  portRadius: 4,
   /** @type {null | ((source: EndInfo, target: EndInfo) => boolean)} */
   canConnect: null,
   /** @type {string} */
@@ -79,6 +79,8 @@ const DEFAULTS = Object.freeze({
 })
 
 const MOVABLE = new Set(['node', 'frame', 'annotation'])
+/** Ports are hit within 12 px of their centre: a 24 px target (design system §6). */
+const PORT_HIT_RADIUS = 12
 const HANDLE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 let instances = 0
 
@@ -140,7 +142,6 @@ export class Graph {
   /** @type {any} */ #root
   /** @type {Record<string, any>} */ #layers = {}
   /** @type {any} */ #marquee
-  /** @type {any} */ #gridPattern
 
   /**
    * @param {HTMLElement} host
@@ -256,7 +257,10 @@ export class Graph {
   setData(data) {
     this.#model = new GraphModel(data ?? {}, {
       portsOf: n => this.#shapeOf(n).ports?.(n) ?? [],
-      sizeOf: n => this.#shapeOf(n).size ?? DEFAULT_NODE_SIZE,
+      sizeOf: n => {
+        const size = this.#shapeOf(n).size
+        return (typeof size === 'function' ? size(n) : size) ?? DEFAULT_NODE_SIZE
+      },
     })
     for (const id of this.#selection) if (!this.#model.kindOf(id)) this.#selection.delete(id)
     for (const id of this.#routes.keys()) if (!this.#model.edges.has(id)) this.#routes.delete(id)
@@ -344,7 +348,7 @@ export class Graph {
   setTransform(t, { animate = false } = {}) {
     const d3 = this.#d3
     const z = d3.zoomIdentity.translate(t.x, t.y).scale(t.k)
-    if (animate && typeof this.#svg.transition === 'function')
+    if (animate && !this.#reducedMotion() && typeof this.#svg.transition === 'function')
       this.#svg.transition().duration(350).call(this.#zoom.transform, z)
     else this.#svg.call(this.#zoom.transform, z)
     return this
@@ -629,16 +633,15 @@ export class Graph {
       .attr('class', 'sg-background')
       .attr('width', '100%')
       .attr('height', '100%')
-    this.#svg
-      .append('rect')
-      .attr('class', 'sg-grid')
-      .attr('width', '100%')
-      .attr('height', '100%')
-      .attr('fill', `url(#${this.#uid}-grid)`)
-      .attr('pointer-events', 'none')
-    this.#gridPattern = this.#svg.select(`#${this.#uid}-grid`)
     this.#root = this.#svg.append('g').attr('class', 'sg-viewport')
     this.#layers = this.#makeLayers(this.#root)
+    // The dot grid lives in world space, in the first scene layer, over the visible area.
+    for (const which of ['minor', 'major'])
+      this.#layers.grid
+        .append('rect')
+        .attr('class', `sg-grid sg-grid-${which}`)
+        .attr('fill', `url(#${this.#uid}-grid-${which})`)
+        .attr('pointer-events', 'none')
     this.#marquee = this.#svg
       .append('rect')
       .attr('class', 'sg-marquee')
@@ -683,61 +686,108 @@ export class Graph {
     }
     marker(`${this.#uid}-arrow`, 'sg-arrow')
     marker(`${this.#uid}-arrow-active`, 'sg-arrow sg-arrow-active')
-    if (!forExport) {
-      const g = this.#opts.grid || 10
-      const pattern = svgEl(
-        'pattern',
-        { id: `${this.#uid}-grid`, patternUnits: 'userSpaceOnUse', width: g * 5, height: g * 5 },
-        doc
-      )
-      pattern.appendChild(svgEl('path', { class: 'sg-grid-minor', fill: 'none', d: '' }, doc))
-      pattern.appendChild(
-        svgEl(
-          'path',
-          { class: 'sg-grid-major', fill: 'none', d: `M${g * 5},0 L0,0 0,${g * 5}` },
+    // Diagonal hatch for a missing component (design system §6).
+    const hatch = svgEl(
+      'pattern',
+      {
+        id: `${this.#uid}-hatch`,
+        patternUnits: 'userSpaceOnUse',
+        width: 8,
+        height: 8,
+        patternTransform: 'rotate(45)',
+      },
+      doc
+    )
+    hatch.appendChild(svgEl('rect', { class: 'sg-hatch-bg', width: 8, height: 8 }, doc))
+    hatch.appendChild(svgEl('line', { class: 'sg-missing-hatch', x1: 0, y1: 0, x2: 0, y2: 8 }, doc))
+    defs.appendChild(hatch)
+    if (!forExport)
+      for (const which of ['minor', 'major']) {
+        const pattern = svgEl(
+          'pattern',
+          { id: `${this.#uid}-grid-${which}`, patternUnits: 'userSpaceOnUse' },
           doc
         )
-      )
-      defs.appendChild(pattern)
-    }
+        pattern.appendChild(svgEl('circle', { class: `sg-grid-dot-${which}` }, doc))
+        defs.appendChild(pattern)
+      }
     return defs
   }
 
+  /**
+   * The scene layers, in the fixed order of eng §12: grid, zones and frames, edges, nodes,
+   * overlays, annotations, comment pins, handles. Frames and regions (zones) share a layer, and
+   * so do the overlays: smart guides and simulation tokens.
+   */
   #makeLayers(root) {
+    const layer = (/** @type {string} */ name) =>
+      root.append('g').attr('class', `sg-layer sg-layer-${name}`).attr('data-layer', name)
+    const grid = layer('grid')
+    const frames = layer('frames')
+    const edges = layer('edges')
+    const nodes = layer('nodes')
+    const overlays = layer('overlays')
+    const annotations = layer('annotations')
+    const pins = layer('comment-pins')
+    const handles = layer('handles')
     return {
-      frames: root.append('g').attr('class', 'sg-layer-frames'),
-      regions: root.append('g').attr('class', 'sg-layer-regions'),
-      edges: root.append('g').attr('class', 'sg-layer-edges'),
-      nodes: root.append('g').attr('class', 'sg-layer-nodes'),
-      annotations: root.append('g').attr('class', 'sg-layer-annotations'),
-      handles: root.append('g').attr('class', 'sg-layer-handles'),
-      guides: root.append('g').attr('class', 'sg-layer-guides'),
-      tokens: root.append('g').attr('class', 'sg-layer-tokens'),
+      grid,
+      frames: frames.append('g').attr('class', 'sg-frames'),
+      regions: frames.append('g').attr('class', 'sg-regions'),
+      edges,
+      nodes,
+      guides: overlays.append('g').attr('class', 'sg-guides'),
+      tokens: overlays.append('g').attr('class', 'sg-tokens'),
+      annotations,
+      pins,
+      handles,
     }
   }
 
+  /**
+   * The dot grid (design system §6): a dot every `grid` units and a stronger one every ten,
+   * each the same size on screen at any zoom. Minor dots fade out below 50% zoom and are gone
+   * at 25%; major dots go once they would sit closer than 8 px.
+   */
   #updateGrid() {
     const { grid, showGrid } = this.#opts
     const g = grid || 10
-    const { x, y, k } = this.#transform
-    const pattern = this.#gridPattern
-    pattern
-      .attr('width', g * 5)
-      .attr('height', g * 5)
-      .attr('patternTransform', `translate(${x},${y}) scale(${k})`)
-    const minor = []
-    for (let i = 1; i < 5; i++)
-      minor.push(`M${i * g},0 L${i * g},${g * 5} M0,${i * g} L${g * 5},${i * g}`)
-    pattern
-      .select('.sg-grid-minor')
-      .attr('d', minor.join(' '))
-      .attr('visibility', g * k < 6 ? 'hidden' : 'visible')
-    pattern
-      .select('.sg-grid-major')
-      .attr('d', `M${g * 5},0 L0,0 0,${g * 5}`)
-      .attr('visibility', g * 5 * k < 8 ? 'hidden' : 'visible')
-    pattern.selectAll('path').attr('vector-effect', 'non-scaling-stroke')
-    this.#svg.select('.sg-grid').attr('visibility', showGrid ? 'visible' : 'hidden')
+    const { k } = this.#transform
+    const layer = this.#layers.grid
+    layer.attr('visibility', showGrid ? 'visible' : 'hidden')
+    if (!showGrid) return
+    const view = visibleRect(this.#transform, this.#size)
+    const minorOpacity = Math.min(1, Math.max(0, (k - 0.25) / 0.25))
+    const opacity = { minor: minorOpacity, major: g * 10 * k < 8 ? 0 : 1 }
+    for (const [which, step, r] of /** @type {const} */ ([
+      ['minor', g, 0.75],
+      ['major', g * 10, 1.25],
+    ])) {
+      this.#svg
+        .select(`#${this.#uid}-grid-${which}`)
+        .attr('x', -step / 2)
+        .attr('y', -step / 2)
+        .attr('width', step)
+        .attr('height', step)
+        .select('circle')
+        .attr('cx', step / 2)
+        .attr('cy', step / 2)
+        .attr('r', r / k)
+      layer
+        .select(`.sg-grid-${which}`)
+        .attr('x', view.x)
+        .attr('y', view.y)
+        .attr('width', view.w)
+        .attr('height', view.h)
+        .attr('visibility', opacity[which] > 0 ? 'visible' : 'hidden')
+        .style('opacity', opacity[which])
+    }
+  }
+
+  /** True when the user asks for reduced motion (eng §12): views jump instead of animating. */
+  #reducedMotion() {
+    return !!this.#host.ownerDocument?.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')
+      .matches
   }
 
   #measureSize() {
@@ -1010,8 +1060,8 @@ export class Graph {
 
   #shapeOf(node) {
     return (
-      this.#shapes.get(node.shape ?? 'box') ??
-      /** @type {import('./shapes.js').ShapeDef} */ (this.#shapes.get('box'))
+      this.#shapes.get(node.shape ?? 'card') ??
+      /** @type {import('./shapes.js').ShapeDef} */ (this.#shapes.get('card'))
     )
   }
 
@@ -1283,6 +1333,7 @@ export class Graph {
         d.pointer = { x: event.x, y: event.y }
         d.moved = true
         d.target = this.#connectTarget(d.pointer, d.source, d.reverse)
+        d.refused = d.target ? null : this.#refusedTarget(d.pointer, d.source, d.reverse)
         this.#renderHandles()
       })
       .on('end', () => {
@@ -1307,18 +1358,46 @@ export class Graph {
   }
 
   /**
+   * Whether a connection from `source` may end on `target`: true, or the reason it may not
+   * ('' when there is none to give). A host's `canConnect` returns true, false, or the reason
+   * as a string.
+   * @returns {true|string}
+   */
+  #verdict(source, target, reverse) {
+    if (target.node === source.node && target.port === source.port) return ''
+    const [s, t] = reverse ? [target, source] : [source, target]
+    if (this.#opts.canConnect) {
+      const v = this.#opts.canConnect(s, t)
+      return typeof v === 'string' ? v : v ? true : ''
+    }
+    if (s.node === t.node) return ''
+    return s.spec?.direction !== 'in' && t.spec?.direction !== 'out' ? true : ''
+  }
+
+  /**
+   * The port of another node under the pointer that a connection may not end on, with the
+   * reason, so it can show the invalid state; null when there is none.
+   */
+  #refusedTarget(point, source, reverse) {
+    const m = this.#model
+    const near = this.#portIndex.nearest(point, 14 / this.#transform.k, key => {
+      const [node] = key.split('\u0000')
+      return node !== source.node && !m.nodes.get(node)?.ghost
+    })
+    if (!near) return null
+    const [node, port] = near.split('\u0000')
+    const target = { node, port, spec: m.nodes.get(node)?.ports.find(q => q.id === port) }
+    const verdict = this.#verdict(source, target, reverse)
+    return verdict === true ? null : { node, port, reason: verdict }
+  }
+
+  /**
    * The port a connection gesture would end on: a port near the pointer, else the first
    * suitable port of the node under it.
    */
   #connectTarget(point, source, reverse) {
     const m = this.#model
-    const allowed = target => {
-      if (target.node === source.node && target.port === source.port) return false
-      const [s, t] = reverse ? [target, source] : [source, target]
-      if (this.#opts.canConnect) return !!this.#opts.canConnect(s, t)
-      if (s.node === t.node) return false
-      return s.spec?.direction !== 'in' && t.spec?.direction !== 'out'
-    }
+    const allowed = target => this.#verdict(source, target, reverse) === true
     const info = key => {
       const [node, port] = key.split('\u0000')
       return { node, port, spec: m.nodes.get(node)?.ports.find(q => q.id === port) }
@@ -1455,6 +1534,7 @@ export class Graph {
           d.pointer = { x: event.x, y: event.y }
           // The moving end must be a target if the fixed end is the source, and vice versa.
           d.target = this.#connectTarget(d.pointer, d.fixed, d.end === 'source')
+          d.refused = d.target ? null : this.#refusedTarget(d.pointer, d.fixed, d.end === 'source')
           this.#renderHandles()
         } else if (d.type === 'waypoints') {
           const g = this.#opts.snap && !event.sourceEvent?.altKey ? this.#opts.grid : 0
@@ -1620,7 +1700,13 @@ export class Graph {
       enter.append('rect').attr('class', 'sg-frame-title').attr('height', 24)
       this.#bindItem(enter, 'frame')
     }
-    const all = enter.merge(sel)
+    const selected = d => interactive && this.#selection.has(d.id)
+    const dimmed = d => !!dim && !dim.has(d.id)
+    const all = enter
+      .merge(sel)
+      .filter((d, i, nodes) =>
+        stale(nodes[i], [d, this.#itemRect(d.id), selected(d), m.isLocked(d), dimmed(d)])
+      )
     all
       .attr('class', d => `sg-frame sg-kind-${d.kind}`)
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
@@ -1667,10 +1753,34 @@ export class Graph {
       .attr('class', 'sg-node')
       .attr('data-id', d => d.id)
     enter.append('g').attr('class', 'sg-body')
+    enter.append('g').attr('class', 'sg-content')
     enter.append('g').attr('class', 'sg-decor')
     enter.append('g').attr('class', 'sg-ports')
     if (interactive) this.#bindItem(enter, 'node')
-    const all = enter.merge(sel)
+    const heat = this.#overlays.get('heatmap')
+    const badges = this.#overlays.get('badges')
+    const heatDomain = heat ? domainOf(heat) : null
+    const target =
+      this.#drag?.type === 'connect' || this.#drag?.type === 'reconnect' ? this.#drag.target : null
+    const all = enter
+      .merge(sel)
+      .filter((d, i, groups) =>
+        stale(groups[i], [
+          d,
+          this.#itemRect(d.id),
+          interactive,
+          interactive && this.#selection.has(d.id),
+          m.isLocked(d),
+          !!dim && !dim.has(d.id),
+          heat?.values?.[d.id] ?? null,
+          heat ? heatDomain : null,
+          badges?.values?.[d.id] ?? null,
+          target?.node === d.id ? target.port : null,
+          this.#dragged(d.id),
+          this.#opts.portRadius,
+          this.#themeVersion,
+        ])
+      )
     all
       .attr('transform', d => {
         const r = this.#itemRect(d.id)
@@ -1678,6 +1788,11 @@ export class Graph {
       })
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed('sg-ghost', d => !!d.ghost)
+      .classed('sg-status-planned', d => d.status === 'planned')
+      .classed('sg-status-deprecated', d => d.status === 'deprecated')
+      .classed('sg-failing', d => !!d.failing)
+      .classed('sg-out-of-scope', d => !!d.outOfScope)
+      .classed('sg-dragging', d => this.#dragged(d.id))
       .classed('sg-composite', d => !!d.composite)
       .classed('sg-locked', d => m.isLocked(d))
       .classed('sg-dimmed', d => !!dim && !dim.has(d.id))
@@ -1691,9 +1806,6 @@ export class Graph {
           d => [d.title ?? d.label, d.sublabel].filter(Boolean).join(', ') || d.id
         )
     }
-    const heat = this.#overlays.get('heatmap')
-    const badges = this.#overlays.get('badges')
-    const heatDomain = heat ? domainOf(heat) : null
     const heatColor = heat
       ? this.#d3.interpolateRgb?.(this.#tokens.heatLow, this.#tokens.heatHigh)
       : null
@@ -1701,29 +1813,40 @@ export class Graph {
     all.each((d, i, groups) => {
       const g = this.#d3.select(groups[i])
       const r = this.#itemRect(d.id)
+      // The full name, as a tooltip (design system §6: titles are truncated on the card).
+      const changes = Array.isArray(d.runChanges) ? d.runChanges : []
+      const tooltip = [
+        d.label,
+        d.missing ? `Missing: ${d.missing}` : '',
+        ...(changes.length ? ['Run-only changes:', ...changes] : []),
+      ]
+      g.selectChildren('title')
+        .data(d.label ? [tooltip.filter(Boolean).join('\n')] : [])
+        .join(enter => enter.insert('title', ':first-child'))
+        .text(t => t)
       this.#renderNodeBody(g, d, r)
 
       // Ports
       const anchors = portAnchors({ x: 0, y: 0, w: r.w, h: r.h }, d.ports)
       const ports = d.ports.map(p => ({ ...p, node: d.id, a: anchors.get(p.id) }))
+      // Each port draws at 8 px and is hit within 24 px (design system §6).
       const psel = g
         .select('.sg-ports')
-        .selectChildren('circle.sg-port')
+        .selectChildren('g.sg-port')
         .data(ports, p => p.id)
       psel.exit().remove()
-      const penter = psel.enter().append('circle').attr('class', 'sg-port')
+      const penter = psel.enter().append('g').attr('class', 'sg-port')
       penter.append('title')
+      penter.append('circle').attr('class', 'sg-port-hit').attr('r', PORT_HIT_RADIUS)
+      penter.append('circle').attr('class', 'sg-port-dot')
+      penter.append('circle').attr('class', 'sg-port-ring').attr('r', 8)
       if (portDrag && !d.ghost) penter.call(portDrag)
-      const target =
-        this.#drag?.type === 'connect' || this.#drag?.type === 'reconnect'
-          ? this.#drag.target
-          : null
-      penter
+      const pall = penter
         .merge(psel)
-        .attr('cx', p => p.a.x)
-        .attr('cy', p => p.a.y)
-        .attr('r', this.#opts.portRadius)
+        .attr('transform', p => `translate(${p.a.x},${p.a.y})`)
         .attr('data-port', p => p.id)
+      pall.select('.sg-port-dot').attr('r', this.#opts.portRadius)
+      pall
         .classed('sg-port-target', p => !!target && target.node === d.id && target.port === p.id)
         .select('title')
         .text(p => p.label ?? p.id)
@@ -1757,9 +1880,85 @@ export class Graph {
         .attr('transform', `translate(${r.w - 2},2)`)
         .select('text')
         .text(v => v)
+      this.#renderNodeStates(decor, d, r)
     })
   }
 
+  /** True for a node being dragged right now. @param {string} id */
+  #dragged(id) {
+    const d = this.#drag
+    return !!(d?.type === 'move' && d.moved && d.idSet?.has(id))
+  }
+
+  /**
+   * The decorations of design system §6's node states, in node coordinates: the selection halo,
+   * the keyboard focus ring, a lock for a read-only placement, a "Deprecated" chip, an error
+   * badge for a failing component, and a warning dot for run-only changes.
+   * @param {any} decor @param {any} d @param {Rect} r
+   */
+  #renderNodeStates(decor, d, r) {
+    const radius = Number(this.#tokens.radius) || 0
+    for (const cls of ['sg-halo', 'sg-focus-ring'])
+      decor
+        .selectChildren(`rect.${cls}`)
+        .data([cls])
+        .join('rect')
+        .attr('class', cls)
+        .attr('x', -3)
+        .attr('y', -3)
+        .attr('width', r.w + 6)
+        .attr('height', r.h + 6)
+        .attr('rx', radius + 3)
+    decor
+      .selectChildren('path.sg-lock')
+      .data(d.readOnly ? [0] : [])
+      .join('path')
+      .attr('class', 'sg-lock')
+      .attr('transform', `translate(${r.w - 17},${r.h - 17})`)
+      .attr('d', 'M2,6 h8 v6 h-8 Z M4,6 V4 a2,2 0 0 1 4,0 V6')
+    const chipWidth = this.#measure('Deprecated') + 12
+    const chip = decor
+      .selectChildren('g.sg-chip')
+      .data(d.status === 'deprecated' ? ['Deprecated'] : [])
+      .join(enter => {
+        const g = enter.append('g').attr('class', 'sg-chip')
+        g.append('rect').attr('height', 16).attr('rx', 8)
+        g.append('text').attr('y', 8)
+        return g
+      })
+      .attr('transform', 'translate(12,-8)')
+    chip.select('rect').attr('width', chipWidth)
+    chip
+      .select('text')
+      .attr('x', chipWidth / 2)
+      .text(t => t)
+    decor
+      .selectChildren('g.sg-error-badge')
+      .data(d.failing ? ['!'] : [])
+      .join(enter => {
+        const g = enter.append('g').attr('class', 'sg-error-badge')
+        g.append('circle').attr('r', 8)
+        g.append('text')
+        return g
+      })
+      .attr('transform', `translate(${r.w},0)`)
+      .select('text')
+      .text(t => t)
+    decor
+      .selectChildren('circle.sg-run-change')
+      .data(Array.isArray(d.runChanges) && d.runChanges.length ? [0] : [])
+      .join('circle')
+      .attr('class', 'sg-run-change')
+      .attr('cx', r.w - 8)
+      .attr('cy', 8)
+      .attr('r', 3)
+  }
+
+  /**
+   * The node's body through its shape's `render`, and the label and icon the graph draws for
+   * shapes that do not draw their own. Both update in place (spec §10); a node whose shape
+   * changes starts from an empty body.
+   */
   #renderNodeBody(g, d, r) {
     const key = JSON.stringify([
       d.shape,
@@ -1769,56 +1968,78 @@ export class Graph {
       d.sublabel,
       d.icon,
       d.style,
+      d.badges,
+      !!d.composite,
+      d.missing ?? null,
       this.#themeVersion,
     ])
     const node = g.node()
     if (node.__sgKey === key) return
     node.__sgKey = key
     const body = g.select('.sg-body')
-    body.selectAll('*').remove()
+    const shapeName = d.shape ?? 'card'
+    if (node.__sgShape !== shapeName) body.selectChildren().remove()
+    node.__sgShape = shapeName
     const shape = this.#shapeOf(d)
     const dd = { ...d, w: r.w, h: r.h }
-    shape.render(body, dd, { theme: this.#tokens, radius: Number(this.#tokens.radius) || 0 })
+    shape.render(body, dd, {
+      theme: this.#tokens,
+      radius: Number(this.#tokens.radius) || 0,
+      fontSize: this.#fontSize,
+      measure: this.#measure,
+      measureBold: this.#measureBold,
+      icon: markup => this.#icon(markup)?.cloneNode(true) ?? null,
+    })
     const style = d.style ?? {}
     body
       .selectAll('.sg-shape')
-      .style('fill', style.fill ?? null)
+      .style('fill', d.missing ? `url(#${this.#uid}-hatch)` : (style.fill ?? null))
       .style('stroke', style.stroke ?? null)
       .style('stroke-dasharray', style.dash ?? null)
-    if (style.opacity !== undefined) body.style('opacity', style.opacity)
+    body.style('opacity', style.opacity ?? null)
+
+    // What the graph draws inside the shape's label box: an icon, the label and a sublabel.
+    const content = g.select('.sg-content')
+    const own = shape.label !== false
     let box = shape.labelBox?.(dd) ?? { x: 6, y: 4, w: dd.w - 12, h: dd.h - 8 }
-    if (d.icon) {
-      const icon = this.#icon(d.icon)
-      if (icon) {
-        // Inside the label box, so it stays within curved and slanted outlines too.
-        const size = Math.max(10, Math.min(18, box.h - 4))
-        const el = /** @type {SVGSVGElement} */ (icon.cloneNode(true))
-        el.setAttribute('class', 'sg-icon')
-        el.setAttribute('x', String(box.x))
-        el.setAttribute('y', String(box.h > 40 ? box.y + 2 : box.y + (box.h - size) / 2))
-        el.setAttribute('width', String(size))
-        el.setAttribute('height', String(size))
-        body.node().appendChild(el)
-        box = { ...box, x: box.x + size + 2, w: Math.max(10, box.w - size - 2) }
-      }
-    }
-    if (shape.label === false || !d.label) return
+    const iconSize = Math.max(10, Math.min(18, box.h - 4))
+    const icon = own && d.icon ? this.#icon(d.icon) : null
+    content
+      .selectChildren('svg.sg-icon')
+      .data(icon ? [d.icon] : [], m => m)
+      .join(enter => enter.append(() => /** @type {Element} */ (icon).cloneNode(true)))
+      .attr('class', 'sg-icon')
+      .attr('x', box.x)
+      .attr('y', box.h > 40 ? box.y + 2 : box.y + (box.h - iconSize) / 2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+    // Inside the label box, so it stays within curved and slanted outlines too.
+    if (icon) box = { ...box, x: box.x + iconSize + 2, w: Math.max(10, box.w - iconSize - 2) }
     const lineH = this.#fontSize * 1.25
-    const sub = d.sublabel ? 1 : 0
+    const sub = own && d.label && d.sublabel ? 1 : 0
     const maxLines = Math.max(1, Math.floor(box.h / lineH) - sub)
-    const lines = wrapText(d.label, box.w, this.#measureBold, { maxLines })
-    const total = (lines.length + sub) * lineH
-    let y = box.y + box.h / 2 - total / 2 + lineH / 2
+    const lines = own && d.label ? wrapText(d.label, box.w, this.#measureBold, { maxLines }) : []
     const cx = box.x + box.w / 2
-    const label = body.append('text').attr('class', 'sg-label')
-    for (const line of lines) {
-      label.append('tspan').attr('x', cx).attr('y', y).text(line)
-      y += lineH
-    }
-    if (d.sublabel) {
-      const [text] = wrapText(d.sublabel, box.w, this.#measure, { maxLines: 1 })
-      body.append('text').attr('class', 'sg-sublabel').attr('x', cx).attr('y', y).text(text)
-    }
+    const top = box.y + box.h / 2 - ((lines.length + sub) * lineH) / 2 + lineH / 2
+    content
+      .selectChildren('text.sg-label')
+      .data(lines.length ? [lines] : [])
+      .join('text')
+      .attr('class', 'sg-label')
+      .selectChildren('tspan')
+      .data(l => l)
+      .join('tspan')
+      .attr('x', cx)
+      .attr('y', (_, i) => top + i * lineH)
+      .text(line => line)
+    content
+      .selectChildren('text.sg-sublabel')
+      .data(sub ? wrapText(d.sublabel, box.w, this.#measure, { maxLines: 1 }) : [])
+      .join('text')
+      .attr('class', 'sg-sublabel')
+      .attr('x', cx)
+      .attr('y', top + lines.length * lineH)
+      .text(t => t)
   }
 
   #icon(markup) {
@@ -1880,7 +2101,20 @@ export class Graph {
     const widths = this.#overlays.get('edge-width')
     const wDomain = widths ? domainOf(widths) : null
     const [wMin, wMax] = widths?.range ?? [1, 8]
-    const all = enter.merge(sel)
+    const all = enter
+      .merge(sel)
+      .filter((d, i, groups) =>
+        stale(groups[i], [
+          d,
+          this.#routeOf(d).path,
+          interactive && this.#selection.has(d.id),
+          !!(m.nodes.get(d.source.node)?.ghost || m.nodes.get(d.target.node)?.ghost),
+          !!dim && !dim.has(d.id),
+          widths?.values?.[d.id] ?? null,
+          widths ? [wDomain, wMin, wMax] : null,
+          this.#themeVersion,
+        ])
+      )
     all
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed(
@@ -1933,6 +2167,14 @@ export class Graph {
     if (interactive) this.#bindItem(enter, 'annotation')
     const all = enter.merge(sel)
     all
+      .filter((d, i, groups) =>
+        stale(groups[i], [
+          d.kind,
+          interactive && this.#selection.has(d.id),
+          m.isLocked(d),
+          !!dim && !dim.has(d.id),
+        ])
+      )
       .attr('class', d => `sg-annotation sg-kind-${d.kind}`)
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
       .classed('sg-locked', d => m.isLocked(d))
@@ -2029,6 +2271,7 @@ export class Graph {
       .append('line')
       .attr('class', 'sg-guide')
       .merge(gsel)
+      .filter((g, i, nodes) => stale(nodes[i], [g, k]))
       .attr('x1', g => (g.axis === 'x' ? g.value : g.from))
       .attr('x2', g => (g.axis === 'x' ? g.value : g.to))
       .attr('y1', g => (g.axis === 'x' ? g.from : g.value))
@@ -2046,6 +2289,7 @@ export class Graph {
       MOVABLE.has(kind) &&
       !m.isLocked(item) &&
       !item.ghost &&
+      !item.readOnly &&
       !m.isHidden(item) &&
       d?.type !== 'move'
     const handles = []
@@ -2071,6 +2315,7 @@ export class Graph {
       .append('rect')
       .call(this.#resizeDragBehavior())
       .merge(hsel)
+      .filter((h, i, nodes) => stale(nodes[i], [h, k]))
       .attr('class', h => `sg-handle sg-handle-${h.dir}`)
       .attr('x', h => h.x - size / 2)
       .attr('y', h => h.y - size / 2)
@@ -2144,6 +2389,7 @@ export class Graph {
         })
       })
       .merge(esel)
+      .filter((h, i, nodes) => stale(nodes[i], [h, k]))
       .attr(
         'class',
         h =>
@@ -2179,17 +2425,95 @@ export class Graph {
       .append('path')
       .attr('class', 'sg-ghost-edge')
       .merge(csel)
+      .filter((p, i, nodes) => stale(nodes[i], [p, k]))
       .attr('d', p => p)
       .attr('stroke-width', 1.5 / k)
     const connecting = d?.type === 'connect' || d?.type === 'reconnect'
+    const refused = connecting ? (d.refused ?? null) : null
     if (connecting || this.#portTargetShown) {
-      L.nodes.selectAll('.sg-port').classed('sg-port-target', function () {
-        if (!connecting || !d.target) return false
-        const nodeId = this.parentNode?.parentNode?.getAttribute('data-id')
-        return nodeId === d.target.node && this.getAttribute('data-port') === d.target.port
-      })
+      this.#svg.classed('sg-connecting', connecting).classed('sg-connect-invalid', !!refused)
+      const at = (/** @type {any} */ el, /** @type {any} */ end) =>
+        !!end &&
+        el.parentNode?.parentNode?.getAttribute('data-id') === end.node &&
+        el.getAttribute('data-port') === end.port
+      L.nodes
+        .selectAll('.sg-port')
+        .classed('sg-port-target', function () {
+          return connecting && at(this, d.target)
+        })
+        .classed('sg-port-invalid', function () {
+          return at(this, refused)
+        })
       this.#portTargetShown = connecting
     }
+    // Why a connection is refused, above the refusing node (design system §6: invalid connect
+    // target).
+    const reason = refused?.reason ? [refused] : []
+    const refusal = L.handles
+      .selectChildren('g.sg-refusal')
+      .data(reason)
+      .join(enter => {
+        const g = enter.append('g').attr('class', 'sg-refusal')
+        g.append('rect').attr('rx', 4)
+        g.append('text')
+        return g
+      })
+      .filter((/** @type {any} */ f, i, nodes) => stale(nodes[i], [f.node, f.port, f.reason, k]))
+    refusal.each((/** @type {any} */ f, i, nodes) => {
+      const p = this.#portPoint(f)
+      const top = this.#itemRect(f.node)?.y ?? p.y
+      const w = (this.#measure(f.reason) + 12) / k
+      const h = 20 / k
+      const g = this.#d3
+        .select(nodes[i])
+        .attr('transform', `translate(${p.x + 12 / k},${top - h - 6 / k})`)
+      g.select('rect')
+        .attr('width', w)
+        .attr('height', h)
+        .attr('stroke-width', 1 / k)
+      g.select('text')
+        .attr('x', 6 / k)
+        .attr('y', h / 2)
+        .style('font-size', `${12 / k}px`)
+        .text(f.reason)
+    })
+
+    // One box around a multi-selection (its handles are 0204's), and dashed outlines where
+    // dragged nodes started.
+    const boxes = [...this.#selection]
+      .filter(id => m.kindOf(id) !== 'edge')
+      .map(id => this.#itemRect(id))
+      .filter(Boolean)
+    const group = boxes.length > 1 && d?.type !== 'move' ? union(boxes) : null
+    L.handles
+      .selectChildren('rect.sg-selection-box')
+      .data(group ? [group] : [])
+      .join('rect')
+      .attr('class', 'sg-selection-box')
+      .filter((/** @type {any} */ b, i, nodes) => stale(nodes[i], [b, k]))
+      .attr('x', (/** @type {any} */ b) => b.x - 8 / k)
+      .attr('y', (/** @type {any} */ b) => b.y - 8 / k)
+      .attr('width', (/** @type {any} */ b) => b.w + 16 / k)
+      .attr('height', (/** @type {any} */ b) => b.h + 16 / k)
+      .attr('stroke-width', 1 / k)
+    const origins =
+      d?.type === 'move' && d.moved
+        ? d.ids
+            .filter((/** @type {string} */ id) => m.kindOf(id) === 'node')
+            .map((/** @type {string} */ id) => ({ id, ...m.rectOf(id) }))
+        : []
+    const radius = Number(this.#tokens.radius) || 0
+    L.handles
+      .selectChildren('rect.sg-drag-origin')
+      .data(origins, (/** @type {any} */ o) => o.id)
+      .join('rect')
+      .attr('class', 'sg-drag-origin')
+      .filter((/** @type {any} */ o, i, nodes) => stale(nodes[i], [o, k]))
+      .attr('x', (/** @type {any} */ o) => o.x)
+      .attr('y', (/** @type {any} */ o) => o.y)
+      .attr('width', (/** @type {any} */ o) => o.w)
+      .attr('height', (/** @type {any} */ o) => o.h)
+      .attr('rx', radius)
   }
 
   #portPoint(end) {
@@ -2204,6 +2528,20 @@ export class Graph {
  * @param {{ values?: Record<string, number>, domain?: [number, number] }} spec
  * @returns {[number, number]}
  */
+/**
+ * Whether an element needs drawing: the first time, and whenever the key of what it shows differs
+ * from the one it was last drawn with. Unchanged elements are left alone, so updates touch only
+ * the elements whose data or state changed (eng §12) and an identical setData mutates nothing.
+ * @param {any} el
+ * @param {unknown[]} state
+ */
+function stale(el, state) {
+  const key = JSON.stringify(state)
+  if (el.__sgState === key) return false
+  el.__sgState = key
+  return true
+}
+
 function domainOf(spec) {
   if (spec.domain) return spec.domain
   const values = Object.values(spec.values ?? {}).filter(v => typeof v === 'number')

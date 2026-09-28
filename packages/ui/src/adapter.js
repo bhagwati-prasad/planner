@@ -65,9 +65,15 @@ export function parseId(id) {
   return m ? { kind: /** @type {any} */ (m[1]), id: m[2] } : { kind: 'model', id }
 }
 
-/** Default size of a shape. @param {string} shape */
-export function shapeSize(shape) {
-  return BUILTIN_SHAPES[shape]?.size ?? DEFAULT_NODE_SIZE
+/**
+ * Default size of a shape, for a node when the shape's size depends on it.
+ * @param {string} shape
+ * @param {object} [node]
+ * @returns {{ w: number, h: number }}
+ */
+export function shapeSize(shape, node = {}) {
+  const size = BUILTIN_SHAPES[shape]?.size
+  return (typeof size === 'function' ? size(node) : size) ?? DEFAULT_NODE_SIZE
 }
 
 /**

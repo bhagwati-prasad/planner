@@ -63,6 +63,7 @@ describe('vendored licences', () => {
       [
         ['d3', '7.9.0', 'ISC'],
         ['three', '0.186.1', 'MIT'],
+        ['plex', '1.1.0 (Sans), 2.5.0 (Mono)', 'OFL-1.1'],
       ]
     )
     assert.ok('d3/LICENSE' in libraries.d3.files)
@@ -72,5 +73,21 @@ describe('vendored licences', () => {
     const readme = readFileSync(join(ROOT, 'vendor/README.md'), 'utf8')
     assert.match(readme, /^\| D3 \| 7\.9\.0 \|.*\| ISC \(`d3\/LICENSE`\) \|/m)
     assert.match(readme, /^\| Three\.js \| 0\.186\.1 \|.*\| MIT \(`three\/LICENSE`\) \|/m)
+  })
+
+  it('vendor/plex pins the three fonts and the OFL licence', () => {
+    const { plex } = manifest().libraries
+    assert.deepEqual(Object.keys(plex?.files ?? {}).sort(), [
+      'plex/IBMPlexMono-Regular-Latin1.woff2',
+      'plex/IBMPlexSans-Regular-Latin1.woff2',
+      'plex/IBMPlexSans-SemiBold-Latin1.woff2',
+      'plex/LICENSE.txt',
+    ])
+    assert.match(
+      readFileSync(join(ROOT, 'vendor/plex/LICENSE.txt'), 'utf8'),
+      /SIL OPEN FONT LICENSE Version 1\.1/
+    )
+    const readme = readFileSync(join(ROOT, 'vendor/README.md'), 'utf8')
+    assert.match(readme, /^\| IBM Plex \|.*\| OFL-1\.1 \(`plex\/LICENSE\.txt`\) \|/m)
   })
 })

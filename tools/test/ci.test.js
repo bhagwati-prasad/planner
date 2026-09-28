@@ -119,6 +119,20 @@ describe('browser tests', () => {
     assert.throws(() => selectBrowsers('chrome'), /unknown browser 'chrome'/)
   })
 
+  it('run visual tests (tagged @visual) in Chromium only, compared at a 0.1% pixel threshold', async () => {
+    const {
+      default: config,
+      browserProjects,
+      selectBrowsers,
+    } = await import('../../playwright.config.js')
+    for (const project of browserProjects(selectBrowsers(undefined))) {
+      const inverted = /** @type {any} */ (project).grepInvert
+      const skipsVisual = inverted instanceof RegExp && inverted.test('@visual')
+      assert.equal(skipsVisual, project.use?.browserName !== 'chromium', project.name)
+    }
+    assert.equal(config.expect?.toHaveScreenshot?.maxDiffPixelRatio, 0.001, 'eng §18: 0.1%')
+  })
+
   it('run Playwright first in the browser gate', () => {
     const script = readFileSync(join(ROOT, 'scripts/run-browser-tests.js'), 'utf8')
     assert.match(script, /resolve\('@playwright\/test\/cli'\)/)

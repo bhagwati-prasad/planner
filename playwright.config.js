@@ -17,7 +17,11 @@ const SERVED = [
   ...E2E,
   'tools/testing/browser/**/*.spec.js',
   'packages/*/test/components/**/*.spec.js',
+  'packages/*/test/*.spec.js',
 ]
+
+/** The tag of visual snapshot tests: `test('…', { tag: '@visual' }, …)`. */
+const VISUAL = /@visual/
 
 /** @typedef {keyof typeof DEVICES} BrowserName */
 
@@ -43,9 +47,17 @@ export function selectBrowsers(list) {
 export function browserProjects(browsers = selectBrowsers()) {
   return browsers.flatMap(browserName => {
     const use = { ...DEVICES[browserName], browserName }
+    // Visual tests (tagged @visual) run in Chromium, the reference browser (eng §15), so their
+    // baselines exist once; the other browsers run everything else.
+    const visual = browserName === 'chromium' ? {} : { grepInvert: VISUAL }
     return [
-      { name: `${browserName}-served`, testMatch: SERVED, use: { ...use, mode: 'served' } },
-      { name: `${browserName}-file`, testMatch: E2E, use: { ...use, mode: 'file' } },
+      {
+        name: `${browserName}-served`,
+        testMatch: SERVED,
+        ...visual,
+        use: { ...use, mode: 'served' },
+      },
+      { name: `${browserName}-file`, testMatch: E2E, ...visual, use: { ...use, mode: 'file' } },
     ]
   })
 }
@@ -54,6 +66,12 @@ export default defineConfig({
   testDir: '.',
   testMatch: SERVED,
   forbidOnly: true,
+  // Eng §18: visual snapshots allow a 0.1% pixel difference. Baselines are created or updated
+  // only after the human approves the screenshots (CLAUDE.md).
+  expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.001 } },
+  // A missing baseline fails instead of being written: only an explicit --update-snapshots run,
+  // after approval, creates one.
+  updateSnapshots: 'none',
   retries: 0,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   outputDir: 'test-results',

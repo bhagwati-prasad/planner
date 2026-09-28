@@ -20,6 +20,7 @@ Write these tests first, in `packages/graph/test/interaction.spec.js`. Run them 
 - [ ] Dropping a dragged component emits one move intent, and it snaps back until `setData` confirms
 - [ ] Connecting an output port to an input port emits a connect intent; an invalid target shows the invalid state
 - [ ] The marquee selects every component whose bounds it intersects
+- [ ] Dragging a handle of a multi-selection's bounding box resizes the group in one `move` intent whose items carry their new sizes (added by the human on 2026-09-27; 0209 draws the box)
 
 ## Done when
 
