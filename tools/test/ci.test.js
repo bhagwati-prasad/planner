@@ -160,8 +160,8 @@ describe('size check', () => {
   it('reads every size budget from eng §15', () => {
     assert.deepEqual(budgets(), [
       { label: 'Core, facade and non-UI packages (minified)', bytes: 250_000 },
-      { label: 'strata-graph (minified)', bytes: 110_000 },
-      { label: 'strata-ui (minified)', bytes: 240_000 },
+      { label: 'strata-graph (minified)', bytes: 115_000 },
+      { label: 'strata-ui (minified)', bytes: 235_000 },
       { label: 'Simulation worker bundle (minified)', bytes: 120_000 },
       { label: 'Bundled fonts (woff2, Latin subset)', bytes: 120_000 },
       { label: 'Console help metadata (minified)', bytes: 25_000 },
@@ -188,7 +188,7 @@ describe('size check', () => {
   it('fails when a fixture bundle exceeds its eng §15 budget', () => {
     const fixture = tree({
       'packages/core/src/index.js': moduleOf(1_000),
-      'packages/graph/src/index.js': moduleOf(111_000),
+      'packages/graph/src/index.js': moduleOf(116_000),
       'packages/ui/src/index.js': moduleOf(1_000),
     })
     const result = checkSizes({ root: fixture.root, exceptions: {} })
@@ -196,7 +196,7 @@ describe('size check', () => {
     assert.equal(result.problems.length, 1)
     assert.match(
       result.problems[0],
-      /strata-graph \(minified\) is 111\.\d KB, over its 110 KB budget/
+      /strata-graph \(minified\) is 116\.\d KB, over its 115 KB budget/
     )
   })
 
