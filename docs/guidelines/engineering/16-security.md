@@ -10,7 +10,7 @@ Treat as untrusted: imported `.strata` files, uploaded component bundles, pasted
 ## Code execution
 
 - `eval`, `new Function` and string arguments to timers are banned everywhere except the sandbox worker bootstrap. **(lint)**
-- Component code runs only in the sandbox worker, loaded from a Blob URL before the worker strips its globals (spec §8).
+- Component code runs only in the sandbox worker, loaded from a Blob URL before the worker strips its globals (spec §8). WebKit refuses that Blob URL from a `file://` page, where no CSP applies, so there the bootstrap evaluates the same text with an indirect eval, still before any behaviour runs (decided by the human on 2026-09-29).
 - A bundle whose integrity hash does not match is refused and rendered as a missing-component placeholder.
 
 ## Local server

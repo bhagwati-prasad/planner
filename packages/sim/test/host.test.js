@@ -6,9 +6,10 @@
 import { before, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
-import { runInThisContext } from 'node:vm'
+import { runInNewContext, runInThisContext } from 'node:vm'
 import { createFakeScheduler } from '../../../tools/testing/index.js'
 import * as sim from '../src/index.js'
+import { bootstrap } from '../src/worker/bootstrap.js'
 import { createSimHost } from '../../facade/src/index.js'
 import * as plugins from '../../plugins/src/index.js'
 import * as server from '../../server/src/index.js'
@@ -203,5 +204,41 @@ describe('worker session', () => {
     const values = reply?.message.payload.output.values
     assert.ok(values instanceof Float64Array, JSON.stringify(posted.map(p => p.message)))
     assert.deepEqual(reply?.transfer, [values.buffer])
+  })
+})
+
+describe('worker bootstrap', () => {
+  /**
+   * A worker scope whose importScripts refuses Blob URLs, as WebKit's does from file://.
+   * @param {Error} refusal
+   */
+  const refusing = refusal => {
+    /** @type {any} */
+    const scope = {
+      Math: {},
+      Date: {},
+      Blob: class {},
+      URL: { createObjectURL: () => 'blob:null/1', revokeObjectURL() {} },
+      importScripts() {
+        throw refusal
+      },
+    }
+    scope.eval = (/** @type {string} */ script) => runInNewContext(script, scope)
+    return scope
+  }
+  const networkError = () => Object.assign(new Error('Load failed'), { name: 'NetworkError' })
+
+  it('evaluates a behaviour script directly when importScripts refuses its Blob URL', () => {
+    const sandbox = bootstrap(refusing(networkError()))
+    /** @type {string[]} */
+    const defined = []
+    sandbox.evaluate(probeScript(), key => defined.push(key))
+    assert.deepEqual(defined, [PROBE])
+  })
+
+  it('reports any other failure of importScripts, such as a syntax error, as it is', () => {
+    const syntax = new SyntaxError('Unexpected token')
+    const sandbox = bootstrap(refusing(syntax))
+    assert.throws(() => sandbox.evaluate(probeScript(), () => {}), syntax)
   })
 })

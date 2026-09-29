@@ -5,8 +5,9 @@
  * `Math.random` a seeded stream and `Date.now` and `performance.now` simulated time. It is the one
  * place that evaluates code: component behaviours arrive as script text and load through a Blob
  * URL with `importScripts`, which the strict CSP allows (`script-src 'self' blob:`), and then it
- * removes `importScripts` too. A `worker_threads` worker has no `importScripts` and evaluates
- * them directly.
+ * removes `importScripts` too. Two cases evaluate the text directly instead: a `worker_threads`
+ * worker, which has no `importScripts`, and WebKit from a file:// page, which refuses the Blob
+ * URL; a file:// page has no CSP, so eval is allowed there (as the human decided on 2026-09-29).
  */
 import { xoshiro128ss } from '../random.js'
 
@@ -65,6 +66,10 @@ export function bootstrap(scope) {
           )
           try {
             scope.importScripts(url)
+          } catch (err) {
+            // WebKit refuses a Blob URL from a file:// page, where no CSP forbids eval.
+            if (/** @type {any} */ (err)?.name !== 'NetworkError') throw err
+            scope.eval(script)
           } finally {
             scope.URL.revokeObjectURL(url)
           }
