@@ -250,6 +250,12 @@ export class Graph {
   #canvasK = 0
   /** @type {string|null} the canvas-drawn component under the pointer */
   #canvasHover = null
+  /** @type {string[]} the components on the canvas layer, in keyboard focus order */
+  #canvasIds = []
+  /** The components last lifted over the canvas layer (#liftedIds), joined. */
+  #liftKey = ''
+  /** @type {Map<string, [Path2D, boolean][]>} shape outlines for the canvas layer (#outline) */
+  #outlines = new Map()
   /** The patterns the grid last drew, and the area its rectangles cover. */
   #gridKey = ''
   /** @type {(Rect & { k: number }) | null} */
@@ -262,6 +268,7 @@ export class Graph {
   /** @type {any} transient gesture state */
   #drag = null
   #spaceDown = false
+  /** @type {string|null} the component with keyboard focus */
   #focusedId = null
   #tokens
   #themeVersion = 0
@@ -1161,11 +1168,56 @@ export class Graph {
         if (id) this.#emitIntent({ type: 'open', id, kind: 'node' })
       })
       .on('pointermove.canvas', event => {
-        const id = this.#canvasK ? hitOf(event) : null
+        const id = this.#canvasK
+          ? (event.target.closest?.('.sg-node')?.getAttribute('data-id') ?? hitOf(event))
+          : null
         if (id === this.#canvasHover) return
         this.#canvasHover = id
         this.#emit('hover', id ? { id, kind: 'node' } : null)
+        this.#lift()
       })
+  }
+
+  /**
+   * The components drawn in SVG over the canvas layer, so they have ports, focus and states like
+   * any other: the one under the pointer, the focused one, and the ends of a connection being
+   * drawn.
+   */
+  #liftedIds() {
+    const d = this.#drag
+    return new Set([
+      this.#canvasHover,
+      this.#focusedId,
+      d?.source?.node,
+      d?.target?.node,
+      d?.refused?.node,
+    ])
+  }
+
+  /**
+   * Draws the lifted components again when they change. The canvas still draws them underneath,
+   * so it needs no redraw.
+   */
+  #lift() {
+    const lifted = this.#liftedIds()
+    const key = [...lifted].join()
+    if (!this.#canvasK || key === this.#liftKey) return
+    this.#liftKey = key
+    const m = this.#model
+    this.#renderNodes(
+      this.#layers.nodes,
+      [...lifted]
+        .map(id => m.nodes.get(/** @type {string} */ (id)))
+        .filter(n => n && !m.isHidden(n)),
+      true,
+      this.#dimmed()
+    )
+  }
+
+  /** The ids the highlight overlay keeps undimmed, or null without one. */
+  #dimmed() {
+    const highlight = this.#overlays.get('highlight')
+    return highlight ? new Set(highlight.ids ?? []) : null
   }
 
   /**
@@ -1234,6 +1286,18 @@ export class Graph {
         if (this.#selection.size) this.#emitIntent({ type: 'select', ids: [] })
         return
       }
+      // On the canvas layer, Tab lifts the next component and focuses it.
+      if (key === 'Tab' && this.#canvasK) {
+        const ids = this.#canvasIds
+        const id =
+          ids[ids.indexOf(/** @type {string} */ (this.#focusedId)) + (event.shiftKey ? -1 : 1)]
+        this.#focusedId = id ?? null
+        if (!id) return
+        event.preventDefault()
+        this.#lift()
+        this.focus(id)
+        return
+      }
       if (key === 'Enter') {
         const id =
           event.target?.closest?.('[data-id]')?.getAttribute('data-id') ??
@@ -1299,6 +1363,10 @@ export class Graph {
     const onBlur = () => {
       this.#spaceDown = false
     }
+    svg.addEventListener('focusin', event => {
+      this.#focusedId =
+        /** @type {any} */ (event.target).closest('.sg-node')?.getAttribute('data-id') ?? null
+    })
     svg.addEventListener('keydown', onKeyDown)
     svg.addEventListener('keyup', onKeyUp)
     svg.addEventListener('blur', onBlur)
@@ -1654,6 +1722,7 @@ export class Graph {
         d.moved = true
         d.target = this.#connectTarget(d.pointer, d.source, d.reverse)
         d.refused = d.target ? null : this.#refusedTarget(d.pointer, d.source, d.reverse)
+        this.#lift()
         this.#renderHandles()
       })
       .on('end', () => {
@@ -1673,6 +1742,7 @@ export class Graph {
             })
           }
         }
+        this.#lift()
         this.#renderHandles()
       }))
   }
@@ -2035,8 +2105,7 @@ export class Graph {
         culled: !!visible,
       }
 
-    const highlight = this.#overlays.get('highlight')
-    const dim = highlight ? new Set(highlight.ids ?? []) : null
+    const dim = this.#dimmed()
     this.#renderFrames(L.frames, frames, interactive, dim)
     this.#renderAnnotations(
       L.regions,
@@ -2046,7 +2115,14 @@ export class Graph {
     )
     this.#renderEdges(L.edges, edges, interactive, dim)
     const canvas = interactive && nodes.length > CANVAS_NODES
-    this.#renderNodes(L.nodes, canvas ? [] : nodes, interactive, dim)
+    const lifted = this.#liftedIds()
+    if (interactive) this.#liftKey = [...lifted].join()
+    this.#renderNodes(
+      L.nodes,
+      canvas ? nodes.filter(n => lifted.has(n.id)) : nodes,
+      interactive,
+      dim
+    )
     if (interactive) this.#drawCanvas(L.nodes, canvas ? nodes : null, area)
     // System names, drawn large over their areas and above every block below 15% zoom
     // (design system §6).
@@ -2250,7 +2326,10 @@ export class Graph {
   /**
    * Above 1,500 visible components the node layer is one Canvas 2D image (spec §10, eng §12). It
    * covers the rendered area, is drawn at the current zoom, and pointer events reach the
-   * background, where the spatial index finds the component under them (#canvasNodeAt).
+   * background, where the spatial index finds the component under them (#canvasNodeAt). Each
+   * component draws its shape's outline (#outline), its title, and the heat, breakpoint, scope and
+   * hop overlays as the SVG layer does. Lifted components (#liftedIds) are drawn again in SVG
+   * above it.
    * @param {any} layer
    * @param {any[]|null} nodes null when the nodes are SVG
    * @param {Rect|null} area
@@ -2258,43 +2337,160 @@ export class Graph {
   #drawCanvas(layer, nodes, area) {
     const on = !!nodes && !!area
     this.#canvasK = on ? this.#transform.k : 0
+    this.#canvasIds = on ? nodes.filter(n => !n.ghost).map(n => n.id) : []
     const box = layer
       .selectChildren('foreignObject.sg-node-layer')
       .data(on ? [area] : [])
       .join(enter => {
-        const f = enter.append('foreignObject').attr('class', 'sg-node-layer')
+        const f = enter.insert('foreignObject', ':first-child').attr('class', 'sg-node-layer')
         f.append('xhtml:canvas').attr('class', 'sg-node-canvas')
         return f
       })
     if (!nodes || !area) return
     const k = this.#transform.k
     const dpr = Math.min(2, this.#host.ownerDocument?.defaultView?.devicePixelRatio || 1)
+    const s = k * dpr
     box.attr('x', area.x).attr('y', area.y).attr('width', area.w).attr('height', area.h)
     const canvas = /** @type {HTMLCanvasElement} */ (
       box.select('canvas').style('width', `${area.w}px`).style('height', `${area.h}px`).node()
     )
-    canvas.width = Math.ceil(area.w * k * dpr)
-    canvas.height = Math.ceil(area.h * k * dpr)
-    const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'))
-    ctx.setTransform(k * dpr, 0, 0, k * dpr, -area.x * k * dpr, -area.y * k * dpr)
+    canvas.width = Math.ceil(area.w * s)
+    canvas.height = Math.ceil(area.h * s)
+    const main = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'))
+    // Components outside a scoped run fade to 30% as a whole, as SVG groups do: they draw on a
+    // second canvas, laid under the others at that opacity.
+    /** @type {CanvasRenderingContext2D|undefined} */
+    let faded
     const t = this.#tokens
     const radius = Number(t.radius) || 0
     const titles = k >= 0.15 && k * this.#fontSize >= 4
-    ctx.textBaseline = 'middle'
-    ctx.font = `600 ${this.#fontSize}px ${t.fontFamily}`
+    const font = `600 ${this.#fontSize}px ${t.fontFamily}`
+    const heat = this.#overlays.get('heatmap')
+    const domain = heat ? domainOf(heat) : null
+    const scope = this.#scopeIds()
+    const breakpoints = this.#overlays.get('breakpoints')?.values
+    const hop = this.#overlays.get('hop')
     for (const d of nodes) {
       const r = this.#itemRect(d.id)
       const selected = this.#selection.has(d.id)
-      ctx.beginPath()
-      ctx.roundRect(r.x, r.y, r.w, r.h, Math.min(radius, r.w / 2, r.h / 2))
-      ctx.fillStyle = t.nodeFill
-      ctx.fill()
+      const ctx =
+        d.outOfScope || (scope && !scope.has(d.id))
+          ? (faded ??= /** @type {any} */ (canvas.cloneNode()).getContext('2d'))
+          : main
+      ctx.setTransform(s, 0, 0, s, (r.x - area.x) * s, (r.y - area.y) * s)
+      ctx.textBaseline = 'middle'
       ctx.lineWidth = (selected ? 2 : 1) / k
       ctx.strokeStyle = selected ? t.accent : t.nodeStroke
-      ctx.stroke()
-      if (!titles || !d.label) continue
-      ctx.fillStyle = t.nodeText
-      ctx.fillText(truncateText(d.label, r.w - 16, this.#measureBold), r.x + 8, r.y + r.h / 2)
+      ctx.fillStyle = t.nodeFill
+      for (const [path, detail] of this.#outline(d, r)) {
+        if (!detail) ctx.fill(path)
+        ctx.stroke(path)
+      }
+      if (titles && d.label) {
+        ctx.font = font
+        ctx.textAlign = 'start'
+        ctx.fillStyle = t.nodeText
+        ctx.fillText(truncateText(d.label, r.w - 16, this.#measureBold), 8, r.h / 2)
+      }
+      // Utilisation: a tint from 50%, a 4 px bar and a danger mark from 95% (see #renderNodes).
+      const hv = heat?.values?.[d.id]
+      if (typeof hv === 'number') {
+        const u = normalise(hv, domain)
+        const step = heatStep(u)
+        ctx.fillStyle = step ? t[step] : t.port
+        ctx.globalAlpha = 0.4
+        if (step) this.#fillRound(ctx, 0, 0, r.w, r.h, radius)
+        ctx.globalAlpha = 1
+        ctx.fillRect(0, r.h - 4, r.w * u, 4)
+        ctx.fillStyle = t.danger
+        if (u >= 0.95) this.#fillRound(ctx, 4, r.h - 16, 10, 10, 3)
+      }
+      // A breakpoint's dot at the top-left corner, "?" when conditional.
+      const bp = breakpoints?.[d.id]
+      if (bp) {
+        ctx.fillStyle = t.danger
+        ctx.beginPath()
+        ctx.arc(0, 0, 5, 0, 7)
+        ctx.fill()
+        if (bp.conditional) {
+          ctx.font = `700 8px ${t.fontFamily}`
+          ctx.textAlign = 'center'
+          ctx.fillStyle = t.badgeText
+          ctx.fillText('?', 0, 0)
+        }
+      }
+      // The outlines of the component being processed and of each component in a scoped run.
+      ctx.strokeStyle = t.accent
+      for (const [ring, o, width, dash] of /** @type {const} */ ([
+        [hop?.node === d.id, 3, 2, []],
+        [scope?.has(d.id), 6, 1.5, [4, 3]],
+      ]))
+        if (ring) {
+          ctx.lineWidth = width
+          ctx.setLineDash(dash)
+          ctx.beginPath()
+          ctx.roundRect(-o, -o, r.w + 2 * o, r.h + 2 * o, radius + o)
+          ctx.stroke()
+          ctx.setLineDash([])
+        }
+    }
+    if (!faded) return
+    main.setTransform(1, 0, 0, 1, 0, 0)
+    main.globalAlpha = 0.3
+    main.globalCompositeOperation = 'destination-over'
+    main.drawImage(faded.canvas, 0, 0)
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} x @param {number} y @param {number} w @param {number} h @param {number} radius
+   */
+  #fillRound(ctx, x, y, w, h, radius) {
+    ctx.beginPath()
+    ctx.roundRect(x, y, w, h, radius)
+    ctx.fill()
+  }
+
+  /**
+   * A component's shape on the canvas layer, as paths in its own coordinates, each with whether
+   * it is a detail line drawn without a fill. The shape draws once into a detached group at the
+   * component's size, and its outline, strata and detail elements become the paths, so every
+   * shape, a host's too, has the same outline on both layers.
+   * @param {any} d @param {Rect} r
+   */
+  #outline(d, r) {
+    const key = JSON.stringify([d.shape, r.w, r.h, !!d.composite, d.side, this.#themeVersion])
+    let parts = this.#outlines.get(key)
+    if (!parts) {
+      if (this.#outlines.size > 500) this.#outlines.clear()
+      const g = this.#d3.create('svg:g')
+      this.#shapeOf(d).render(g, { ...d, w: r.w, h: r.h }, this.#shapeContext())
+      parts = g
+        .selectAll('.sg-shape, .sg-stratum, .sg-bp-disc')
+        .nodes()
+        .map((/** @type {Element} */ el) => {
+          const a = (/** @type {string} */ name) => Number(el.getAttribute(name)) || 0
+          const path = new Path2D(el.getAttribute('d') ?? '')
+          if (el.localName === 'rect')
+            path.roundRect(a('x'), a('y'), a('width'), a('height'), a('rx'))
+          if (/^(circle|ellipse)$/.test(el.localName))
+            path.ellipse(a('cx'), a('cy'), a('rx') || a('r'), a('ry') || a('r'), 0, 0, 7)
+          return /** @type {[Path2D, boolean]} */ ([path, el.getAttribute('fill') === 'none'])
+        })
+      this.#outlines.set(key, parts)
+    }
+    return parts
+  }
+
+  /** What a shape draws with (shapes.js). @returns {import('./shapes.js').ShapeContext} */
+  #shapeContext() {
+    return {
+      theme: this.#tokens,
+      radius: Number(this.#tokens.radius) || 0,
+      fontSize: this.#fontSize,
+      measure: this.#measure,
+      measureBold: this.#measureBold,
+      icon: markup => this.#icon(markup)?.cloneNode(true) ?? null,
     }
   }
 
@@ -2608,14 +2804,7 @@ export class Graph {
     node.__sgShape = shapeName
     const shape = this.#shapeOf(d)
     const dd = { ...d, w: r.w, h: r.h }
-    shape.render(body, dd, {
-      theme: this.#tokens,
-      radius: Number(this.#tokens.radius) || 0,
-      fontSize: this.#fontSize,
-      measure: this.#measure,
-      measureBold: this.#measureBold,
-      icon: markup => this.#icon(markup)?.cloneNode(true) ?? null,
-    })
+    shape.render(body, dd, this.#shapeContext())
     const style = d.style ?? {}
     body
       .selectAll('.sg-shape')
