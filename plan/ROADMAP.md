@@ -72,6 +72,7 @@ The generic D3 diagram library: data in, intents out, fast at 500+ components, w
 - [x] [0206 Frames, zones, boundaries and annotations](M02-strata-graph/0206-frames-annotations.md) (after 0204)
 - [x] [0207 Level of detail and performance](M02-strata-graph/0207-lod-performance.md) (after 0206)
 - [x] [0208 Overlays and export](M02-strata-graph/0208-overlays-export.md) (after 0207)
+- [ ] [0211 Canvas layer parity: shapes, ports, connecting and keyboard focus](M02-strata-graph/0211-canvas-layer-parity.md) (after 0208)
 
 ### M03 Component model and plugins
 
