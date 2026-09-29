@@ -1,10 +1,6 @@
 {
   "Core, facade and non-UI packages (minified)": {
-    "bytes": 257504,
+    "bytes": 263802,
     "owner": "0418"
-  },
-  "Simulation worker bundle (minified)": {
-    "bytes": 158554,
-    "owner": "0402"
   }
 }

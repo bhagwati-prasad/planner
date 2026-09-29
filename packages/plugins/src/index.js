@@ -33,6 +33,7 @@ export { validateBehaviour, checkModuleState, createTestContext } from './behavi
 export {
   packComponent,
   componentScript,
+  behaviourScript,
   readBundle,
   manifestOfBundle,
   requireBundle,

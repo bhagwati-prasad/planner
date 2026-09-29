@@ -4,6 +4,7 @@
  */
 export { startServer, CSP } from './server.js'
 export { ComponentCatalog } from './catalog.js'
+export { spawnThreadWorker } from './sim-worker.js'
 export { readFolder, packFolder, syntaxProblems, componentFolders } from './folders.js'
 // Node-side plugin tooling the CLI uses; eng §6 lets the CLI reach plugins only through here.
 /**

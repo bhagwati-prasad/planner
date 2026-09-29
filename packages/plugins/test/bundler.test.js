@@ -141,6 +141,69 @@ describe('bundler', () => {
     assert.equal(run.geometry, 'function', 'three comes from the vendored global')
   })
 
+  describe('re-export pruning', () => {
+    // A library entry made only of re-exports, like core's index.js, whose modules each note
+    // that they ran.
+    const library = {
+      'main.js': "import { a, alpha } from './lib/index.js'\nexport const value = a() + alpha\n",
+      'lib/index.js':
+        "// The library's entry.\nexport { a } from './a.js'\nexport { b } from './b.js'\nexport { inner as alpha } from './inner/index.js'\n",
+      'lib/a.js': "globalThis.ran.push('a')\nexport function a() {\n  return 'a'\n}\n",
+      'lib/b.js': "globalThis.ran.push('b')\nexport const b = 'b'\n",
+      'lib/inner/index.js':
+        "export { inner } from './inner.js'\nexport { unused } from './unused.js'\n",
+      'lib/inner/inner.js': "globalThis.ran.push('inner')\nexport const inner = '+inner'\n",
+      'lib/inner/unused.js': "globalThis.ran.push('unused')\nexport const unused = 0\n",
+    }
+    /** @param {Record<string, string>} files */
+    const run = files => {
+      const context = /** @type {any} */ ({ ran: [] })
+      context.globalThis = context
+      runInNewContext(
+        emitScript(bundleModules(files, ['main.js']), {
+          entry: 'main.js',
+          format: 'iife',
+          globalName: 'Fixture',
+        }),
+        context
+      )
+      return { value: context.Fixture.value, ran: context.ran }
+    }
+
+    it('follows imported names through modules made only of re-exports, and leaves out the rest', () => {
+      const bundle = bundleModules(library, ['main.js'])
+      assert.deepEqual(bundle.problems, [])
+      assert.deepEqual(
+        bundle.order.filter(p => !p.endsWith('index.js')),
+        ['lib/a.js', 'lib/inner/inner.js', 'main.js']
+      )
+      assert.deepEqual(run(library), { value: 'a+inner', ran: ['a', 'inner'] })
+    })
+
+    it('keeps every module that a namespace import, an export * or a module with its own code reaches', () => {
+      const namespace = {
+        ...library,
+        'main.js': "import * as lib from './lib/index.js'\nexport const value = lib.b\n",
+      }
+      const whole = bundleModules(namespace, ['main.js']).order
+      for (const path of ['lib/a.js', 'lib/b.js', 'lib/inner/inner.js', 'lib/inner/unused.js'])
+        assert.ok(whole.includes(path), `${path} is bundled for the namespace`)
+      assert.deepEqual(run(namespace), { value: 'b', ran: ['b'] }, 'each runs when first read')
+      const star = {
+        ...library,
+        'lib/index.js': "export * from './a.js'\nexport * from './b.js'\n",
+      }
+      star['main.js'] = "import { a } from './lib/index.js'\nexport const value = a()\n"
+      assert.deepEqual(run(star).ran, ['a', 'b'])
+      const own = {
+        ...library,
+        'lib/index.js': `${library['lib/index.js']}export const version = 1\n`,
+      }
+      assert.ok(bundleModules(own, ['main.js']).order.includes('lib/b.js'))
+      assert.deepEqual(run(own).ran, ['a', 'b', 'inner'])
+    })
+  })
+
   it('produces byte-identical output across runs and input orders', () => {
     const files = folder('three-files')
     const reversed = Object.fromEntries(Object.entries(files).reverse())

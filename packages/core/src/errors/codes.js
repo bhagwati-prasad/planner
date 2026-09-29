@@ -98,6 +98,10 @@ const DESCRIPTIONS = {
   E_SIM_NO_EDGE: 'The system has no edge for a request to travel over',
   E_SIM_EDGE_NOT_FOUND: 'The edge a run names is not in the model',
   E_SIM_COMPONENT_NOT_FOUND: 'An edge in a run names a component that is not in the model',
+  E_SIM_NOT_LOADED: 'A call names a component the simulation worker has not loaded',
+  E_SIM_SEALED: 'The simulation worker has loaded its components; a new worker loads others',
+  E_SIM_METHOD_HUNG: 'A method ran for 2 s without returning, so its worker was stopped',
+  E_SIM_STOPPED: 'The simulation worker was stopped before it answered',
 
   E_PROTOCOL_VERSION: 'A worker message uses a protocol version this build does not speak',
   E_PROTOCOL_UNKNOWN_TYPE: 'A worker message has a type the worker does not handle',

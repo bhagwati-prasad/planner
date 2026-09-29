@@ -173,6 +173,7 @@ export function bundleModules(files, entries) {
     order.push(path)
   }
   for (const path of [...deps.keys()].sort()) if (!seen.has(path)) walk(path)
+  const included = neededModules(modules, entries)
 
   checkCycles(modules, deps, error)
 
@@ -215,7 +216,65 @@ export function bundleModules(files, entries) {
     }
   }
 
-  return { modules, order, problems }
+  return { modules, order: order.filter(p => included.has(p)), problems }
+}
+
+/**
+ * The modules a bundle needs. A module made only of named re-exports (`reexportsOnly`) is
+ * looked through: importing some of its names needs the modules that define them, not every
+ * module it re-exports. A namespace import, `export *` or `import()` of it needs all of them.
+ * @param {Record<string, import('./modules.js').TransformedModule>} modules
+ * @param {string[]} entries
+ */
+function neededModules(modules, entries) {
+  const included = new Set()
+  const whole = new Set()
+  const named = new Set()
+  /** @param {string} from @param {string|null} specifier */
+  const target = (from, specifier) => {
+    if (specifier === null) return null
+    const r = resolveImport(from, specifier)
+    return 'path' in r && modules[r.path] ? r.path : null
+  }
+  /** Needs `path` and everything it imports. @param {string|null} path */
+  const need = path => {
+    if (path === null || whole.has(path)) return
+    whole.add(path)
+    included.add(path)
+    const mod = modules[path]
+    for (const imp of mod.imports) {
+      const to = target(path, imp.specifier)
+      const names = [...imp.bindings.map(b => b.imported), ...imp.reexports.map(r => r.imported)]
+      if (
+        to &&
+        !mod.reexportsOnly &&
+        modules[to].reexportsOnly &&
+        !imp.star &&
+        !names.includes('*')
+      )
+        for (const name of names) needName(to, name)
+      else need(to)
+    }
+    for (const d of mod.dynamic) need(target(path, d.specifier))
+  }
+  /** Needs what defines `name` in the re-export module `path`. @param {string} path @param {string} name */
+  const needName = (path, name) => {
+    if (whole.has(path) || named.has(`${path}#${name}`)) return
+    named.add(`${path}#${name}`)
+    included.add(path)
+    for (const imp of modules[path].imports)
+      for (const r of imp.reexports) {
+        if (r.exported !== name) continue
+        const to = target(path, imp.specifier)
+        if (to && modules[to].reexportsOnly) needName(to, r.imported)
+        else need(to)
+      }
+  }
+  for (const entry of entries) {
+    const path = normalizePath(entry)
+    if (path !== null && modules[path]) need(path)
+  }
+  return included
 }
 
 /**

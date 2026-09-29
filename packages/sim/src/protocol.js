@@ -1,8 +1,8 @@
 // @ts-check
 /**
  * The worker protocol (eng §13 "Worker protocol"): every message is `{ v, type, id, payload }`,
- * where `v` is the protocol version and `id` pairs a reply with its request. Task 0402 adds
- * streaming, Transferables and the heartbeat.
+ * where `v` is the protocol version and `id` pairs a reply with its request. The worker's
+ * session (worker/session.js) adds `load`, `call` and the heartbeat.
  *
  *   → { v: 1, type: 'run', id, payload: RunInput }
  *   ← { v: 1, type: 'run.result', id, payload: RunResult }
@@ -15,6 +15,29 @@ export const PROTOCOL_VERSION = 1
 /**
  * @typedef {{ v: number, type: string, id: string|number|null, payload?: any }} ProtocolMessage
  */
+
+/**
+ * The buffers of the typed arrays and ArrayBuffers inside a value, to move instead of copy when
+ * posting it (eng §13 "Large arrays travel as Transferables").
+ * @param {unknown} value
+ * @returns {ArrayBuffer[]}
+ */
+export function transferables(value) {
+  /** @type {Set<ArrayBuffer>} */
+  const buffers = new Set()
+  const seen = new Set()
+  /** @param {unknown} v */
+  const visit = v => {
+    if (typeof v !== 'object' || v === null || seen.has(v)) return
+    seen.add(v)
+    if (v instanceof ArrayBuffer) buffers.add(v)
+    else if (ArrayBuffer.isView(v)) {
+      if (v.buffer instanceof ArrayBuffer) buffers.add(v.buffer)
+    } else for (const item of Object.values(v)) visit(item)
+  }
+  visit(value)
+  return [...buffers]
+}
 
 /**
  * @param {ProtocolMessage['id']} id

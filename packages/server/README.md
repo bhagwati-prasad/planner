@@ -7,6 +7,10 @@ The local server behind `strata serve`: static files under a strict CSP, compone
 - Entry point: `src/index.js`, the only file other packages may import (eng §4)
 - Tests: `test/`, run with `npm test`
 
+## Simulation worker in Node
+
+`spawnThreadWorker(source)` starts the simulation worker bundle (`dist/sim-worker.js`) in a `worker_threads` worker, behind a prelude that gives it a browser worker's `postMessage` and `onmessage` (spec §18 "Sandbox host"). It is the `spawn` that strata-sim's `createSimHost` takes; the facade re-exports `createSimHost`.
+
 ## Security (eng §16 "Local server")
 
 - **Binding.** It binds to a loopback address only.
