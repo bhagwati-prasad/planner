@@ -26,14 +26,36 @@ const DESCRIPTIONS = {
   E_COMMAND_VERSION:
     'An operation was written by a newer version of its command, or a command version has no upgrader from the one before',
 
+  E_BEHAVIOUR_SHAPE:
+    'A behaviour module does not export an object of hooks, has an unknown hook, or a method that is not a function',
+  E_BEHAVIOUR_UNDECLARED_METHOD: 'A behaviour has a public method the manifest does not declare',
+  E_BEHAVIOUR_MISSING_METHOD:
+    'A method the manifest declares, or ctx.call names, has no implementation',
+  E_BEHAVIOUR_MODULE_STATE: 'A behaviour module keeps mutable state at module level',
+  E_BEHAVIOUR_UNDECLARED_STATE: 'Behaviour code set a state field the manifest does not declare',
+
   E_BUNDLE_BARE_SPECIFIER:
     'A bundle imports an npm package; only relative imports, d3 and three are allowed',
   E_BUNDLE_CYCLE:
     'Bundle modules import each other in a cycle through bindings that are not hoisted',
+  E_BUNDLE_INTEGRITY:
+    'A packed bundle was changed after packing, so its integrity hash does not match',
   E_BUNDLE_MISSING_EXPORT: 'A bundle module imports a name its target does not export',
   E_BUNDLE_MISSING_MODULE: 'A bundle module imports a file that is not in the bundle',
   E_BUNDLE_OUTSIDE_ROOT: 'A bundle module imports a path outside the component folder',
   E_BUNDLE_SYNTAX: 'A bundle module is not valid JavaScript',
+
+  E_MANIFEST_IDENTITY:
+    'A manifest id, name or version is missing or malformed, or the id is reserved',
+  E_MANIFEST_KIND: 'A manifest is not an object, or its kind or extends is not valid',
+  E_MANIFEST_API_RANGE: "A manifest's strataApi is missing, malformed or excludes this plugin API",
+  E_MANIFEST_PORT: 'A manifest port has no name, a repeated name, or a bad direction or accepts',
+  E_MANIFEST_UNKNOWN_METHOD: 'A manifest port exposes a method that is not declared public',
+  E_MANIFEST_METHOD: 'A manifest method is malformed, or has a bad latency or errors list',
+  E_MANIFEST_PROPERTY: 'A manifest property schema is not valid',
+  E_MANIFEST_STATE: 'A manifest state field has a bad type, or a missing or bad initial value',
+  E_MANIFEST_METRIC: 'A manifest metric is malformed or has an unknown roll-up rule',
+  E_MANIFEST_FILE: 'A file a manifest names is missing or of the wrong kind',
 
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',
   E_SYSTEM_CYCLE: 'The change would make a system contain itself, directly or through descendants',

@@ -10,6 +10,11 @@ import { messageQueueFolder } from '../../plugins/test/fixtures.js'
 
 let root
 let server
+/** The session cookie the app page comes with; API calls need it (eng §16). */
+let session = ''
+/** An API call with the session token. @param {string} path @param {RequestInit} [init] */
+const api = (path, init = {}) =>
+  fetch(`${server.url}${path}`, { ...init, headers: { cookie: session } })
 
 /** Writes a component folder under root/components/<name>. */
 function writeFolder(name, files) {
@@ -47,6 +52,7 @@ before(async () => {
   writeFileSync(join(root, 'app', 'index.html'), '<!doctype html><title>app</title>')
   writeFileSync(join(root, '.env'), 'SECRET=1')
   server = await startServer({ root, components: [join(root, 'components')], watch: true })
+  session = (await fetch(`${server.url}/app/`)).headers.get('set-cookie')?.split(';')[0] ?? ''
 })
 
 after(async () => {
@@ -55,7 +61,7 @@ after(async () => {
 })
 
 test('the component API lists packed components and their problems', async () => {
-  const res = await fetch(`${server.url}/api/components`)
+  const res = await api('/api/components')
   assert.equal(res.headers.get('content-security-policy'), CSP)
   const { components } = await res.json()
   assert.deepEqual(
@@ -77,11 +83,11 @@ test('the component API lists packed components and their problems', async () =>
   assert.equal(queue.script, '/api/components/acme.message-queue%401.2.0.strata.js')
   assert.deepEqual(readBundle(queue.bundle), queue.bundle, 'bundles arrive intact')
 
-  const script = await fetch(`${server.url}${queue.script}`)
+  const script = await api(queue.script)
   assert.equal(script.headers.get('content-type'), 'text/javascript; charset=utf-8')
   assert.equal(readBundle(await script.text()).integrity, queue.integrity)
-  assert.equal((await fetch(`${server.url}/api/components/acme.nope@1.0.0.strata.js`)).status, 404)
-  assert.equal((await fetch(`${server.url}/api/nope`)).status, 404)
+  assert.equal((await api('/api/components/acme.nope@1.0.0.strata.js')).status, 404)
+  assert.equal((await api('/api/nope')).status, 404)
 })
 
 test('static files, redirects and the security rules of served mode', async () => {
@@ -115,7 +121,7 @@ test('static files, redirects and the security rules of served mode', async () =
 
 test('changing a component folder repacks it and notifies open pages', async () => {
   const controller = new AbortController()
-  const res = await fetch(`${server.url}/api/events`, { signal: controller.signal })
+  const res = await api('/api/events', { signal: controller.signal })
   assert.equal(res.headers.get('content-type'), 'text/event-stream')
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -128,15 +134,14 @@ test('changing a component folder repacks it and notifies open pages', async () 
     }
     return text
   }
-  const before = (await (await fetch(`${server.url}/api/components`)).json()).components[1]
-    .integrity
+  const before = (await (await api('/api/components')).json()).components[1].integrity
   writeFileSync(join(root, 'components', 'message-queue', 'README.md'), '# Changed\n')
   const event = await next()
   const data = JSON.parse(/data: (.*)\n/.exec(event)?.[1] ?? '{}')
   assert.deepEqual(data.changes, [
     { action: 'changed', folder: 'components/message-queue', typeRef: 'acme.message-queue@1.2.0' },
   ])
-  const after = (await (await fetch(`${server.url}/api/components`)).json()).components[1].integrity
+  const after = (await (await api('/api/components')).json()).components[1].integrity
   assert.notEqual(after, before)
   controller.abort()
 })

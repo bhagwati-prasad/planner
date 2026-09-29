@@ -15,16 +15,19 @@ import { Collection } from './collection.js'
 export class ComponentsApi {
   #registry
   #emit
+  #storage
   /** @type {Map<string, ComponentBundle>} typeRef → bundle */
   #bundles = new Map()
 
   /**
    * @param {import('../../core/src/index.js').Registry} registry
    * @param {(event: string, data: any) => void} emit
+   * @param {import('./storage.js').StorageAdapter} storage  keeps uploaded components
    */
-  constructor(registry, emit) {
+  constructor(registry, emit, storage) {
     this.#registry = registry
     this.#emit = emit
+    this.#storage = storage
   }
 
   /**
@@ -82,7 +85,8 @@ export class ComponentsApi {
   }
 
   /**
-   * Packs uploaded files and installs the result.
+   * Packs uploaded files and installs the result. The storage adapter keeps it, so a later
+   * session installs it again with restore().
    * @param {{ path: string, content: string|Uint8Array }[]} files
    * @param {{ replace?: boolean, inflateRaw?: (data: Uint8Array) => Uint8Array|Promise<Uint8Array> }} [options]
    * @returns {Promise<{ component: InstalledComponent|null, problems: import('../../plugins/src/index.js').Problem[] }>}
@@ -91,12 +95,28 @@ export class ComponentsApi {
   async upload(files, { replace, inflateRaw } = {}) {
     const result = await packUpload(files, { inflateRaw })
     if (!result.bundle) return { component: null, problems: result.problems }
-    return { component: this.install(result.bundle, { replace }), problems: result.problems }
+    const component = this.install(result.bundle, { replace })
+    await this.#storage.saveComponent?.(result.bundle)
+    return { component, problems: result.problems }
   }
 
   /**
-   * Removes a component type (one version, or every version when none is given). Nodes that
-   * use it keep their properties and show as placeholders until it is installed again.
+   * Installs the components uploaded in earlier sessions, which the storage adapter keeps
+   * (spec §8 "Loading paths"). The app does this as it starts.
+   * @returns {Promise<string[]>} the type references installed
+   * @example await strata.components.restore()
+   */
+  async restore() {
+    const bundles = (await this.#storage.loadComponents?.()) ?? []
+    return bundles.map(
+      bundle => this.install(/** @type {any} */ (bundle), { replace: true }).typeRef
+    )
+  }
+
+  /**
+   * Removes a component type (one version, or every version when none is given), and the copy
+   * the storage adapter keeps of an uploaded one. Nodes that use it keep their properties and
+   * show as placeholders until it is installed again.
    * @param {string} ref id or id@version
    * @example strata.components.uninstall('acme.queue@1.2.0')
    */
@@ -108,8 +128,12 @@ export class ComponentsApi {
     if (!versions.length || (version && !this.#registry.get(ref)))
       fail('NOT_FOUND', `Component '${ref}' is not installed`)
     for (const v of versions) {
+      const typeRef = `${id}@${v}`
       this.#registry.unregister(id, v)
-      this.#bundles.delete(`${id}@${v}`)
+      this.#bundles.delete(typeRef)
+      this.#storage
+        .removeComponent?.(typeRef)
+        ?.catch(err => this.#emit('components', { action: 'error', typeRef, message: err.message }))
     }
     this.#emit('components', { action: 'uninstall', typeRef: version ? ref : id })
     return versions.length

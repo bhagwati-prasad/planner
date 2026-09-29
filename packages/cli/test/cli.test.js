@@ -170,6 +170,7 @@ test('usage errors and commands from later releases', async () => {
 test('serve starts the local server with the components it finds, until stopped', async () => {
   for (const [path, content] of Object.entries(messageQueueFolder()))
     write(`components/message-queue/${path}`, content)
+  write('app/index.html', '<!doctype html><title>app</title>')
   const controller = new AbortController()
   let stdout = ''
   const running = main(['serve', '--port', '0', '--root', '.'], {
@@ -186,7 +187,11 @@ test('serve starts the local server with the components it finds, until stopped'
   const url = /running at (http:\/\/[^/\s]+)\//.exec(stdout)?.[1]
   assert.ok(url)
   assert.match(stdout, /components: 1 packed from components/)
-  const { components } = await (await fetch(`${url}/api/components`)).json()
+  // API calls carry the session token the app page comes with (eng §16).
+  const cookie = (await fetch(`${url}/app/`)).headers.get('set-cookie')?.split(';')[0] ?? ''
+  const { components } = await (
+    await fetch(`${url}/api/components`, { headers: { cookie } })
+  ).json()
   assert.equal(components[0].typeRef, 'acme.message-queue@1.2.0')
   controller.abort()
   assert.equal(await running, 0)

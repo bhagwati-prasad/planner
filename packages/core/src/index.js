@@ -39,9 +39,11 @@ export {
   Registry,
   createRegistry,
   normalizeManifest,
+  checkManifest,
   parseTypeRef,
   typeRefOf,
   CORE_API_VERSION,
+  SUPPORTED_API_RANGE,
   PORT_DIRECTIONS,
   PLUGIN_KINDS,
 } from './registry.js'
