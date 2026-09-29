@@ -10,6 +10,8 @@ import {
   boundaryAnchor,
   segmentCrossesRect,
   slideOut,
+  partAlong,
+  pointAlong,
   snap,
   expand,
   center,
@@ -96,6 +98,29 @@ test('a point slides along its segment out of a rectangle, toward the end that i
     slideOut({ x: 100, y: 50 }, { x: 100, y: 0 }, { x: 100, y: 100 }, pill),
     { x: 100, y: 60 },
     'vertical segments too'
+  )
+})
+
+test('a point a fraction of the way along a polyline, measured by length', () => {
+  const route = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+  ]
+  assert.deepEqual(pointAlong(route, 0), { x: 0, y: 0 })
+  assert.deepEqual(pointAlong(route, 0.25), { x: 50, y: 0 })
+  assert.deepEqual(pointAlong(route, 0.75), { x: 100, y: 50 })
+  assert.deepEqual(pointAlong(route, 1), { x: 100, y: 100 })
+  assert.deepEqual(pointAlong(route, 2), { x: 100, y: 100 }, 'clamped')
+  assert.deepEqual(pointAlong([{ x: 5, y: 5 }], 0.5), { x: 5, y: 5 }, 'a single point')
+  assert.deepEqual(
+    partAlong(route, 0.75),
+    [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 50 },
+    ],
+    "the route up to that point, for a followed request's trail"
   )
 })
 

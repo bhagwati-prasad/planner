@@ -47,6 +47,8 @@ import {
   boundaryAnchor,
   center,
   containsPoint,
+  partAlong,
+  pointAlong,
   expand,
   portAnchors,
   rectFromPoints,
@@ -108,6 +110,37 @@ function slide(anchor, by) {
 }
 const HANDLE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const FRAME_RADIUS = 6
+/** Request dots drawn at once, at most (design system §6). */
+const MAX_DOTS = 400
+/** What a stub marker's tooltip calls each stub mode (design system §6). */
+const STUB_MODES = /** @type {Record<string, string>} */ ({
+  fixed: 'Fixed',
+  recorded: 'Recorded',
+  'black-box': 'Black box',
+})
+/** The glyphs of the stub (a plug) and traffic (play) markers, in a 14 px box. */
+const GLYPHS = /** @type {Record<string, string>} */ ({
+  stub: 'M-3,-5v3M3,-5v3M-4,-2h8v2a4,4 0 0 1-8,0zM0,4v3',
+  traffic: 'M-2,-4L4,0L-2,4Z',
+})
+/**
+ * The token of design system §3's heat ramp for a utilisation from 0 to 1, or null below 50%,
+ * where there is no tint.
+ * @param {number} u
+ */
+const heatStep = u =>
+  u < 0.5
+    ? null
+    : u < 0.7
+      ? 'heatLow'
+      : u < 0.85
+        ? 'heatMid'
+        : u < 0.95
+          ? 'heatHigh'
+          : 'heatCritical'
+/** A short, stable hash of a string, for ids that must not depend on drawing order. */
+const hash = (/** @type {string} */ s) =>
+  ([...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 0) >>> 0).toString(36)
 /** Above this many visible components the node layer is one Canvas 2D image (spec §10). */
 const CANVAS_NODES = 1500
 
@@ -507,12 +540,24 @@ export class Graph {
    *   'edge-width' { values: { id: number }, domain?: [min, max], range?: [min, max] }
    *   'badges'     { values: { id: number|string } }  counters on nodes (open comments, failures)
    *   'highlight'  { ids: string[] }  dims everything else
+   * and those of design system §6:
+   *   'heatmap'     utilisation from 0 to 1 draws the heat ramp as a tint from 50%, a 4 px bar
+   *                 and, from 75% zoom, the percentage
+   *   'requests'    { dots: [{ edge, t, failed? }] }  dots t (0 to 1) along edges, at most 400
+   *   'followed'    { edge, t, trail?: edgeIds }  the followed request and the path it took
+   *   'scope'       { ids, stubs?: { edgeId: 'fixed'|'recorded'|'black-box' },
+   *                 sources?: { edgeId: label } }  outlines what runs, dims the rest to 30%, and
+   *                 marks connections leaving (stubs) and entering (traffic) the scope
+   *   'breakpoints' { values: { id: { conditional? } } }  a danger dot, "?" when conditional
+   *   'hop'         { node?, edge? }  the component and connection being processed
    * @param {string} name
    * @param {any} spec
    */
   setOverlay(name, spec) {
     this.#overlays.set(name, spec)
-    this.#render()
+    // Dots move every frame, so they redraw alone.
+    if (name === 'requests' || name === 'followed') this.#renderOverlays(this.#layers)
+    else this.#render()
     return this
   }
 
@@ -621,6 +666,19 @@ export class Graph {
    * @returns {string}
    */
   exportSVG({ ids, padding = 24, background = true } = {}) {
+    // Ids in the file do not depend on which graph drew it, so the same data exports the same
+    // document (task 0208).
+    const live = this.#uid
+    this.#uid = 'strata'
+    try {
+      return this.#exportSVG(ids, padding, background)
+    } finally {
+      this.#uid = live
+    }
+  }
+
+  /** @param {Iterable<string>|undefined} ids @param {number} padding @param {boolean} background */
+  #exportSVG(ids, padding, background) {
     const only = ids ? new Set(ids) : null
     const bounds = this.#model.bounds(only ?? undefined) ?? { x: 0, y: 0, w: 1, h: 1 }
     const box = expand(bounds, padding)
@@ -862,6 +920,9 @@ export class Graph {
       edges,
       nodes,
       names: overlays.append('g').attr('class', 'sg-names'),
+      marks: overlays.append('g').attr('class', 'sg-marks'),
+      followed: overlays.append('g').attr('class', 'sg-follow'),
+      requests: overlays.append('g').attr('class', 'sg-requests'),
       guides: overlays.append('g').attr('class', 'sg-guides'),
       tokens: overlays.append('g').attr('class', 'sg-tokens'),
       annotations,
@@ -2001,6 +2062,7 @@ export class Graph {
       .attr('x', d => center(this.#itemRect(d.id)).x)
       .attr('y', d => center(this.#itemRect(d.id)).y)
       .text(d => d.label)
+    this.#renderOverlays(L)
     this.#renderAnnotations(
       L.annotations,
       annotations.filter(a => a.kind !== 'region'),
@@ -2064,6 +2126,125 @@ export class Graph {
         .text(trust ? `Trust boundary${d.label ? `: ${d.label}` : ''}` : (d.label ?? ''))
       g.select('.sg-frame-title').attr('x', r.x).attr('y', r.y).attr('width', r.w)
     })
+  }
+
+  /** The components a scoped run covers, or null outside one. */
+  #scopeIds() {
+    const ids = this.#overlays.get('scope')?.ids
+    return ids ? new Set(ids) : null
+  }
+
+  /**
+   * What simulation and debugging draw over the scene (design system §6): request dots, at most
+   * 400 and only those in view; the followed request with its trail; and the stub and traffic
+   * markers where a scoped run's connections leave or enter the scope.
+   * @param {Record<string, any>} L
+   */
+  #renderOverlays(L) {
+    if (!L.marks) return
+    const m = this.#model
+    const pointsOf = (/** @type {string} */ id) => {
+      const e = m.edges.get(id)
+      return e && !m.isHidden(e) ? this.#routeOf(e).points : null
+    }
+    const scope = this.#scopeIds()
+    const spec = this.#overlays.get('scope')
+    const marks = []
+    for (const e of scope ? m.edges.values() : []) {
+      const leaves = scope?.has(e.source.node)
+      const pts = leaves !== scope?.has(e.target.node) && pointsOf(e.id)
+      if (!pts) continue
+      marks.push(
+        leaves
+          ? {
+              key: `s${e.id}`,
+              kind: 'stub',
+              at: pts[pts.length - 1],
+              title: `Stub: ${STUB_MODES[spec.stubs?.[e.id]] ?? STUB_MODES.fixed}`,
+              text: '',
+            }
+          : {
+              key: `t${e.id}`,
+              kind: 'traffic',
+              at: pts[0],
+              title: '',
+              text: spec.sources?.[e.id] ?? '',
+            }
+      )
+    }
+    L.marks
+      .selectChildren('g')
+      .data(marks, (/** @type {any} */ d) => d.key)
+      .join((/** @type {any} */ enter) => {
+        const g = enter.append('g')
+        for (const tag of ['title', 'rect', 'path', 'text']) g.append(tag)
+        return g
+      })
+      .attr('class', (/** @type {any} */ d) => `sg-${d.kind}`)
+      .attr('transform', (/** @type {any} */ d) => `translate(${d.at.x},${d.at.y})`)
+      .call((/** @type {any} */ g) =>
+        g.select('title').text((/** @type {any} */ d) => d.title || d.text)
+      )
+      .call((/** @type {any} */ g) =>
+        g
+          .select('rect')
+          .attr('x', -7)
+          .attr('y', -7)
+          .attr('width', 14)
+          .attr('height', 14)
+          .attr('rx', (/** @type {any} */ d) => (d.kind === 'traffic' ? 7 : 2))
+      )
+      .call((/** @type {any} */ g) =>
+        g.select('path').attr('d', (/** @type {any} */ d) => GLYPHS[d.kind])
+      )
+      .call((/** @type {any} */ g) =>
+        g
+          .select('text')
+          .attr('y', -12)
+          .text((/** @type {any} */ d) => d.text)
+      )
+    const view = expand(visibleRect(this.#transform, this.#size), 8)
+    const dots = []
+    for (const dot of this.#overlays.get('requests')?.dots ?? []) {
+      if (dots.length >= MAX_DOTS) break
+      const pts = pointsOf(dot.edge)
+      const at = pts && pointAlong(pts, dot.t)
+      if (at && containsPoint(view, at)) dots.push({ ...at, failed: !!dot.failed })
+    }
+    L.requests
+      .selectChildren('circle')
+      .data(dots)
+      .join('circle')
+      .attr('class', (/** @type {any} */ d) =>
+        d.failed ? 'sg-request sg-request-failed' : 'sg-request'
+      )
+      .attr('cx', (/** @type {any} */ d) => d.x)
+      .attr('cy', (/** @type {any} */ d) => d.y)
+      .attr('r', 2)
+    // The trail follows each connection taken, not the gaps between them inside components.
+    const f = this.#overlays.get('followed')
+    const current = f && pointsOf(f.edge)
+    const legs = current
+      ? [
+          ...(f.trail ?? []).map((/** @type {string} */ id) => pointsOf(id)).filter(Boolean),
+          partAlong(current, f.t),
+        ]
+      : []
+    const line = (/** @type {any[]} */ p) => `M${p.map(q => `${q.x},${q.y}`).join('L')}`
+    L.followed
+      .selectChildren('path')
+      .data(legs.length ? [legs.map(line).join('')] : [])
+      .join('path')
+      .attr('class', 'sg-trail')
+      .attr('d', (/** @type {string} */ d) => d)
+    L.followed
+      .selectChildren('circle')
+      .data(current ? [legs[legs.length - 1].at(-1)] : [])
+      .join('circle')
+      .attr('class', 'sg-followed')
+      .attr('cx', (/** @type {any} */ p) => p.x)
+      .attr('cy', (/** @type {any} */ p) => p.y)
+      .attr('r', 4)
   }
 
   /**
@@ -2146,6 +2327,10 @@ export class Graph {
     const heat = this.#overlays.get('heatmap')
     const badges = this.#overlays.get('badges')
     const heatDomain = heat ? domainOf(heat) : null
+    const scope = this.#scopeIds()
+    const breakpoints = this.#overlays.get('breakpoints')?.values
+    const hop = this.#overlays.get('hop')
+    const radius = Number(this.#tokens.radius) || 0
     const target =
       this.#drag?.type === 'connect' || this.#drag?.type === 'reconnect' ? this.#drag.target : null
     const all = enter
@@ -2161,6 +2346,9 @@ export class Graph {
           heat?.values?.[d.id] ?? null,
           heat ? heatDomain : null,
           badges?.values?.[d.id] ?? null,
+          scope ? scope.has(d.id) : null,
+          breakpoints?.[d.id] ?? null,
+          hop?.node === d.id,
           target?.node === d.id ? target.port : null,
           this.#dragged(d.id),
           this.#opts.portRadius,
@@ -2177,7 +2365,7 @@ export class Graph {
       .classed('sg-status-planned', d => d.status === 'planned')
       .classed('sg-status-deprecated', d => d.status === 'deprecated')
       .classed('sg-failing', d => !!d.failing)
-      .classed('sg-out-of-scope', d => !!d.outOfScope)
+      .classed('sg-out-of-scope', d => !!d.outOfScope || (!!scope && !scope.has(d.id)))
       .classed('sg-dragging', d => this.#dragged(d.id))
       .classed('sg-composite', d => !!d.composite)
       .classed('sg-locked', d => m.isLocked(d))
@@ -2192,9 +2380,6 @@ export class Graph {
           d => [d.title ?? d.label, d.sublabel].filter(Boolean).join(', ') || d.id
         )
     }
-    const heatColor = heat
-      ? this.#d3.interpolateRgb?.(this.#tokens.heatLow, this.#tokens.heatHigh)
-      : null
     const portDrag = interactive ? this.#portDragBehavior() : null
     all.each((d, i, groups) => {
       const g = this.#d3.select(groups[i])
@@ -2239,21 +2424,76 @@ export class Graph {
 
       // Overlays: heat tint and badge
       const decor = g.select('.sg-decor')
+      // Utilisation (design system §6): the heat ramp of §3 as a tint from 50%, a 4 px bar along
+      // the bottom edge and, from 75% zoom, the percentage, with a danger mark from 95%.
       const hv = heat?.values?.[d.id]
-      const heatSel = decor.selectChildren('rect.sg-heat').data(typeof hv === 'number' ? [hv] : [])
-      heatSel.exit().remove()
-      heatSel
-        .enter()
-        .append('rect')
-        .attr('class', 'sg-heat')
-        .merge(heatSel)
-        .attr('width', r.w)
-        .attr('height', r.h)
-        .attr('rx', Number(this.#tokens.radius) || 0)
-        .attr('fill', v =>
-          heatColor ? heatColor(normalise(v, heatDomain)) : this.#tokens.heatHigh
-        )
-        .attr('fill-opacity', 0.4)
+      decor
+        .selectChildren('g.sg-heat')
+        .data(typeof hv === 'number' ? [normalise(hv, heatDomain)] : [])
+        .join(enter => {
+          const h = enter.append('g').attr('class', 'sg-heat')
+          for (const part of ['tint', 'bar', 'alert'])
+            h.append('rect').attr('class', `sg-heat-${part}`)
+          h.append('text').attr('class', 'sg-heat-label')
+          return h
+        })
+        .each((u, j, els) => {
+          const h = this.#d3.select(els[j])
+          const step = heatStep(u)
+          const fill = step ? this.#tokens[step] : this.#tokens.port
+          h.select('.sg-heat-tint')
+            .attr('display', step ? null : 'none')
+            .attr('width', r.w)
+            .attr('height', r.h)
+            .attr('rx', radius)
+            .attr('fill', fill)
+          h.select('.sg-heat-bar')
+            .attr('y', r.h - 4)
+            .attr('width', r.w * u)
+            .attr('height', 4)
+            .attr('fill', fill)
+          // The danger octagon of design system §3, as a 10 px square cut at the corners.
+          h.select('.sg-heat-alert')
+            .attr('display', u >= 0.95 ? null : 'none')
+            .attr('x', 4)
+            .attr('y', r.h - 16)
+            .attr('width', 10)
+            .attr('height', 10)
+            .attr('rx', 3)
+          h.select('.sg-heat-label')
+            .attr('x', r.w - 4)
+            .attr('y', r.h - 8)
+            .text(`${Math.round(u * 100)}%`)
+        })
+      // Debugging (design system §6): a breakpoint's danger dot at the top-left corner, "?" when
+      // conditional; the outline of the component being processed; and, in a scoped run, the
+      // dashed outline of each component that runs.
+      const bp = breakpoints?.[d.id]
+      decor
+        .selectChildren('g.sg-breakpoint')
+        .data(bp ? [bp] : [])
+        .join(enter => {
+          const b = enter.append('g').attr('class', 'sg-breakpoint')
+          b.append('circle').attr('r', 5)
+          b.append('text')
+          return b
+        })
+        .select('text')
+        .text(b => (b.conditional ? '?' : ''))
+      const rings = [
+        ...(hop?.node === d.id ? [['sg-hop-outline', 3]] : []),
+        ...(scope?.has(d.id) ? [['sg-scope-outline', 6]] : []),
+      ]
+      decor
+        .selectChildren('rect.sg-ring')
+        .data(rings, ring => ring[0])
+        .join('rect')
+        .attr('class', ([c]) => `sg-ring ${c}`)
+        .attr('x', ([, o]) => -o)
+        .attr('y', ([, o]) => -o)
+        .attr('width', ([, o]) => r.w + 2 * o)
+        .attr('height', ([, o]) => r.h + 2 * o)
+        .attr('rx', ([, o]) => radius + o)
       const badge = badges?.values?.[d.id] ?? d.badge
       const show = badge !== undefined && badge !== null && badge !== '' && badge !== 0
       const bsel = decor.selectChildren('g.sg-badge').data(show ? [String(badge)] : [])
@@ -2429,9 +2669,10 @@ export class Graph {
   }
 
   #icon(markup) {
-    if (!this.#iconCache.has(markup))
-      this.#iconCache.set(markup, sanitizeSvg(markup, `${this.#uid}-i${this.#iconCache.size}`))
-    return this.#iconCache.get(markup)
+    const key = `${this.#uid} ${markup}`
+    if (!this.#iconCache.has(key))
+      this.#iconCache.set(key, sanitizeSvg(markup, `${this.#uid}-i${hash(markup)}`))
+    return this.#iconCache.get(key)
   }
 
   #renderEdges(layer, edges, interactive, dim) {
@@ -2486,6 +2727,9 @@ export class Graph {
     }
     const widths = this.#overlays.get('edge-width')
     const wDomain = widths ? domainOf(widths) : null
+    const scope = this.#scopeIds()
+    const hop = this.#overlays.get('hop')
+    const outside = e => !!scope && !scope.has(e.source.node) && !scope.has(e.target.node)
     const [wMin, wMax] = widths?.range ?? [1, 8]
     const all = enter
       .merge(sel)
@@ -2498,11 +2742,15 @@ export class Graph {
           !!dim && !dim.has(d.id),
           widths?.values?.[d.id] ?? null,
           widths ? [wDomain, wMin, wMax] : null,
+          outside(d),
+          hop?.edge === d.id,
           this.#themeVersion,
         ])
       )
     all
       .classed('sg-selected', d => interactive && this.#selection.has(d.id))
+      .classed('sg-out-of-scope', outside)
+      .classed('sg-hop', d => hop?.edge === d.id)
       .classed(
         'sg-ghost',
         d => !!(m.nodes.get(d.source.node)?.ghost || m.nodes.get(d.target.node)?.ghost)
