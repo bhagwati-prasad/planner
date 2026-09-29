@@ -6,6 +6,10 @@ Every connection also carries the base connection properties: mode (sync or asyn
 
 Extends `base:connection`.
 
+## Joins
+
+A DB protocol connection ends at a data store: its manifest's `joins` names `base:store` as the target, so `registry.joins('db-protocol', source, target)` refuses any other target.
+
 ## Properties
 
 | Property | Type | Default | Group | Notes |

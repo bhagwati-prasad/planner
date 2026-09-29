@@ -65,7 +65,7 @@ import { fitTransform, screenToWorld, visibleRect, zoomAt } from '../viewport.js
 import { truncateText, wrapText } from '../text.js'
 import { STYLESHEET, TOKENS, themeStyle, themeTokens } from '../theme.js'
 import { BUILTIN_SHAPES } from './shapes.js'
-import { SVG_NS, createMeasurer, sanitizeSvg, svgEl } from './svg.js'
+import { SVG_NS, adoptStyles, createMeasurer, sanitizeSvg, svgEl } from './svg.js'
 
 const DEFAULTS = Object.freeze({
   grid: 10,
@@ -633,7 +633,7 @@ export class Graph {
   setTheme(theme) {
     this.#opts.theme = theme
     this.#applyThemeTokens()
-    this.#svg.attr('style', this.#rootStyle())
+    this.#svg.node().style.cssText = this.#rootStyle()
     this.#themeVersion++
     this.#render()
     return this
@@ -801,12 +801,16 @@ export class Graph {
       .attr('role', 'application')
       .attr('aria-roledescription', 'diagram')
       .attr('aria-label', this.#opts.ariaLabel)
-      .attr('style', this.#rootStyle())
       .classed('sg-readonly', !!this.#opts.readOnly)
     const svg = this.#svg.node()
-    const style = svgEl('style', {}, doc)
-    style.textContent = STYLESHEET
-    svg.appendChild(style)
+    // Styles go through the CSSOM and an adopted stylesheet, which a CSP without
+    // 'unsafe-inline' allows (eng §16); a host outside any document falls back to <style>.
+    svg.style.cssText = this.#rootStyle()
+    if (!adoptStyles(svg, STYLESHEET)) {
+      const style = svgEl('style', {}, doc)
+      style.textContent = STYLESHEET
+      svg.appendChild(style)
+    }
     svg.appendChild(this.#defs(doc, false))
     this.#svg
       .append('rect')

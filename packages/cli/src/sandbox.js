@@ -1,37 +1,11 @@
 /**
  * `strata test-component`: loads a packed component's behaviour the way the simulation
  * worker will (spec §7 "Sandbox"): in a fresh context with no network, storage or Node APIs,
- * seeded randomness and a fixed clock, under a time limit. Then checks its hooks.
+ * seeded randomness and a fixed clock, under a time limit. Then checks it against the manifest
+ * with the behaviour contract of spec §8 (validateBehaviour).
  */
 import { createContext, runInContext } from 'node:vm'
-import { createModuleRuntime } from '../../server/src/index.js'
-
-export const HOOKS = Object.freeze(['init', 'onMessage', 'onTimer', 'onFault'])
-
-/**
- * The hook name closest to a misspelt one (at most two edits away), or undefined.
- * @param {string} name
- */
-function closestHook(name) {
-  const distance = (/** @type {string} */ a, /** @type {string} */ b) => {
-    const row = Array.from({ length: b.length + 1 }, (_, i) => i)
-    for (let i = 1; i <= a.length; i++) {
-      let diagonal = row[0]
-      row[0] = i
-      for (let j = 1; j <= b.length; j++) {
-        const above = row[j]
-        row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1))
-        diagonal = above
-      }
-    }
-    return row[b.length]
-  }
-  const ranked = HOOKS.map(hook => ({
-    hook,
-    d: distance(name.toLowerCase(), hook.toLowerCase()),
-  })).sort((a, b) => a.d - b.d)
-  return ranked[0].d <= 2 ? ranked[0].hook : undefined
-}
+import { createModuleRuntime, validateBehaviour } from '../../server/src/index.js'
 
 /**
  * Evaluates the bundle's modules in a sandbox and returns the namespace of `path`.
@@ -79,23 +53,13 @@ export async function checkBehaviour(bundle) {
   } else {
     try {
       const ns = loadInSandbox(bundle, bundle.entry)
-      const behaviour = ns.default
-      if (!behaviour || typeof behaviour !== 'object')
-        bad(`${bundle.entry} must export default an object of hooks (${HOOKS.join(', ')})`)
-      else {
-        const hooks = Object.keys(behaviour)
-        for (const key of hooks) {
-          if (!HOOKS.includes(key)) {
-            const close = closestHook(key)
-            bad(
-              `Unknown hook '${key}'${close ? `. Did you mean '${close}'?` : `; hooks are ${HOOKS.join(', ')}`}`
-            )
-          } else if (typeof behaviour[key] !== 'function') bad(`${key} must be a function`)
-        }
-        if (ok)
-          messages.push(
-            `✓ Behaviour loads in the sandbox; hooks: ${hooks.join(', ') || 'none (the base behaviour applies)'}`
-          )
+      const problems = validateBehaviour(ns.default, bundle.manifest, { file: bundle.entry })
+      for (const p of problems)
+        if (p.level === 'error') bad(p.message)
+        else messages.push(`! ${p.message}`)
+      if (ok) {
+        const methods = Object.keys(ns.default.public ?? {}).join(', ') || 'none'
+        messages.push(`✓ The behaviour matches the manifest (public methods: ${methods})`)
       }
     } catch (err) {
       bad(`${bundle.entry} failed to load in the sandbox: ${err?.message ?? err}`)

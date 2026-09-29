@@ -51,6 +51,32 @@ function append(el, children) {
   }
 }
 
+/** @type {WeakMap<Document, Map<string, CSSStyleSheet>>} stylesheets by document, then CSS */
+const SHEETS = new WeakMap()
+
+/**
+ * Styles a shadow root or document with CSS, as a constructable stylesheet that every root
+ * with the same CSS shares. Unlike a <style> element, it needs no 'unsafe-inline' in the CSP
+ * of eng §16.
+ * @param {Document|ShadowRoot} root
+ * @param {string} css
+ */
+export function adoptStyles(root, css) {
+  const doc = /** @type {Document} */ (root.ownerDocument ?? root)
+  let sheets = SHEETS.get(doc)
+  if (!sheets) SHEETS.set(doc, (sheets = new Map()))
+  let sheet = sheets.get(css)
+  if (!sheet) {
+    const View = /** @type {any} */ (doc.defaultView ?? window)
+    /** @type {CSSStyleSheet} */
+    const created = new View.CSSStyleSheet()
+    created.replaceSync(css)
+    sheets.set(css, (sheet = created))
+  }
+  if (!root.adoptedStyleSheets.includes(sheet))
+    root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet]
+}
+
 /** Styles every shell element shares; tokens come from the page (see app.js). */
 export const BASE_CSS = `
 :host { display: block; box-sizing: border-box; color: var(--st-text); font: var(--st-font); }
@@ -88,9 +114,7 @@ export class StrataElement extends HTMLElement {
   constructor() {
     super()
     const root = this.attachShadow({ mode: 'open' })
-    const style = document.createElement('style')
-    style.textContent = BASE_CSS + /** @type {typeof StrataElement} */ (this.constructor).css
-    root.append(style)
+    adoptStyles(root, BASE_CSS + /** @type {typeof StrataElement} */ (this.constructor).css)
     this.content = document.createElement('div')
     this.content.className = 'content'
     root.append(this.content)

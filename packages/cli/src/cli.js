@@ -10,13 +10,21 @@
  *   strata serve [--port 4321] [--components <dir>]... [--root <dir>] [--no-watch]
  *   strata repl [--components <dir>]...
  */
-import { mkdir, writeFile, stat, access, readdir } from 'node:fs/promises'
+import { mkdir, writeFile, readFile, stat, access, readdir } from 'node:fs/promises'
 import { watch as watchFs } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { formatProblem, packFolder, componentFolders, startServer } from '../../server/src/index.js'
+import {
+  formatProblem,
+  packFolder,
+  componentFolders,
+  startServer,
+  checkModuleState,
+  validateBehaviour,
+} from '../../server/src/index.js'
 import { scaffoldComponent, BASE_TYPES } from './scaffold.js'
+import { checkAwaits, checkIconRules } from './checks.js'
 import { installScriptTag } from './install.js'
 
 export const VERSION = '0.1.0'
@@ -320,12 +328,45 @@ async function packCommand(argv, ctx) {
   return 0
 }
 
+/**
+ * What `strata validate` checks beyond packing (spec §8, eng §10, design system §13): the icon
+ * rules, the behaviour contract, and module-level state and non-ctx awaits in behaviour code.
+ * @param {string} folder
+ * @param {import('../../server/src/index.js').ComponentBundle} bundle
+ */
+async function componentChecks(folder, bundle) {
+  const problems = []
+  if (bundle.icon) problems.push(...checkIconRules(bundle.icon, bundle.manifest.icon ?? 'icon.svg'))
+  for (const path of Object.keys(bundle.modules).filter(p => p.endsWith('.js'))) {
+    const source = await readFile(join(folder, path), 'utf8')
+    problems.push(...checkModuleState(source, path), ...checkAwaits(source, path))
+  }
+  if (bundle.entry) {
+    const { loadInSandbox } = await import('./sandbox.js')
+    try {
+      const ns = loadInSandbox(bundle, bundle.entry)
+      problems.push(...validateBehaviour(ns.default, bundle.manifest, { file: bundle.entry }))
+    } catch (err) {
+      problems.push({
+        level: 'error',
+        file: bundle.entry,
+        message: `It failed to load in the sandbox: ${err?.message ?? err}`,
+      })
+    }
+  }
+  return problems
+}
+
 async function validateCommand(argv, ctx) {
   const { positionals } = parseArgs(argv, {})
   const folder = await requireFolder(ctx.cwd, positionals[0])
   const result = await packFolder(folder)
-  const failed = report(result.problems, folder, ctx)
-  const warnings = result.problems.filter(p => p.level === 'warning').length
+  const problems = [
+    ...result.problems,
+    ...(result.bundle ? await componentChecks(folder, result.bundle) : []),
+  ]
+  const failed = report(problems, folder, ctx)
+  const warnings = problems.filter(p => p.level === 'warning').length
   if (failed) {
     ctx.complain(`✗ ${relative(ctx.cwd, folder) || '.'} is not valid`)
     return 1
@@ -357,7 +398,10 @@ async function testComponentCommand(argv, ctx) {
   const code = await new Promise(resolve => {
     // A parent test runner's context would redirect the child's report; drop it.
     const { NODE_TEST_CONTEXT, ...env } = process.env
-    const child = spawn(process.execPath, ['--test', '--test-reporter=spec', ...tests], {
+    // Self-tests import createTestContext as 'strata/testing' (spec §8, task 0303).
+    const loader = new URL('./testing-loader.js', import.meta.url).href
+    const args = ['--import', loader, '--test', '--test-reporter=spec', ...tests]
+    const child = spawn(process.execPath, args, {
       cwd: folder,
       env,
     })

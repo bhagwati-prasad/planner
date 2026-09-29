@@ -117,11 +117,7 @@ const html = scripts => `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Strata</title>
-<style>
-  html, body { margin: 0; height: 100%; }
-  strata-app { height: 100vh; }
-  noscript { display: block; padding: 2rem; font: 15px system-ui, sans-serif; }
-</style>
+<link rel="stylesheet" href="strata.css">
 <script src="vendor/d3.min.js"></script>
 <script src="sim-worker.js"></script>
 <script src="strata.js"></script>
@@ -190,6 +186,8 @@ export async function build({
   const three = await threeScript(minify)
   await writeFile(join(outDir, 'vendor/three.js'), three.code)
   await cp(join(ROOT, 'vendor/three/LICENSE'), join(outDir, 'vendor/LICENSE-three'))
+  // The page's own styles, as a file: served with the CSP of eng §16, inline styles are refused.
+  await cp(join(ROOT, 'app/app.css'), join(outDir, 'strata.css'))
   await writeFile(join(outDir, 'strata.html'), html(scripts))
 
   const kb = n => `${(n / 1024).toFixed(0)} KB`

@@ -41,3 +41,13 @@ Manifest validation, the in-house bundler and minifier, the component packer, an
   - `ctx.call` runs the behaviour's private methods, and `ctx.send` answers from `replies`;
   - it records what a method sends, emits, calls, fails, measures, logs and schedules, and every state change with its path;
   - setting a state field the manifest does not declare throws.
+
+## Connection types
+
+A connection type is a plugin folder with `"kind": "connection-type"`, extending `base:connection`, which carries what every connection carries (spec §9). The six built-in types are in `connection-types/`. A type may declare the components it may join:
+
+```json
+"joins": { "to": ["base:store"] }
+```
+
+`joins.from` and `joins.to` list the component types the source and target must be, or extend. `registry.joins(type, from, to)` answers `true`, or why not. Without `joins`, any components may be joined.

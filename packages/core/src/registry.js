@@ -202,6 +202,23 @@ export function checkManifest(manifest) {
     add('E_MANIFEST_KIND', `kind must be one of ${PLUGIN_KINDS.join(', ')}`)
   if (m.kind === 'connection-type' && Array.isArray(m.ports) && m.ports.length)
     add('E_MANIFEST_KIND', 'a connection type has no ports')
+  // A connection type may name the component types each end must be or extend (task 0308).
+  if (m.joins !== undefined) {
+    if (m.kind !== 'connection-type')
+      add(
+        'E_MANIFEST_KIND',
+        'joins is for connection types, which name the components they may join'
+      )
+    else
+      for (const end of ['from', 'to']) {
+        const list = isPlainObject(m.joins) ? m.joins[end] : m.joins
+        if (list !== undefined && (!Array.isArray(list) || list.some(id => typeof id !== 'string')))
+          add(
+            'E_MANIFEST_KIND',
+            `joins.${end} must be a list of component type ids, e.g. ["base:store"]`
+          )
+      }
+  }
   if (m.extends !== undefined && m.extends !== null) {
     try {
       parseTypeRef(m.extends)
@@ -443,6 +460,28 @@ export class Registry {
   }
 
   /**
+   * Whether an edge of connection type `type` may join a component of type `from` to one of
+   * type `to`: true, or the reason it may not. A connection type's `joins` names the component
+   * types each end must be or extend; without it, any components may.
+   * @param {string} type connection type id or id@version
+   * @param {string} from the source component's type
+   * @param {string} to the target component's type
+   * @returns {true|string}
+   */
+  joins(type, from, to) {
+    const t = this.resolve(type)
+    for (const [end, ref] of /** @type {const} */ ([
+      ['from', from],
+      ['to', to],
+    ])) {
+      const allowed = /** @type {string[]|undefined} */ (t?.joins?.[end])
+      if (allowed && !allowed.some(id => this.isA(ref, id)))
+        return `${t?.name} joins only ${allowed.join(' or ')} as the ${end === 'from' ? 'source' : 'target'}; ${this.resolve(ref)?.name ?? ref} is not one`
+    }
+    return true
+  }
+
+  /**
    * Latest version of every registered type, sorted by id.
    * @param {{ kind?: 'component'|'connection-type' }} [options]
    */
@@ -545,6 +584,8 @@ export function createRegistry({ builtins = true } = {}) {
  * @property {Record<string, {unit?: string, rollup?: string, description?: string, estimate?: string}>} metrics  `estimate` names the property that estimates the metric until simulation measures it
  * @property {string} [shape]    diagram shape name (strata-graph); defaults by base type
  * @property {string} [iconSvg]  icon markup, attached when a packed bundle is registered (M4)
+ * @property {{ from?: string[], to?: string[] }} [joins]  a connection type's allowed ends: the
+ *   component types its source and target must be or extend (task 0308)
  *
  * @typedef {Manifest & { typeRef: string, lineage: string[], missingBase: string|null }} EffectiveManifest
  */

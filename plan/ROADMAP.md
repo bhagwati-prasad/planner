@@ -84,9 +84,9 @@ Manifests with properties, state, public and private methods and metrics; the re
 - [x] [0304 strata pack](M03-component-model-and-plugins/0304-pack-cli.md) (after 0005, 0302)
 - [x] [0305 Registration and upload loaders](M03-component-model-and-plugins/0305-loaders.md) (after 0304)
 - [x] [0306 strata serve](M03-component-model-and-plugins/0306-serve.md) (after 0304)
-- [ ] [0309 Strict CSP: styles without inline style elements or attributes](M03-component-model-and-plugins/0309-strict-csp.md) (after 0306)
-- [ ] [0307 strata new component, validate and test-component](M03-component-model-and-plugins/0307-scaffold-validate.md) (after 0303, 0304)
-- [ ] [0308 Connection-type plugins](M03-component-model-and-plugins/0308-connection-types.md) (after 0302)
+- [x] [0309 Strict CSP: styles without inline style elements or attributes](M03-component-model-and-plugins/0309-strict-csp.md) (after 0306)
+- [x] [0307 strata new component, validate and test-component](M03-component-model-and-plugins/0307-scaffold-validate.md) (after 0303, 0304)
+- [x] [0308 Connection-type plugins](M03-component-model-and-plugins/0308-connection-types.md) (after 0302)
 
 ### M04 Simulation core
 

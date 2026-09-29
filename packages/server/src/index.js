@@ -10,4 +10,11 @@ export { readFolder, packFolder, syntaxProblems, componentFolders } from './fold
  * @typedef {import('../../plugins/src/index.js').ComponentBundle} ComponentBundle
  * @typedef {import('../../plugins/src/index.js').Problem} Problem
  */
-export { formatProblem, createModuleRuntime } from '../../plugins/src/index.js'
+export {
+  formatProblem,
+  createModuleRuntime,
+  tokenize,
+  validateBehaviour,
+  checkModuleState,
+  createTestContext,
+} from '../../plugins/src/index.js'

@@ -14,7 +14,7 @@
  */
 import { Shell } from './shell.js'
 import { registerDefaultActions, shortcutOf, displayShortcut } from './actions.js'
-import { h, fill, define } from './base.js'
+import { h, fill, define, adoptStyles } from './base.js'
 
 export const DEFAULT_CONFIG = Object.freeze({
   regions: {
@@ -142,8 +142,7 @@ export class StrataApp extends HTMLElement {
   constructor() {
     super()
     const root = this.attachShadow({ mode: 'open' })
-    const style = document.createElement('style')
-    style.textContent = APP_CSS
+    adoptStyles(root, APP_CSS)
     this.#toasts = h('div', { class: 'toasts', role: 'status', 'aria-live': 'polite' })
     this.#help = h('div', {
       class: 'help',
@@ -152,7 +151,7 @@ export class StrataApp extends HTMLElement {
         if (e.target === this.#help) this.#help.hidden = true
       },
     })
-    root.append(style, this.#toasts, this.#help)
+    root.append(this.#toasts, this.#help)
   }
 
   get strata() {
@@ -364,12 +363,9 @@ export class StrataApp extends HTMLElement {
   }
 }
 
+/** The design tokens, on the page itself, as a stylesheet adoptStyles shares. @param {Document} doc */
 function installTokens(doc) {
-  if (doc.getElementById('strata-tokens')) return
-  const style = doc.createElement('style')
-  style.id = 'strata-tokens'
-  style.textContent = TOKENS_CSS
-  doc.head.append(style)
+  adoptStyles(doc, TOKENS_CSS)
 }
 
 function initialTheme() {

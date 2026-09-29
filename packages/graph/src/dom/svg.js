@@ -16,6 +16,35 @@ export function svgEl(tag, attrs = {}, doc = document) {
   return el
 }
 
+/** @type {WeakMap<Document, Map<string, CSSStyleSheet>>} stylesheets by document, then CSS */
+const SHEETS = new WeakMap()
+
+/**
+ * Styles the document or shadow root `node` is in with CSS, as a constructable stylesheet that
+ * every root with the same CSS shares. Unlike a <style> element, it needs no 'unsafe-inline' in
+ * a CSP (eng §16). Returns false when `node` is in neither, for the caller to fall back to a
+ * <style> element.
+ * @param {Node} node
+ * @param {string} css
+ */
+export function adoptStyles(node, css) {
+  const root = /** @type {any} */ (node.getRootNode())
+  const doc = node.ownerDocument
+  const View = /** @type {any} */ (doc?.defaultView)
+  if (!doc || !Array.isArray(root.adoptedStyleSheets) || !View?.CSSStyleSheet) return false
+  let sheets = SHEETS.get(doc)
+  if (!sheets) SHEETS.set(doc, (sheets = new Map()))
+  let sheet = sheets.get(css)
+  if (!sheet) {
+    sheet = /** @type {CSSStyleSheet} */ (new View.CSSStyleSheet())
+    sheet.replaceSync(css)
+    sheets.set(css, sheet)
+  }
+  if (!root.adoptedStyleSheets.includes(sheet))
+    root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet]
+  return true
+}
+
 /**
  * A width function for a font, backed by a canvas when available.
  * @param {string} fontFamily

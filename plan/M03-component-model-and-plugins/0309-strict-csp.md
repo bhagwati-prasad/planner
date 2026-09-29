@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M03 Component model and plugins](../ROADMAP.md#m03-component-model-and-plugins) | R0 | todo | [0306](../M03-component-model-and-plugins/0306-serve.md) |
+| [M03 Component model and plugins](../ROADMAP.md#m03-component-model-and-plugins) | R0 | done | [0306](../M03-component-model-and-plugins/0306-serve.md) |
 
 Split from 0306, as the human decided on 2026-09-29.
 
@@ -27,11 +27,13 @@ An exported SVG keeps its inline `<style>`, since it is a standalone document.
 
 Write these tests first. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] Every response of `strata serve` carries exactly the CSP that eng §16 names, read from the guideline (`packages/server/test/serve.test.js`)
-- [ ] The app, served with that CSP, starts, draws its sample project and reports no CSP violation (`tests/e2e/csp.spec.js`, served mode)
-- [ ] strata-graph renders a diagram with no `<style>` element or `style` attribute in the live page, and its visual snapshots are unchanged (`packages/graph/test/`)
+- [x] Every response of `strata serve` carries exactly the CSP that eng §16 names, read from the guideline (`packages/server/test/serve.test.js`)
+- [x] The app, served with that CSP, starts, draws its sample project and reports no CSP violation (`packages/ui/test/csp.spec.js`, which runs in served mode only)
+- [x] strata-graph renders a diagram, its overlays, both themes, the minimap and an export under that CSP with no violation, and its visual snapshots are unchanged (`packages/graph/test/csp.spec.js`)
 
 ## Notes
+
+- The second test lives in `packages/ui/test/`, not `tests/e2e/`: specs there run from `file://` too, where no server sends a CSP. The third test once asked for no `style` attribute in the live page. Browsers reflect CSSOM changes into that attribute, which the policy allows, so it asks for what the policy enforces instead: no violation.
 
 - Constructable stylesheets are not inline styles, so `style-src 'self'` does not block them. Neither do CSSOM property changes.
 - Visual snapshot baselines must not change. If one does, stop and show the human the screenshots.
@@ -39,8 +41,8 @@ Write these tests first. Run them and confirm each one fails for the reason it d
 
 ## Done when
 
-- [ ] Every test above passes, and no test was weakened, skipped or deleted to get there
-- [ ] `npm run check` passes
-- [ ] New or changed public APIs have JSDoc, and facade methods have help metadata
-- [ ] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
-- [ ] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
+- [x] Every test above passes, and no test was weakened, skipped or deleted to get there
+- [x] `npm run check` passes
+- [x] New or changed public APIs have JSDoc, and facade methods have help metadata
+- [x] The [definition of done](../../docs/guidelines/engineering/23-definition-of-done.md) holds for this change
+- [x] Status above is `done`, the task is ticked in [ROADMAP.md](../ROADMAP.md), and a line is added to [LOG.md](../LOG.md)
