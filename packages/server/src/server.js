@@ -8,10 +8,13 @@
  *   GET /api/health
  *   anything else                  static files under `root`
  *
- * Security (§19 "Served mode"): it binds to a loopback address only, refuses requests whose
- * Host header is not local (DNS rebinding), serves only GET and HEAD, never lists directories
- * or leaves `root`, and sends a strict Content Security Policy.
+ * Security (eng §16 "Local server"): it binds to a loopback address only, refuses requests
+ * whose Host header is not local (DNS rebinding) or whose Origin is not its own (cross-site
+ * requests), answers API calls only with the session token that comes with every page it
+ * serves, serves only GET and HEAD, never lists directories or leaves `root`, and sends a
+ * Content Security Policy.
  */
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, normalize, resolve, sep } from 'node:path'
@@ -36,6 +39,11 @@ const TYPES = {
 }
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
+/** The cookie that carries the session token (eng §16). */
+const SESSION = 'strata-session'
+
+/** A host name without its port or IPv6 brackets. @param {string} host */
+const hostname = host => host.replace(/:\d+$/, '').replace(/^\[(.*)\]$/, '$1')
 
 /**
  * @typedef {object} ServerOptions
@@ -73,6 +81,27 @@ export async function startServer({
   await catalog.scan()
   /** @type {Set<import('node:http').ServerResponse>} */
   const clients = new Set()
+  // A random token per session, issued with every page and required by API calls (eng §16).
+  const token = Buffer.from(randomBytes(24).toString('base64url'))
+  const cookie = `${SESSION}=${token}; Path=/; HttpOnly; SameSite=Strict`
+  /** @param {import('node:http').IncomingMessage} req */
+  const hasToken = req => {
+    const sent = new RegExp(`(?:^|;\\s*)${SESSION}=([^;]*)`).exec(req.headers.cookie ?? '')?.[1]
+    const given = Buffer.from(sent ?? '')
+    return given.length === token.length && timingSafeEqual(given, token)
+  }
+  /** Whether an Origin header names this server: http, a loopback host and its port. @param {string} origin */
+  const ownOrigin = origin => {
+    try {
+      const url = new URL(origin)
+      const port = /** @type {import('node:net').AddressInfo} */ (server.address()).port
+      return (
+        url.protocol === 'http:' && LOOPBACK.has(hostname(url.host)) && url.port === String(port)
+      )
+    } catch {
+      return false
+    }
+  }
 
   const security = {
     'content-security-policy': CSP,
@@ -110,19 +139,23 @@ export async function startServer({
 
   const server = createServer(async (req, res) => {
     try {
-      const hostHeader = String(req.headers.host ?? '')
-        .replace(/:\d+$/, '')
-        .replace(/^\[(.*)\]$/, '$1')
-      if (!LOOPBACK.has(hostHeader))
+      if (!LOOPBACK.has(hostname(String(req.headers.host ?? ''))))
         return send(res, 403, 'Forbidden: strata serve only answers requests for localhost')
+      if (req.headers.origin !== undefined && !ownOrigin(req.headers.origin))
+        return send(res, 403, 'Forbidden: strata serve only answers pages it serves itself')
       if (req.method !== 'GET' && req.method !== 'HEAD')
         return send(res, 405, 'Method not allowed', undefined, { allow: 'GET, HEAD' })
       const url = new URL(req.url ?? '/', 'http://localhost')
       const pathname = decodeURIComponent(url.pathname)
 
       if (pathname === '/' && home) return send(res, 302, '', undefined, { location: home })
-      if (pathname === '/api/health')
-        return json(res, { ok: true, components: catalog.entries().length })
+      if (pathname === '/api/health') return json(res, { ok: true })
+      if (pathname.startsWith('/api/') && !hasToken(req))
+        return send(
+          res,
+          403,
+          'Forbidden: API calls need the session token that comes with the app; open the app from this server first'
+        )
       if (pathname === '/api/components') return json(res, listing())
       if (pathname.startsWith('/api/components/') && pathname.endsWith('.strata.js')) {
         const ref = pathname.slice('/api/components/'.length, -'.strata.js'.length)
@@ -162,7 +195,8 @@ export async function startServer({
         res,
         200,
         req.method === 'HEAD' ? '' : body,
-        TYPES[extname(path)] ?? 'application/octet-stream'
+        TYPES[extname(path)] ?? 'application/octet-stream',
+        { 'set-cookie': cookie }
       )
     } catch {
       if (!res.headersSent) send(res, 404, 'Not found')

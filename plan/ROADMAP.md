@@ -83,7 +83,8 @@ Manifests with properties, state, public and private methods and metrics; the re
 - [x] [0303 Behaviour contract and component test harness](M03-component-model-and-plugins/0303-behaviour-contract.md) (after 0301)
 - [x] [0304 strata pack](M03-component-model-and-plugins/0304-pack-cli.md) (after 0005, 0302)
 - [x] [0305 Registration and upload loaders](M03-component-model-and-plugins/0305-loaders.md) (after 0304)
-- [ ] [0306 strata serve](M03-component-model-and-plugins/0306-serve.md) (after 0304)
+- [x] [0306 strata serve](M03-component-model-and-plugins/0306-serve.md) (after 0304)
+- [ ] [0309 Strict CSP: styles without inline style elements or attributes](M03-component-model-and-plugins/0309-strict-csp.md) (after 0306)
 - [ ] [0307 strata new component, validate and test-component](M03-component-model-and-plugins/0307-scaffold-validate.md) (after 0303, 0304)
 - [ ] [0308 Connection-type plugins](M03-component-model-and-plugins/0308-connection-types.md) (after 0302)
 
@@ -144,7 +145,7 @@ Annotations and threaded comments designed for later collaboration, then the R0 
 - [ ] [0701 Annotations](M07-comments-and-r0-release/0701-annotations.md) (after 0206, 0506)
 - [ ] [0702 Comment threads and anchors](M07-comments-and-r0-release/0702-threads-anchors.md) (after 0115)
 - [ ] [0703 Comments UI and roll-up badges](M07-comments-and-r0-release/0703-comments-ui.md) (after 0702, 0511)
-- [ ] [0704 R0 exit test and release](M07-comments-and-r0-release/0704-r0-exit.md) (after 0701, 0703, 0605, 0512, 0305, 0306)
+- [ ] [0704 R0 exit test and release](M07-comments-and-r0-release/0704-r0-exit.md) (after 0701, 0703, 0605, 0512, 0305, 0306, 0309)
 
 ## R1 Load, chaos and tests
 
