@@ -21,11 +21,10 @@ export function createMinimap(graph, host, { width = 200, height = 140, padding 
     doc
   )
   // Share the graph's theme variables (the minimap lives outside the graph's <svg>).
-  const theme = () =>
-    svg.setAttribute(
-      'style',
-      `${graph.element.getAttribute('style') ?? ''} display: block; cursor: pointer; width: ${width}px; height: ${height}px;`
-    )
+  // Through the CSSOM, which a CSP without 'unsafe-inline' allows (eng §16).
+  const theme = () => {
+    svg.style.cssText = `${graph.element.style.cssText} display: block; cursor: pointer; width: ${width}px; height: ${height}px;`
+  }
   const bg = svgEl(
     'rect',
     { width: '100%', height: '100%', fill: 'var(--sg-background, #fafaf9)' },

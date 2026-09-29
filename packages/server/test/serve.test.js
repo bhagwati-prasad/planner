@@ -1,9 +1,9 @@
 // strata serve's security rules and live component folders (task 0306, spec §8 "Loading paths",
-// eng §16 "Local server"). The strict CSP is task 0309's.
+// eng §16 "Local server"), and its strict CSP (task 0309).
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { request } from 'node:http'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { startServer } from '../src/index.js'
@@ -125,5 +125,23 @@ describe('strata serve', () => {
     assert.match(cookie, /; Path=\/; HttpOnly; SameSite=Strict/)
     // Readiness checks need no token and learn nothing about the components.
     assert.deepEqual(JSON.parse((await get('/api/health')).body), { ok: true })
+  })
+
+  it('sends exactly the CSP that eng §16 names with every response', async () => {
+    const guideline = readFileSync(
+      new URL('../../../docs/guidelines/engineering/16-security.md', import.meta.url),
+      'utf8'
+    )
+    const csp = /Sends a strict CSP: `([^`]+)`/.exec(guideline)?.[1]
+    assert.ok(csp, 'eng §16 names the policy')
+    const headers = await session()
+    for (const response of [
+      await get('/app/'),
+      await get('/api/components', headers),
+      await get('/api/health'),
+      await get('/missing.js'),
+      await get('/app/', { host: 'evil.example' }),
+    ])
+      assert.equal(response.headers['content-security-policy'], csp)
   })
 })

@@ -21,8 +21,9 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ComponentCatalog } from './catalog.js'
 
+/** The Content Security Policy of eng §16 "Local server": no inline scripts or styles. */
 export const CSP =
-  "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+  "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'"
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
