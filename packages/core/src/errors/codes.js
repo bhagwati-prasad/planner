@@ -26,6 +26,14 @@ const DESCRIPTIONS = {
   E_COMMAND_VERSION:
     'An operation was written by a newer version of its command, or a command version has no upgrader from the one before',
 
+  E_BEHAVIOUR_SHAPE:
+    'A behaviour module does not export an object of hooks, has an unknown hook, or a method that is not a function',
+  E_BEHAVIOUR_UNDECLARED_METHOD: 'A behaviour has a public method the manifest does not declare',
+  E_BEHAVIOUR_MISSING_METHOD:
+    'A method the manifest declares, or ctx.call names, has no implementation',
+  E_BEHAVIOUR_MODULE_STATE: 'A behaviour module keeps mutable state at module level',
+  E_BEHAVIOUR_UNDECLARED_STATE: 'Behaviour code set a state field the manifest does not declare',
+
   E_BUNDLE_BARE_SPECIFIER:
     'A bundle imports an npm package; only relative imports, d3 and three are allowed',
   E_BUNDLE_CYCLE:
