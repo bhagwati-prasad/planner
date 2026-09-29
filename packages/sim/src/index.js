@@ -7,6 +7,7 @@
 export { ENGINE_VERSION, Kernel } from './kernel.js'
 export { EventQueue } from './queue.js'
 export { createStreams, xoshiro128ss, hashKey } from './random.js'
+export { log, exp } from './math.js'
 export { runHash } from './hash.js'
 export { simulate } from './skeleton.js'
 export { PROTOCOL_VERSION, handleMessage } from './protocol.js'

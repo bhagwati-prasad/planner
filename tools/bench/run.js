@@ -2,7 +2,8 @@
 // The performance benchmarks of eng §15 (`npm run bench`, task 0207): every tools/bench/*.bench.js,
 // or the files named on the command line, in Chromium, the reference browser, against the
 // development server. A benchmark exports `bench`, which takes { browser, baseURL } and returns
-// its measures; the run fails when one is over its budget. `npm run check` does not run benchmarks.
+// its measures; the run fails when one is over its budget, or under it for a throughput.
+// `npm run check` does not run benchmarks.
 //
 //   npm run bench [-- tools/bench/graph-pan.bench.js]
 import { readdirSync } from 'node:fs'
@@ -15,20 +16,26 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
  * @property {number} value
  * @property {string} unit
  * @property {number} budget the eng §15 budget, in the same unit
+ * @property {'lower'|'higher'} [better] which way is better: lower (the default) for times and
+ *   sizes, higher for throughputs, whose budget is a floor
  */
 
 /** @param {number} n */
 const shown = n => (Number.isFinite(n) ? String(Math.round(n * 10) / 10) : String(n))
 
 /**
- * One line for each measure over its budget; a measure that is not a number is over it.
+ * One line for each measure on the wrong side of its budget; a measure that is not a number is
+ * on the wrong side.
  * @param {Measure[]} measures
  * @returns {string[]}
  */
 export function overBudget(measures) {
   return measures
-    .filter(m => !(m.value <= m.budget))
-    .map(m => `${m.name} is ${shown(m.value)} ${m.unit}, over its ${m.budget} ${m.unit} budget`)
+    .filter(m => !(m.better === 'higher' ? m.value >= m.budget : m.value <= m.budget))
+    .map(
+      m =>
+        `${m.name} is ${shown(m.value)} ${m.unit}, ${m.better === 'higher' ? 'under' : 'over'} its ${m.budget} ${m.unit} budget`
+    )
 }
 
 /** @param {string[]} files */

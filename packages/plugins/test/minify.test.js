@@ -141,6 +141,26 @@ export class Counter {
     assert.equal(minify(src), minify(src, { rename: false }), 'renaming is opt-in')
   })
 
+  it('never gives a binding a longer name than it has', () => {
+    // Every one-letter name is taken, as a key, so the new names have two letters.
+    const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$'
+    const src = `export const keys = { ${[...letters].map(c => `${c}: 1`).join(', ')} }
+export function area(w, h) {
+  const s = w * h
+  return s
+}
+export function perimeter(width, height) {
+  return 2 * (width + height)
+}
+`
+    const out = minify(src, { rename: true })
+    assert.match(out, /function area\(w,h\)\{const s=w\*h/, 'one-letter names stay')
+    const names = namesOf(out)
+    for (const long of ['width', 'height'])
+      assert.ok(!names.has(long), `${long} gets a two-letter name`)
+    assert.ok(out.length < minify(src).length, `${out.length} bytes`)
+  })
+
   it('every snippet behaves the same before and after renaming', () => {
     // Shadowing, closures, and a block that declares the same name again.
     renamed(`function outer(value) {

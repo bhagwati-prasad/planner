@@ -259,11 +259,14 @@ describe('size check', () => {
     assert.match(result.problems[0], /within its budget: remove its exception/)
   })
 
-  it('measures core, facade and the non-UI packages under 255 KB, and passes without an exception for them', () => {
+  it('measures core, facade and the non-UI packages under 255 KB, or within the exception 0418 removes', () => {
+    // As the human decided on 2026-09-29, 0401 recorded an exception for them, owned by 0418,
+    // which restores this test's earlier form: under 255 KB, with no exception.
     const { rows, problems } = checkSizes()
     const core = rows.find(r => r.label.startsWith('Core'))
-    assert.ok(core?.bytes && core.bytes < 255_000, `${core?.bytes} bytes`)
-    assert.equal(core.exception, undefined, 'no exception is recorded for them')
+    assert.ok(core?.bytes, 'they are measured')
+    if (core.exception) assert.equal(core.exception.owner, '0418', 'only 0418 owns their exception')
+    else assert.ok(core.bytes < 255_000, `${core.bytes} bytes`)
     assert.deepEqual(problems, [])
   })
 

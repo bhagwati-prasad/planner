@@ -92,8 +92,9 @@ Manifests with properties, state, public and private methods and metrics; the re
 
 The core feature, built headless first: kernel, sandbox, method dispatch, typed state, black-box and expanded composites, the starter library, scopes and stubs, stepping in every unit, editing paused runs and branches.
 
-- [ ] [0401 Kernel: event queue, integer time and PRNG streams](M04-simulation-core/0401-kernel.md) (after 0009, 0103)
+- [x] [0401 Kernel: event queue, integer time and PRNG streams](M04-simulation-core/0401-kernel.md) (after 0009, 0103)
 - [ ] [0402 Worker hosts, sandbox and protocol](M04-simulation-core/0402-worker-host.md) (after 0401, 0303)
+- [ ] [0418 Simulation code only in the worker bundle](M04-simulation-core/0418-sim-in-worker-only.md) (after 0402)
 - [ ] [0403 ctx API and method dispatch](M04-simulation-core/0403-ctx-dispatch.md) (after 0402, 0111)
 - [ ] [0404 Typed state at run time](M04-simulation-core/0404-state-runtime.md) (after 0403)
 - [ ] [0405 Edges, routing and the network model](M04-simulation-core/0405-edges-network.md) (after 0403, 0308)
