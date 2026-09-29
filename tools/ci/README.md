@@ -19,7 +19,7 @@
 
 | Budget | Measures |
 | --- | --- |
-| Core, facade and non-UI packages | `src/` of every package except graph, 3d and ui (the views) and cli and server (Node only), without the console help metadata |
+| Core, facade and non-UI packages | `src/` of every package except graph, 3d and ui (the views), cli and server (Node only) and sim (the worker bundle's, [ADR 0018](../../docs/adr/0018-simulation-code-ships-only-in-the-worker.md)), without the console help metadata |
 | strata-graph | `packages/graph/src` |
 | strata-ui | `packages/ui/src` |
 | Simulation worker bundle | The bundle the build makes from `packages/sim/src/worker/main.js`, with everything it imports (reported as not built until the entry exists) |
@@ -28,9 +28,7 @@
 
 A budget that existing code already exceeds is recorded in `size-exceptions.json` with the measured size and the task that brings it within budget. The measure may shrink but not grow past the recorded size, and the check fails once the exception is no longer needed, so the file only shrinks. `tools/test/ci.test.js` keeps it to eng §15 budgets with an owner.
 
-| Budget | Recorded | Removed by |
-| --- | --- | --- |
-| Core, facade and non-UI packages | 263.8 KB of 255 KB | 0418 (simulation code only in the worker bundle). The kernel's deterministic `log` and `exp` (0401) took them past their budget, to 257.5 KB; the worker's host, session and sandbox (0402) to 263.8 KB |
+No exception is recorded.
 
 strata-graph had an exception here until [ADR 0014](../../docs/adr/0014-strata-graph-budget-of-110-kb.md) set its budget at 110 KB and strata-ui's at 240 KB, as the human decided on 2026-09-28. It was over 60 KB before M02's tasks began (75.8 KB after 0119 shortened local names). The scene, cards, node states, edges, interaction, guides, frames and annotations of 0201 to 0206 then took it to 97.6 KB.
 
@@ -38,7 +36,7 @@ The simulation worker bundle had an exception here until 0402, which owned it: i
 
 The console help metadata measures 19.0 KB of its 25 KB.
 
-Core, facade and the non-UI packages: task 0118 took them to 250.7 KB of the 250 KB they had then, and 0119 brought them back by shortening local names. 0303's behaviour contract took them to 253.5 KB, and [ADR 0017](../../docs/adr/0017-core-budget-of-255-kb.md) set their budget at 255 KB and strata-ui's at 230 KB, as the human decided on 2026-09-29. As the human decided on 2026-09-27, the same policy applies when a task takes them past their budget again: the task records an exception at the size they reach and says so in its `plan/LOG.md` line. It also proposes the task that brings them back within budget, which the exception names as its owner. 0401 did so at 257.5 KB: strata-sim counts both here, since the facade imports it for its in-process host, and in the worker bundle, and 0418 keeps it to the worker, as the human decided on 2026-09-29.
+Core, facade and the non-UI packages: task 0118 took them to 250.7 KB of the 250 KB they had then, and 0119 brought them back by shortening local names. 0303's behaviour contract took them to 253.5 KB, and [ADR 0017](../../docs/adr/0017-core-budget-of-255-kb.md) set their budget at 255 KB and strata-ui's at 230 KB, as the human decided on 2026-09-29. As the human decided on 2026-09-27, the same policy applies when a task takes them past their budget again: the task records an exception at the size they reach and says so in its `plan/LOG.md` line. It also proposes the task that brings them back within budget, which the exception names as its owner. 0401 did so at 257.5 KB, and 0402's worker host took them to 263.8 KB. strata-sim counted both here, since the facade imported it for its in-process host, and in the worker bundle. [ADR 0018](../../docs/adr/0018-simulation-code-ships-only-in-the-worker.md), as the human decided on 2026-09-29, keeps strata-sim to the worker, and task 0418 made the change: the facade no longer imports strata-sim, this line leaves it out, and it measures 253.2 KB of 255 KB with no exception.
 
 ## Licences
 

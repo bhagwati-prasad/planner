@@ -2,13 +2,13 @@
 // The browser's simulation host (spec §18 "Sandbox host: Web Worker (Blob URL)"). The offline
 // build loads dist/sim-worker.js, which defines StrataSimWorker.source; a file:// page cannot
 // start a worker from a script URL, so the host starts one from a Blob URL, which needs no
-// network, so runs work after the network goes away too. The host (strata-sim's createSimHost)
+// network, so runs work after the network goes away too. The host (the facade's createSimHost)
 // pairs replies with requests and stops a worker that stays silent for 2 s (spec §8 "Watchdog").
 import { createSimHost } from '../packages/facade/src/index.js'
 
 /**
- * A host for the facade's `simHost` option, or undefined when the worker source is not loaded
- * (the development page), which leaves the facade's in-thread default in place.
+ * A host for the facade's `simHost` option, or undefined when the worker source is not loaded:
+ * then simulations fail with E_SIM_NO_HOST, and the development page needs `npm run build`.
  * @returns {import('../packages/facade/src/sim.js').SimHost|undefined}
  */
 export function browserSimHost() {

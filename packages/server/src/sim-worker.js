@@ -3,7 +3,7 @@
  * The simulation worker in Node (spec §18 "Sandbox host: worker_threads"): starts the same
  * bundle the browser starts from a Blob URL (`dist/sim-worker.js`) in a `worker_threads` worker,
  * behind a prelude that gives it the browser's `postMessage` and `onmessage`. It is the `spawn`
- * that strata-sim's `createSimHost` takes.
+ * that the facade's `createSimHost` takes.
  */
 import { Worker } from 'node:worker_threads'
 

@@ -98,6 +98,14 @@ async function threeScript(minify) {
   })
 }
 
+/**
+ * The repository paths of the modules a bundle from `entry` carries, in evaluation order.
+ * @param {string} entry  e.g. 'app/offline.js'
+ */
+export async function bundledModules(entry) {
+  return bundleModules(await sources(), [entry]).order
+}
+
 /** The simulation worker's entry (eng §13), bundled with everything it imports. */
 export const SIM_WORKER_ENTRY = 'packages/sim/src/worker/main.js'
 

@@ -6,12 +6,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createFakeClock, createRandom } from '../../../tools/testing/index.js'
 import { createMemoryStorage, createStrata } from '../src/index.js'
+import * as sim from '../../sim/src/index.js'
 
 /** @param {string} path */
 const manifest = path =>
   JSON.parse(readFileSync(new URL(`../../../${path}/manifest.json`, import.meta.url), 'utf8'))
 
-/** A strata with the starter client, service and HTTP types, and a project open. */
+/**
+ * A strata with the starter client, service and HTTP types, and a project open. It runs
+ * simulations in the calling thread (strata-sim's inProcessSimHost) unless options say otherwise.
+ * @param {object} [options]
+ */
 async function skeleton(options = {}) {
   const clock = createFakeClock({ start: Date.UTC(2026, 8, 26, 9) })
   const random = createRandom(10)
@@ -21,6 +26,7 @@ async function skeleton(options = {}) {
     random: n => Uint8Array.from({ length: n }, () => random.uint32() & 0xff),
     identity: { id: 'user-1', name: 'Ada' },
     output: () => {},
+    simHost: sim.inProcessSimHost,
     ...options,
   })
   for (const path of ['components/client', 'components/service', 'connection-types/http'])
@@ -34,6 +40,31 @@ async function skeleton(options = {}) {
 }
 
 describe('strata.sim.start', () => {
+  it('runs through the simulation host it is given, and without one says how to get one', async () => {
+    /** @type {string[]} */
+    const requests = []
+    const host = {
+      /** @param {any} message */
+      request: async message => {
+        requests.push(message.type)
+        return sim.handleMessage(message)
+      },
+    }
+    const given = await skeleton({ simHost: host })
+    given.root.connect(given.client.port('out'), given.orders.port('in'), { type: 'http' })
+    const run = await given.strata.sim.start({ seed: 42 })
+    assert.equal(run.response?.status, 'ok')
+    assert.deepEqual(requests, ['run'])
+
+    const none = await skeleton({ simHost: undefined })
+    none.root.connect(none.client.port('out'), none.orders.port('in'), { type: 'http' })
+    await assert.rejects(none.strata.sim.start({ seed: 42 }), err => {
+      assert.equal(/** @type {any} */ (err).code, 'E_SIM_NO_HOST')
+      assert.match(/** @type {Error} */ (err).message, /simHost/)
+      return true
+    })
+  })
+
   it('runs one request over the edge and answers after the latencies the model gives', async () => {
     const { strata, root, client, orders } = await skeleton()
     const edge = root.connect(client.port('out'), orders.port('in'), { type: 'http' })

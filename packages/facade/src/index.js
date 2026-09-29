@@ -13,4 +13,4 @@ export { createMemoryStorage } from './storage.js'
 export { formatTable } from './format.js'
 export { StrataError, createRegistry } from '../../core/src/index.js'
 // The simulation worker's host (spec §8 "Sandbox"), which the app and Node give a `spawn`.
-export { createSimHost } from '../../sim/src/index.js'
+export { createSimHost } from './sim-host.js'

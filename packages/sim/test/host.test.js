@@ -9,6 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { runInThisContext } from 'node:vm'
 import { createFakeScheduler } from '../../../tools/testing/index.js'
 import * as sim from '../src/index.js'
+import { createSimHost } from '../../facade/src/index.js'
 import * as plugins from '../../plugins/src/index.js'
 import * as server from '../../server/src/index.js'
 import { simWorkerSource } from '../../../scripts/build.js'
@@ -75,7 +76,7 @@ function threadHost() {
       },
     }
   }
-  const host = sim.createSimHost({ spawn, scheduler })
+  const host = createSimHost({ spawn, scheduler })
   const heartbeat = () => new Promise(resolve => waiting.push(resolve))
   return { host, scheduler, workers, heartbeat }
 }
@@ -164,7 +165,7 @@ describe('simulation worker host', () => {
     } finally {
       host.terminate()
     }
-    const stale = sim.createSimHost({
+    const stale = createSimHost({
       scheduler: createFakeScheduler(),
       spawn: ({ message }) => ({
         post: (/** @type {any} */ m) =>

@@ -5,11 +5,11 @@
  * run by a simulation host. Task 0417 grows it into run handles with every control (spec §12).
  *
  * The host carries protocol messages to the kernel (eng §13 "Worker protocol"). The browser app
- * gives a Blob-URL Web Worker; the default runs the kernel in the calling thread, which Node and
- * tests use.
+ * gives a Blob-URL Web Worker (createSimHost), Node a worker_threads worker, and tests strata-sim's
+ * inProcessSimHost. The facade never imports strata-sim, so the main thread carries no
+ * simulation code (ADR 0018).
  */
-import { StrataError, fail, statistic } from '../../core/src/index.js'
-import { PROTOCOL_VERSION, handleMessage } from '../../sim/src/index.js'
+import { SIM_PROTOCOL_VERSION, StrataError, fail, statistic } from '../../core/src/index.js'
 
 /**
  * @typedef {import('../../sim/src/skeleton.js').RunInput} RunInput
@@ -20,11 +20,6 @@ import { PROTOCOL_VERSION, handleMessage } from '../../sim/src/index.js'
  * @property {(message: ProtocolMessage) => Promise<ProtocolMessage>} request
  *   delivers one protocol message to the kernel and resolves with its reply
  */
-
-/** The default host: the kernel in the calling thread. @type {SimHost} */
-export const inProcessSimHost = Object.freeze({
-  request: async message => handleMessage(message),
-})
 
 /** Default one-way latency of an edge whose connection type gives none, in microseconds. */
 const DEFAULT_EDGE_LATENCY_US = 1000
@@ -42,7 +37,7 @@ export class SimApi {
 
   /**
    * @param {{ project: any }} strata
-   * @param {SimHost} host
+   * @param {SimHost} [host]  none: simulations fail with E_SIM_NO_HOST
    */
   constructor(strata, host) {
     this.#strata = strata
@@ -62,8 +57,14 @@ export class SimApi {
   async start({ system, edge, seed = 1 } = {}) {
     const project = this.#strata.project ?? fail('NOT_FOUND', 'No project is open')
     const input = runInput(system ?? project.nav.current ?? project.root, edge, seed)
-    const reply = await this.#host.request({
-      v: PROTOCOL_VERSION,
+    const host =
+      this.#host ??
+      fail(
+        'E_SIM_NO_HOST',
+        'No simulation host: the browser app starts one; in Node, pass simHost to createStrata (strata-sim has inProcessSimHost for scripts and tests)'
+      )
+    const reply = await host.request({
+      v: SIM_PROTOCOL_VERSION,
       type: 'run',
       id: this.#nextId++,
       payload: input,

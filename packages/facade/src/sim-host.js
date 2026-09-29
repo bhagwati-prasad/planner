@@ -7,12 +7,14 @@
  * silent for 2 s while requests wait, naming the method the worker's last heartbeat said it
  * started: a worker cannot be interrupted mid-function, so stopping it is the only hard stop.
  * A worker that stops is started again on the next request.
+ *
+ * It lives on the page's side, in the facade, so the main thread carries no simulation code:
+ * strata-sim ships only in the worker bundle (ADR 0018).
  */
-import { StrataError } from '../../core/src/index.js'
-import { PROTOCOL_VERSION } from './protocol.js'
+import { SIM_PROTOCOL_VERSION as PROTOCOL_VERSION, StrataError } from '../../core/src/index.js'
 
 /**
- * @typedef {import('./protocol.js').ProtocolMessage} ProtocolMessage
+ * @typedef {import('../../sim/src/protocol.js').ProtocolMessage} ProtocolMessage
  *
  * @typedef {object} SpawnedWorker
  * @property {(message: ProtocolMessage, transfer?: any[]) => void} post
@@ -27,11 +29,14 @@ import { PROTOCOL_VERSION } from './protocol.js'
  */
 
 /**
+ * A host for `createStrata({ simHost })` that runs simulations in a worker it starts, and stops
+ * one that stays silent for 2 s.
  * @param {object} options
  * @param {Spawn} options.spawn  starts a worker running the simulation worker bundle
  * @param {import('../../core/src/types.js').Scheduler} options.scheduler  runs the watchdog
  * @param {number} [options.silenceMs]  how long a busy worker may stay silent (spec §8: 2 s)
  * @returns {SimHost}
+ * @example createSimHost({ spawn: spawnThreadWorker(source), scheduler: { setTimeout, clearTimeout } })
  */
 export function createSimHost({ spawn, scheduler, silenceMs = 2000 }) {
   /** @type {SpawnedWorker|null} */
