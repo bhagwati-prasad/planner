@@ -1,10 +1,11 @@
 /**
- * Manifest validation for plugin authors (spec §7 "Manifest"). The core's `normalizeManifest`
+ * Manifest validation for plugin authors (spec §8 "Manifest"). The core's `checkManifest`
  * decides what the model accepts; this adds what a packed plugin must also get right (an API
- * range, files it names, units, known keys) and reports everything at once, as errors and
- * warnings, so `strata validate` and the upload dialog can show the whole list.
+ * range, files it names, units, known keys) and reports everything at once, as errors with
+ * their E_MANIFEST_ codes and warnings, so `strata validate` and the upload dialog can show the
+ * whole list.
  */
-import { normalizeManifest, suggest, StrataError, PLUGIN_KINDS } from '../../core/src/index.js'
+import { checkManifest, suggest, PLUGIN_KINDS } from '../../core/src/index.js'
 
 export { PLUGIN_KINDS }
 
@@ -23,6 +24,7 @@ export const MANIFEST_KEYS = Object.freeze([
   'shape',
   'ports',
   'properties',
+  'state',
   'methods',
   'metrics',
   'templates',
@@ -62,29 +64,30 @@ const SELF_DESCRIBING = new Set([
 export function validateManifest(manifest, { files, file = 'manifest.json' } = {}) {
   /** @type {Problem[]} */
   const problems = []
-  const error = message => problems.push({ level: 'error', file, message })
+  /**
+   * @param {import('../../core/src/errors.js').ErrorCode} code
+   * @param {string} message
+   */
+  const error = (code, message) => problems.push({ level: 'error', code, file, message })
+  /** @param {string} message */
   const warn = message => problems.push({ level: 'warning', file, message })
 
   if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
-    error('The manifest must be a JSON object')
+    error('E_MANIFEST_KIND', 'The manifest must be a JSON object')
     return problems
   }
   const m = /** @type {Record<string, any>} */ (manifest)
 
-  try {
-    normalizeManifest(m)
-  } catch (err) {
-    if (!(err instanceof StrataError)) throw err
-    const details = Array.isArray(err.details) ? err.details : [err.message]
-    for (const d of details) error(d)
-  }
+  for (const p of checkManifest(m)) error(p.code, p.message)
 
   if (m.strataApi === undefined)
     error(
+      'E_MANIFEST_API_RANGE',
       'strataApi is required: the range of plugin API versions this plugin works with, e.g. "^1.0"'
     )
   if (typeof m.id === 'string' && m.id.startsWith('base:'))
     error(
+      'E_MANIFEST_IDENTITY',
       "ids starting with 'base:' are reserved for the built-in base types; use your own prefix, e.g. 'acme.queue'"
     )
   const kind = m.kind ?? 'component'
@@ -121,7 +124,10 @@ export function validateManifest(manifest, { files, file = 'manifest.json' } = {
       if (!metric || typeof metric !== 'object') continue
       if (metric.estimate !== undefined) {
         if (typeof metric.estimate !== 'string' || !metric.estimate)
-          error(`metrics.${key}.estimate must name a property, e.g. "serviceTime.p99"`)
+          error(
+            'E_MANIFEST_METRIC',
+            `metrics.${key}.estimate must name a property, e.g. "serviceTime.p99"`
+          )
         else if (m.properties && !(metric.estimate.split('.')[0] in m.properties))
           warn(
             `metrics.${key}.estimate names '${metric.estimate.split('.')[0]}', which this manifest does not declare; it must come from the base type`
@@ -136,56 +142,54 @@ export function validateManifest(manifest, { files, file = 'manifest.json' } = {
     )
   }
 
-  if (files) {
-    const present = new Set(files)
-    const need = (path, what) => {
-      if (typeof path !== 'string' || !path) {
-        error(`${what} must be a file path`)
-        return
+  const present = files ? new Set(files) : null
+  /** @param {unknown} path @param {string} what */
+  const need = (path, what) => {
+    if (typeof path !== 'string' || !path)
+      return error('E_MANIFEST_FILE', `${what} must be a file path`)
+    if (!present || present.has(path)) return
+    const close = suggest(path, present, 1)
+    error(
+      'E_MANIFEST_FILE',
+      `${what} '${path}' is not in the folder${close.length ? `. Did you mean '${close[0]}'?` : ''}`
+    )
+  }
+  if (m.icon !== undefined && m.icon !== null) {
+    need(m.icon, 'icon')
+    if (typeof m.icon === 'string' && !m.icon.endsWith('.svg'))
+      error('E_MANIFEST_FILE', 'icon must be an SVG file')
+  } else if (present && kind === 'component')
+    warn('No icon; the library shows the base shape. Add "icon": "icon.svg"')
+  if (m.entry !== undefined && m.entry !== null) {
+    need(m.entry, 'entry')
+    if (typeof m.entry === 'string' && !m.entry.endsWith('.js'))
+      error('E_MANIFEST_FILE', 'entry must be a JavaScript module (.js)')
+  }
+  if (m.templates !== undefined) {
+    if (!m.templates || typeof m.templates !== 'object' || Array.isArray(m.templates))
+      error(
+        'E_MANIFEST_FILE',
+        'templates must be an object such as { "docs": ["templates/runbook.md"] }'
+      )
+    else
+      for (const [group, list] of Object.entries(m.templates)) {
+        if (!Array.isArray(list))
+          error('E_MANIFEST_FILE', `templates.${group} must be a list of files`)
+        else for (const path of list) need(path, `templates.${group}`)
       }
-      if (!present.has(path)) {
-        const close = suggest(path, present, 1)
-        error(
-          `${what} '${path}' is not in the folder${close.length ? `. Did you mean '${close[0]}'?` : ''}`
-        )
+  }
+  if (m.migrations !== undefined) {
+    if (!m.migrations || typeof m.migrations !== 'object' || Array.isArray(m.migrations))
+      error(
+        'E_MANIFEST_FILE',
+        'migrations must map a version range to a module, e.g. { "1.x": "migrations/v1-to-v2.js" }'
+      )
+    else
+      for (const [range, path] of Object.entries(m.migrations)) {
+        need(path, `migrations['${range}']`)
+        if (typeof path === 'string' && !path.endsWith('.js'))
+          error('E_MANIFEST_FILE', `migrations['${range}'] must be a JavaScript module`)
       }
-    }
-    if (m.icon !== undefined && m.icon !== null) {
-      need(m.icon, 'icon')
-      if (typeof m.icon === 'string' && !m.icon.endsWith('.svg')) error('icon must be an SVG file')
-    } else if (kind === 'component')
-      warn('No icon; the library shows the base shape. Add "icon": "icon.svg"')
-    if (m.entry !== undefined && m.entry !== null) {
-      need(m.entry, 'entry')
-      if (typeof m.entry === 'string' && !m.entry.endsWith('.js'))
-        error('entry must be a JavaScript module (.js)')
-    }
-    if (m.templates !== undefined) {
-      if (!m.templates || typeof m.templates !== 'object')
-        error('templates must be an object such as { "docs": ["templates/runbook.md"] }')
-      else {
-        for (const [group, list] of Object.entries(m.templates)) {
-          if (!Array.isArray(list)) {
-            error(`templates.${group} must be a list of files`)
-            continue
-          }
-          for (const path of list) need(path, `templates.${group}`)
-        }
-      }
-    }
-    if (m.migrations !== undefined) {
-      if (!m.migrations || typeof m.migrations !== 'object')
-        error(
-          'migrations must map a version range to a module, e.g. { "1.x": "migrations/v1-to-v2.js" }'
-        )
-      else {
-        for (const [range, path] of Object.entries(m.migrations)) {
-          need(path, `migrations['${range}']`)
-          if (typeof path === 'string' && !path.endsWith('.js'))
-            error(`migrations['${range}'] must be a JavaScript module`)
-        }
-      }
-    }
   }
   return problems
 }

@@ -7,7 +7,8 @@
 import { fail, didYouMean, suggest } from './errors.js'
 import { deepFreeze, isPlainObject, toPlain } from './plain.js'
 import { checkSchema, ROLLUP_RULES, validateValue } from './props.js'
-import { compareSemver, isSemver, satisfies } from './semver.js'
+import { STATE_TYPES, checkDistribution, checkValue } from './schema.js'
+import { compareSemver, isSemver, parseSemver, satisfies } from './semver.js'
 import { BUILTIN_MANIFESTS } from './builtins.js'
 
 /** Version of the plugin API this core implements; manifests declare a compatible `strataApi` range. */
@@ -37,130 +38,243 @@ export function parseTypeRef(ref) {
 export const typeRefOf = manifest => `${manifest.id}@${manifest.version}`
 
 /**
+ * @typedef {object} ManifestProblem
+ * @property {import('./errors/codes.js').ErrorCode} code  an E_MANIFEST_ code
+ * @property {string} message
+ */
+
+/** The plugin API ranges this core accepts, as a manifest writes them: '^1.0' for API 1.x. */
+export const SUPPORTED_API_RANGE = `^${parseSemver(CORE_API_VERSION).major}.0`
+
+/**
+ * A method's latency: a distribution, or the name of a property that holds one (spec §8). A
+ * name the manifest does not declare may come from its base type, so only a declared property
+ * of another type is a problem.
+ * @param {unknown} latency
+ * @param {Record<string, any>} properties
+ * @param {string} at
+ * @returns {string|null}
+ */
+function latencyProblem(latency, properties, at) {
+  if (latency === undefined) return null
+  if (typeof latency === 'string') {
+    const type = isPlainObject(properties[latency]) ? properties[latency].type : 'distribution'
+    return type === 'distribution'
+      ? null
+      : `${at}.latency names '${latency}', ${/^[aeiou]/.test(type) ? 'an' : 'a'} ${type}; it must be a distribution or a property that holds one`
+  }
+  const result = checkDistribution(latency, `${at}.latency`)
+  return result.ok === false ? String(result.details.message) : null
+}
+
+/**
  * Checks a manifest's `methods.public` and `methods.private` (spec §8), and that each port
  * `exposes` only public methods (spec §6, ADR 0010).
  * @param {unknown} methods
  * @param {{ name: string, exposes?: unknown }[]} ports
- * @returns {string[]}
+ * @param {Record<string, any>} properties
+ * @param {(code: import('./errors/codes.js').ErrorCode, message: string) => void} add
  */
-function checkMethods(methods, ports) {
-  const errors = []
+function checkMethods(methods, ports, properties, add) {
   /** @type {Record<string, Record<string, unknown>>} */
   const groups = { public: {}, private: {} }
   if (methods !== undefined && !isPlainObject(methods))
-    errors.push('methods must be an object with public and private methods')
+    add('E_MANIFEST_METHOD', 'methods must be an object with public and private methods')
   else
     for (const scope of /** @type {const} */ (['public', 'private'])) {
       const group = /** @type {Record<string, unknown>|undefined} */ (methods)?.[scope]
       if (group === undefined) continue
       if (!isPlainObject(group)) {
-        errors.push(`methods.${scope} must be an object of method names`)
+        add('E_MANIFEST_METHOD', `methods.${scope} must be an object of method names`)
         continue
       }
       groups[scope] = /** @type {Record<string, unknown>} */ (group)
-      for (const [name, spec] of Object.entries(group))
-        if (!isPlainObject(spec)) errors.push(`methods.${scope}.${name} must be an object`)
+      for (const [name, spec] of Object.entries(group)) {
+        const at = `methods.${scope}.${name}`
+        if (!isPlainObject(spec)) {
+          add('E_MANIFEST_METHOD', `${at} must be an object`)
+          continue
+        }
+        const s = /** @type {Record<string, unknown>} */ (spec)
+        const latency = latencyProblem(s.latency, properties, at)
+        if (latency) add('E_MANIFEST_METHOD', latency)
+        if (
+          s.errors !== undefined &&
+          (!Array.isArray(s.errors) || s.errors.some(e => typeof e !== 'string'))
+        )
+          add(
+            'E_MANIFEST_METHOD',
+            `${at}.errors must be a list of error codes, e.g. ["QUEUE_FULL"]`
+          )
+      }
     }
   for (const name of Object.keys(groups.private))
-    if (name in groups.public) errors.push(`methods: '${name}' is both public and private`)
+    if (name in groups.public)
+      add('E_MANIFEST_METHOD', `methods: '${name}' is both public and private`)
   for (const port of ports) {
     if (port.exposes === undefined) continue
     if (!Array.isArray(port.exposes) || port.exposes.some(e => typeof e !== 'string')) {
-      errors.push(`port '${port.name}': exposes must be a list of public method names`)
+      add('E_MANIFEST_PORT', `port '${port.name}': exposes must be a list of public method names`)
       continue
     }
     for (const name of port.exposes)
       if (!(name in groups.public))
-        errors.push(`port '${port.name}' exposes '${name}', which is not a public method`)
+        add(
+          'E_MANIFEST_UNKNOWN_METHOD',
+          `port '${port.name}' exposes '${name}', which is not a public method`
+        )
   }
-  return errors
 }
 
 /**
- * Validates and normalises a manifest. Throws INVALID with every problem listed in `details`.
+ * Checks a manifest's state fields (spec §8, eng §10): each has a type state can hold and an
+ * initial value of that type. Items of a record type such as 'message' are not checked, since
+ * record types are not declared yet.
+ * @param {unknown} state
+ * @param {(code: import('./errors/codes.js').ErrorCode, message: string) => void} add
+ */
+function checkState(state, add) {
+  if (state === undefined) return
+  if (!isPlainObject(state)) return add('E_MANIFEST_STATE', 'state must be an object of fields')
+  for (const [key, field] of Object.entries(/** @type {Record<string, any>} */ (state))) {
+    const at = `state.${key}`
+    if (!isPlainObject(field) || !STATE_TYPES.includes(field.type))
+      add('E_MANIFEST_STATE', `${at}.type must be one of ${STATE_TYPES.join(', ')}`)
+    else if (field.initial === undefined)
+      add('E_MANIFEST_STATE', `${at} has no initial value; every state field declares one`)
+    else {
+      const known = typeof field.of !== 'string' || STATE_TYPES.includes(field.of)
+      const result = checkValue(
+        known ? field : { ...field, of: undefined },
+        field.initial,
+        `${at}.initial`
+      )
+      if (result.ok === false) add('E_MANIFEST_STATE', String(result.details.message))
+    }
+  }
+}
+
+/**
+ * Every problem with a manifest (spec §6, §8), each with its E_MANIFEST_ code: its identity, the
+ * plugin API range, ports and what they expose, properties, state, public and private methods,
+ * and metrics. Empty when the manifest is valid.
+ * @param {unknown} manifest
+ * @returns {ManifestProblem[]}
+ */
+export function checkManifest(manifest) {
+  /** @type {ManifestProblem[]} */
+  const problems = []
+  /** @param {import('./errors/codes.js').ErrorCode} code @param {string} message */
+  const add = (code, message) => {
+    problems.push({ code, message })
+  }
+  if (!isPlainObject(manifest)) {
+    add('E_MANIFEST_KIND', 'A manifest must be an object')
+    return problems
+  }
+  const m = /** @type {Record<string, any>} */ (manifest)
+  if (typeof m.id !== 'string' || !ID_RE.test(m.id))
+    add(
+      'E_MANIFEST_IDENTITY',
+      "id must be lowercase letters and digits separated by '.', ':', '/', '-' or '_' (e.g. 'acme.message-queue')"
+    )
+  if (typeof m.name !== 'string' || !m.name.trim()) add('E_MANIFEST_IDENTITY', 'name is required')
+  if (!isSemver(m.version))
+    add('E_MANIFEST_IDENTITY', 'version must be a semantic version such as 1.2.0')
+  if (m.strataApi !== undefined) {
+    /** @type {boolean|null} null when strataApi is not a range */
+    let fits = null
+    try {
+      fits = satisfies(CORE_API_VERSION, m.strataApi)
+    } catch {}
+    if (fits === null)
+      add(
+        'E_MANIFEST_API_RANGE',
+        `strataApi ${JSON.stringify(m.strataApi)} is not a version range; use one such as '${SUPPORTED_API_RANGE}'`
+      )
+    else if (!fits)
+      add(
+        'E_MANIFEST_API_RANGE',
+        `strataApi '${m.strataApi}' is not compatible with this core, which supports plugin API ${SUPPORTED_API_RANGE} (${CORE_API_VERSION})`
+      )
+  }
+  if (m.kind !== undefined && !PLUGIN_KINDS.includes(m.kind))
+    add('E_MANIFEST_KIND', `kind must be one of ${PLUGIN_KINDS.join(', ')}`)
+  if (m.kind === 'connection-type' && Array.isArray(m.ports) && m.ports.length)
+    add('E_MANIFEST_KIND', 'a connection type has no ports')
+  if (m.extends !== undefined && m.extends !== null) {
+    try {
+      parseTypeRef(m.extends)
+    } catch (err) {
+      add('E_MANIFEST_KIND', `extends: ${/** @type {Error} */ (err).message}`)
+    }
+  }
+
+  if (m.ports !== undefined && !Array.isArray(m.ports))
+    add('E_MANIFEST_PORT', 'ports must be a list')
+  const ports = []
+  const seenPorts = new Set()
+  for (const [i, p] of (Array.isArray(m.ports) ? m.ports : []).entries()) {
+    if (!isPlainObject(p) || typeof p.name !== 'string' || !p.name) {
+      add('E_MANIFEST_PORT', `ports[${i}].name is required`)
+      continue
+    }
+    if (seenPorts.has(p.name))
+      add('E_MANIFEST_PORT', `ports[${i}]: duplicate port name '${p.name}'`)
+    seenPorts.add(p.name)
+    if (!PORT_DIRECTIONS.includes(p.direction))
+      add('E_MANIFEST_PORT', `ports[${i}].direction must be in, out or both`)
+    if (
+      p.accepts !== undefined &&
+      (!Array.isArray(p.accepts) || p.accepts.some(a => typeof a !== 'string'))
+    )
+      add('E_MANIFEST_PORT', `ports[${i}].accepts must be a list of connection type names`)
+    ports.push(p)
+  }
+
+  const properties = m.properties ?? {}
+  if (!isPlainObject(properties)) add('E_MANIFEST_PROPERTY', 'properties must be an object')
+  else
+    for (const [key, schema] of Object.entries(properties))
+      for (const message of checkSchema(schema, `properties.${key}`))
+        add('E_MANIFEST_PROPERTY', message)
+
+  checkMethods(m.methods, ports, isPlainObject(properties) ? properties : {}, add)
+  checkState(m.state, add)
+
+  const metrics = m.metrics ?? {}
+  if (!isPlainObject(metrics)) add('E_MANIFEST_METRIC', 'metrics must be an object')
+  else
+    for (const [key, metric] of Object.entries(metrics)) {
+      if (!isPlainObject(metric)) {
+        add('E_MANIFEST_METRIC', `metrics.${key} must be an object`)
+        continue
+      }
+      const rule = typeof metric.rollup === 'string' ? metric.rollup : metric.rollup?.rule
+      if (metric.rollup !== undefined && !ROLLUP_RULES.includes(rule))
+        add('E_MANIFEST_METRIC', `metrics.${key}.rollup must be one of ${ROLLUP_RULES.join(', ')}`)
+    }
+  return problems
+}
+
+/**
+ * Validates and normalises a manifest. Throws INVALID with every problem checkManifest finds
+ * listed in `details`.
  * @param {unknown} input
  * @returns {Manifest}
  */
 export function normalizeManifest(input) {
   const m = /** @type {Record<string, any>} */ (toPlain(input, 'manifest'))
-  const errors = []
-  if (!isPlainObject(m)) fail('INVALID', 'A manifest must be an object')
-  if (typeof m.id !== 'string' || !ID_RE.test(m.id))
-    errors.push(
-      "id must be lowercase letters and digits separated by '.', ':', '/', '-' or '_' (e.g. 'acme.message-queue')"
-    )
-  if (typeof m.name !== 'string' || !m.name.trim()) errors.push('name is required')
-  if (!isSemver(m.version)) errors.push('version must be a semantic version such as 1.2.0')
-  if (m.strataApi !== undefined) {
-    try {
-      if (!satisfies(CORE_API_VERSION, m.strataApi))
-        errors.push(
-          `strataApi '${m.strataApi}' is not compatible with this core (API ${CORE_API_VERSION})`
-        )
-    } catch (err) {
-      errors.push(`strataApi: ${err.message}`)
-    }
-  }
-  if (m.kind !== undefined && !PLUGIN_KINDS.includes(m.kind))
-    errors.push(`kind must be one of ${PLUGIN_KINDS.join(', ')}`)
-  if (m.kind === 'connection-type' && Array.isArray(m.ports) && m.ports.length)
-    errors.push('a connection type has no ports')
-  if (m.extends !== undefined && m.extends !== null) {
-    try {
-      parseTypeRef(m.extends)
-    } catch (err) {
-      errors.push(`extends: ${err.message}`)
-    }
-  }
-
-  const ports = []
-  if (m.ports !== undefined && !Array.isArray(m.ports)) errors.push('ports must be a list')
-  const seenPorts = new Set()
-  for (const [i, p] of (Array.isArray(m.ports) ? m.ports : []).entries()) {
-    if (!isPlainObject(p) || typeof p.name !== 'string' || !p.name) {
-      errors.push(`ports[${i}].name is required`)
-      continue
-    }
-    if (seenPorts.has(p.name)) errors.push(`ports[${i}]: duplicate port name '${p.name}'`)
-    seenPorts.add(p.name)
-    if (!PORT_DIRECTIONS.includes(p.direction))
-      errors.push(`ports[${i}].direction must be in, out or both`)
-    if (
-      p.accepts !== undefined &&
-      (!Array.isArray(p.accepts) || p.accepts.some(a => typeof a !== 'string'))
-    )
-      errors.push(`ports[${i}].accepts must be a list of connection type names`)
-    ports.push({ ...p, name: p.name, direction: p.direction, accepts: p.accepts ?? [] })
-  }
-
-  errors.push(...checkMethods(m.methods, ports))
-
-  const properties = m.properties ?? {}
-  if (!isPlainObject(properties)) errors.push('properties must be an object')
-  else
-    for (const [key, schema] of Object.entries(properties))
-      errors.push(...checkSchema(schema, `properties.${key}`))
-
-  const metrics = m.metrics ?? {}
-  if (!isPlainObject(metrics)) errors.push('metrics must be an object')
-  else {
-    for (const [key, metric] of Object.entries(metrics)) {
-      if (!isPlainObject(metric)) {
-        errors.push(`metrics.${key} must be an object`)
-        continue
-      }
-      const rule = typeof metric.rollup === 'string' ? metric.rollup : metric.rollup?.rule
-      if (metric.rollup !== undefined && !ROLLUP_RULES.includes(rule))
-        errors.push(`metrics.${key}.rollup must be one of ${ROLLUP_RULES.join(', ')}`)
-    }
-  }
-
+  const errors = checkManifest(m).map(p => p.message)
   if (errors.length)
     fail(
       'INVALID',
-      `Invalid manifest${typeof m.id === 'string' ? ` '${m.id}'` : ''}: ${errors.join('; ')}`,
+      `Invalid manifest${typeof m?.id === 'string' ? ` '${m.id}'` : ''}: ${errors.join('; ')}`,
       errors
     )
+  const ports = m.ports ?? []
+  const properties = m.properties ?? {}
+  const metrics = m.metrics ?? {}
 
   return deepFreeze({
     ...m,
@@ -174,7 +288,7 @@ export function normalizeManifest(input) {
     entry: m.entry ?? null,
     extends: m.extends ?? null,
     abstract: m.abstract === true,
-    ports,
+    ports: ports.map(p => ({ ...p, accepts: p.accepts ?? [] })),
     // Defaults are stored like any value, in canonical units (eng §8, ADR 0008).
     properties: Object.fromEntries(
       Object.entries(properties).map(([key, schema]) => [

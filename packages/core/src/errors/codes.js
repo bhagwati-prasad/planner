@@ -35,6 +35,18 @@ const DESCRIPTIONS = {
   E_BUNDLE_OUTSIDE_ROOT: 'A bundle module imports a path outside the component folder',
   E_BUNDLE_SYNTAX: 'A bundle module is not valid JavaScript',
 
+  E_MANIFEST_IDENTITY:
+    'A manifest id, name or version is missing or malformed, or the id is reserved',
+  E_MANIFEST_KIND: 'A manifest is not an object, or its kind or extends is not valid',
+  E_MANIFEST_API_RANGE: "A manifest's strataApi is missing, malformed or excludes this plugin API",
+  E_MANIFEST_PORT: 'A manifest port has no name, a repeated name, or a bad direction or accepts',
+  E_MANIFEST_UNKNOWN_METHOD: 'A manifest port exposes a method that is not declared public',
+  E_MANIFEST_METHOD: 'A manifest method is malformed, or has a bad latency or errors list',
+  E_MANIFEST_PROPERTY: 'A manifest property schema is not valid',
+  E_MANIFEST_STATE: 'A manifest state field has a bad type, or a missing or bad initial value',
+  E_MANIFEST_METRIC: 'A manifest metric is malformed or has an unknown roll-up rule',
+  E_MANIFEST_FILE: 'A file a manifest names is missing or of the wrong kind',
+
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',
   E_SYSTEM_CYCLE: 'The change would make a system contain itself, directly or through descendants',
   E_SYSTEM_READONLY:

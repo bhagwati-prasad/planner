@@ -78,7 +78,7 @@ The generic D3 diagram library: data in, intents out, fast at 500+ components, w
 
 Manifests with properties, state, public and private methods and metrics; the registry; packing, loading, serving, scaffolding and validation.
 
-- [ ] [0301 Manifest schema](M03-component-model-and-plugins/0301-manifest-schema.md) (after 0107)
+- [x] [0301 Manifest schema](M03-component-model-and-plugins/0301-manifest-schema.md) (after 0107)
 - [ ] [0302 Component registry and versions](M03-component-model-and-plugins/0302-registry.md) (after 0301)
 - [ ] [0303 Behaviour contract and component test harness](M03-component-model-and-plugins/0303-behaviour-contract.md) (after 0301)
 - [ ] [0304 strata pack](M03-component-model-and-plugins/0304-pack-cli.md) (after 0005, 0302)
