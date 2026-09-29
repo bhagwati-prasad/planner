@@ -48,9 +48,15 @@ export const HELP = {
       "await strata.components.upload([{ path: 'queue.strata.js', content: text }])",
     ],
     [
+      'restore',
+      '',
+      'Installs the components uploaded in earlier sessions, which the storage adapter keeps (spec §8 "Loading paths")',
+      'await strata.components.restore()',
+    ],
+    [
       'uninstall',
       'ref',
-      'Removes a component type (one version, or every version when none is given)',
+      'Removes a component type (one version, or every version when none is given), and the copy the storage adapter keeps of an uploaded one',
       "strata.components.uninstall('acme.queue@1.2.0')",
     ],
     [

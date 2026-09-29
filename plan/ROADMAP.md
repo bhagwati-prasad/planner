@@ -82,7 +82,7 @@ Manifests with properties, state, public and private methods and metrics; the re
 - [x] [0302 Component registry and versions](M03-component-model-and-plugins/0302-registry.md) (after 0301)
 - [x] [0303 Behaviour contract and component test harness](M03-component-model-and-plugins/0303-behaviour-contract.md) (after 0301)
 - [x] [0304 strata pack](M03-component-model-and-plugins/0304-pack-cli.md) (after 0005, 0302)
-- [ ] [0305 Registration and upload loaders](M03-component-model-and-plugins/0305-loaders.md) (after 0304)
+- [x] [0305 Registration and upload loaders](M03-component-model-and-plugins/0305-loaders.md) (after 0304)
 - [ ] [0306 strata serve](M03-component-model-and-plugins/0306-serve.md) (after 0304)
 - [ ] [0307 strata new component, validate and test-component](M03-component-model-and-plugins/0307-scaffold-validate.md) (after 0303, 0304)
 - [ ] [0308 Connection-type plugins](M03-component-model-and-plugins/0308-connection-types.md) (after 0302)

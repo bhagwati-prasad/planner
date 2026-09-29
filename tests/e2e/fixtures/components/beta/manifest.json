@@ -1,0 +1,12 @@
+{
+  "strataApi": "^1.0",
+  "id": "e2e.beta",
+  "name": "E2E Beta",
+  "version": "1.0.0",
+  "category": "Testing",
+  "icon": "icon.svg",
+  "entry": "index.js",
+  "extends": "base:service",
+  "ports": [{ "name": "in", "direction": "in", "exposes": ["ping"] }],
+  "methods": { "public": { "ping": { "input": "message", "output": "ok" } } }
+}

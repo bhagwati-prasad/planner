@@ -50,6 +50,7 @@ export default [
     // for any code a user might bundle.
     files: [
       'components/*/index.js',
+      'tests/e2e/fixtures/components/*/index.js',
       'eslint.config.js',
       'playwright.config.js',
       'tests/e2e/global-setup.js',

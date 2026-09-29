@@ -104,7 +104,7 @@ export class Strata {
     })
 
     /** Component types (built-in types, manifests and packed plugins share one registry). */
-    this.components = new ComponentsApi(this.#registry, emit)
+    this.components = new ComponentsApi(this.#registry, emit, storage)
 
     /** Simulation (spec §11): one request over one edge so far. */
     this.sim = new SimApi(this, simHost)
