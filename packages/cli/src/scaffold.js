@@ -1,5 +1,6 @@
 /**
- * `strata new component`: the files of a new component folder (spec §7 "Folder layout").
+ * `strata new component`: the files of a new component folder (spec §8 "Folder layout"), with a
+ * behaviour in the API of spec §8 and a self-test that uses its test context.
  */
 
 /** The built-in base behaviours a component can extend (spec §7 "Behaviour API"). */
@@ -63,6 +64,23 @@ export function scaffoldComponent(
         description: 'Time to handle one message',
       },
     },
+    ports: [
+      { name: 'in', direction: 'in', exposes: ['handle'] },
+      { name: 'out', direction: 'out' },
+    ],
+    state: {
+      handled: { type: 'integer', initial: 0, description: 'Messages handled so far' },
+    },
+    methods: {
+      public: {
+        handle: {
+          input: 'message',
+          output: 'ack',
+          latency: 'serviceTime',
+          description: 'Handles one message',
+        },
+      },
+    },
     metrics: {
       handled: { unit: 'messages', rollup: 'sum', description: 'Messages handled so far' },
     },
@@ -77,24 +95,19 @@ export function scaffoldComponent(
 </svg>
 `,
     'index.js': `// Behaviour of ${title}. It runs only inside the simulation worker, never on the page.
-// Every hook is optional: leave one out and the base behaviour (${base}) applies.
-// ctx: props, state, now, random(), sample(dist), send(port, msg), forward(msg),
-//      reply(msg, response), reject(msg, code), schedule(delay, name, data), metric(name, value), log(level, ...args)
+// Public methods answer the requests of the ports that expose them (manifest.json), and the
+// return value is the response. Leave a hook out and the base behaviour (${base}) applies.
+// ctx: props, state, now, random(), sample(dist), call(name, args), send(port, method, args),
+//      emit(port, method, args), fail(code, details), schedule(delay, name, data),
+//      metric(name, value) and log(level, ...args). Await only what ctx returns.
 
 export default {
-  init (ctx) {
-    ctx.state.handled = 0
-  },
-
-  onMessage (msg, ctx) {
-    ctx.schedule(ctx.sample(ctx.props.serviceTime), 'done', { msg })
-  },
-
-  onTimer (name, ctx, data) {
-    if (name !== 'done') return
-    ctx.state.handled += 1
-    ctx.metric('handled', ctx.state.handled)
-    ctx.forward(data.msg)
+  public: {
+    handle (msg, ctx) {
+      ctx.state.handled += 1
+      ctx.metric('handled', ctx.state.handled)
+      return { ok: true, handledAt: ctx.now }
+    }
   }
 }
 `,
@@ -108,33 +121,19 @@ What ${title} does, when to use it, and what its properties mean.
 
 Change the \`id\` in manifest.json to your own namespace (for example \`acme.${name}\`) before you share it.
 `,
-    [`tests/${name}.test.js`]: `// Self-tests for ${title}: plain node:test, run by \`strata test-component\`.
+    [`tests/${name}.test.js`]: `// Self-tests for ${title}: plain node:test, run by \`strata test-component\`, which
+// provides 'strata/testing': a ctx that records what a method does, without the kernel.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createTestContext } from 'strata/testing'
 import behaviour from '../index.js'
+import manifest from '../manifest.json' with { type: 'json' }
 
-/** A minimal stand-in for the simulation context. */
-function fakeContext (props = {}) {
-  const calls = []
-  return {
-    calls,
-    props: { serviceTime: 20, ...props },
-    state: {},
-    now: 0,
-    sample: dist => (typeof dist === 'number' ? dist : dist.median),
-    schedule: (delay, name, data) => calls.push(['schedule', delay, name, data]),
-    forward: msg => calls.push(['forward', msg]),
-    metric: (name, value) => calls.push(['metric', name, value])
-  }
-}
-
-test('a message is forwarded after the service time', () => {
-  const ctx = fakeContext()
-  behaviour.init(ctx)
-  behaviour.onMessage('m1', ctx)
-  assert.deepEqual(ctx.calls, [['schedule', 20, 'done', { msg: 'm1' }]])
-  behaviour.onTimer('done', ctx, { msg: 'm1' })
-  assert.deepEqual(ctx.calls.slice(1), [['metric', 'handled', 1], ['forward', 'm1']])
+test('handle counts each message and answers it', () => {
+  const ctx = createTestContext({ manifest, behaviour, now: 250 })
+  assert.deepEqual(behaviour.public.handle({ body: { id: 'm1' } }, ctx), { ok: true, handledAt: 250 })
+  assert.deepEqual(ctx.snapshot(), { handled: 1 })
+  assert.deepEqual(ctx.metrics, [{ name: 'handled', value: 1 }])
 })
 `,
   }

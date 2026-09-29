@@ -32,6 +32,8 @@ const DESCRIPTIONS = {
   E_BEHAVIOUR_MISSING_METHOD:
     'A method the manifest declares, or ctx.call names, has no implementation',
   E_BEHAVIOUR_MODULE_STATE: 'A behaviour module keeps mutable state at module level',
+  E_BEHAVIOUR_AWAIT: 'Behaviour code awaits a promise that did not come from ctx',
+  E_ICON_RULE: 'A component icon breaks the rules of design system §13',
   E_BEHAVIOUR_UNDECLARED_STATE: 'Behaviour code set a state field the manifest does not declare',
 
   E_BUNDLE_BARE_SPECIFIER:

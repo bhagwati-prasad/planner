@@ -107,8 +107,8 @@ test('test-component runs the sandbox check and the self-tests', async () => {
   await run('new', 'component', 'worker')
   const ok = await run('test-component', 'components/worker')
   assert.equal(ok.code, 0, ok.stdout + ok.stderr)
-  assert.match(ok.stdout, /✓ Behaviour loads in the sandbox; hooks: init, onMessage, onTimer/)
-  assert.match(ok.stdout, /a message is forwarded after the service time/)
+  assert.match(ok.stdout, /✓ The behaviour matches the manifest \(public methods: handle\)/)
+  assert.match(ok.stdout, /handle counts each message and answers it/)
 
   write(
     'components/worker/tests/worker.test.js',
@@ -213,8 +213,8 @@ test('the sandbox has no network or Node APIs, seeded randomness and a time limi
   )
   assert.match((await check('while (true) {}\nexport default {}')).messages.join(), /timed out/)
   assert.match(
-    (await check('export default { onMesage () {} }')).messages.join(),
-    /Unknown hook 'onMesage'\. Did you mean 'onMessage'\?/
+    (await check('export default { onTimr () {} }')).messages.join(),
+    /Unknown hook 'onTimr'\. Did you mean 'onTimer'\?/
   )
   assert.match(
     (await check("new Function('return 1')()\nexport default {}")).messages.join(),
