@@ -30,6 +30,8 @@ const DESCRIPTIONS = {
     'A bundle imports an npm package; only relative imports, d3 and three are allowed',
   E_BUNDLE_CYCLE:
     'Bundle modules import each other in a cycle through bindings that are not hoisted',
+  E_BUNDLE_INTEGRITY:
+    'A packed bundle was changed after packing, so its integrity hash does not match',
   E_BUNDLE_MISSING_EXPORT: 'A bundle module imports a name its target does not export',
   E_BUNDLE_MISSING_MODULE: 'A bundle module imports a file that is not in the bundle',
   E_BUNDLE_OUTSIDE_ROOT: 'A bundle module imports a path outside the component folder',

@@ -373,8 +373,9 @@ export function readBundle(input) {
   const expected = bundleIntegrity(/** @type {ComponentBundle} */ (b))
   if (expected !== b.integrity) {
     throw new StrataError(
-      'INVALID',
-      `The bundle for ${b.manifest.id}@${b.manifest.version} was changed after it was packed (integrity mismatch). Pack it again with strata pack.`
+      'E_BUNDLE_INTEGRITY',
+      `The bundle for ${b.manifest.id}@${b.manifest.version} was changed after it was packed (integrity mismatch). Pack it again with strata pack.`,
+      { expected, actual: b.integrity }
     )
   }
   return /** @type {ComponentBundle} */ (b)
