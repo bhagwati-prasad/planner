@@ -51,7 +51,9 @@ export const TOKENS = Object.freeze({
   chip: '--sg-chip',
   chipText: '--sg-chip-text',
   heatLow: '--sg-heat-low',
+  heatMid: '--sg-heat-mid',
   heatHigh: '--sg-heat-high',
+  heatCritical: '--sg-heat-critical',
   fontFamily: '--sg-font-family',
   fontFamilyMono: '--sg-font-family-mono',
   fontSize: '--sg-font-size',
@@ -111,8 +113,10 @@ export const LIGHT = Object.freeze({
   iconGlyph: '#3B424D',
   chip: '#E4E7EC',
   chipText: '#3B424D',
-  heatLow: '#16a34a',
-  heatHigh: '#dc2626',
+  heatLow: '#F4DE9C',
+  heatMid: '#EDB85A',
+  heatHigh: '#DD7F37',
+  heatCritical: '#B8322E',
   fontFamily: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
   fontFamilyMono: "'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace",
   fontSize: '13px',
@@ -294,6 +298,26 @@ export const STYLESHEET = `
 .sg-badge circle { fill: ${v('badge')}; }
 .sg-badge text { fill: ${v('badgeText')}; font-size: 0.8em; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .sg-heat { pointer-events: none; }
+.sg-heat-tint { fill-opacity: 0.4; }
+.sg-heat-alert { fill: ${v('danger')}; }
+.sg-heat-label { fill: ${v('nodeSubtext')}; font-size: 11px; font-weight: 500; text-anchor: end; }
+.sg-lod-mid .sg-heat-label { display: none; }
+.sg-breakpoint circle { fill: ${v('danger')}; }
+.sg-breakpoint text { fill: ${v('badgeText')}; font-size: 8px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.sg-ring { fill: none; stroke: ${v('accent')}; pointer-events: none; }
+.sg-hop-outline { stroke-width: 2; }
+.sg-scope-outline { stroke-width: 1.5; stroke-dasharray: 4 3; }
+.sg-edge.sg-hop .sg-edge-path { stroke: ${v('accent')}; stroke-width: 2; }
+.sg-edge.sg-out-of-scope { opacity: 0.3; }
+.sg-stub rect, .sg-traffic rect { fill: ${v('nodeFill')}; stroke: ${v('nodeStroke')}; stroke-width: 1; }
+.sg-stub path { fill: none; stroke: ${v('glyph')}; stroke-width: 1.25; }
+.sg-traffic path { fill: ${v('accent')}; }
+.sg-traffic text { fill: ${v('nodeSubtext')}; font-size: ${v('fontSizeSmall')}; text-anchor: middle; }
+.sg-request { fill: ${v('accent')}; pointer-events: none; }
+.sg-request-failed { fill: ${v('danger')}; }
+.sg-trail { fill: none; stroke: ${v('accent')}; stroke-width: 2; pointer-events: none; }
+.sg-followed { fill: ${v('accent')}; stroke: ${v('accentSoft')}; stroke-width: 2; pointer-events: none; }
+.sg-marks, .sg-marks * { pointer-events: none; }
 .sg-guide { stroke: ${v('guide')}; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .sg-moving { will-change: transform; }
 .sg-node-layer { pointer-events: none; overflow: visible; }

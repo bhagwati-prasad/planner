@@ -14,3 +14,15 @@ The generic D3 diagram library: it renders graph data and emits intents, and kno
 - **Culling.** Above `cullThreshold` items (default 600), only items near the view are rendered.
 - **Canvas layer.** Above 1,500 visible components, the node layer is one Canvas 2D image, with rounded blocks and titles. Clicks, drags, double-clicks, context menus and hover reach components through the spatial index ([ADR 0015](../../docs/adr/0015-strata-graph-uses-its-own-spatial-index.md)).
 - **Benchmark.** `npm run bench` measures panning 500 components against eng §15's 16 ms frame budget (`tools/bench/graph-pan.bench.js`).
+
+## Overlays and export
+
+- **Overlays.** `setOverlay(name, spec)` draws what simulation and debugging need over the diagram (design system §6):
+  - `heatmap`, on §3's heat ramp;
+  - `requests`, at most 400 dots;
+  - `followed`, a request and its trail;
+  - `scope`, with stub and traffic markers;
+  - `breakpoints`;
+  - `hop`.
+  Its JSDoc gives each spec. Request dots and the followed request redraw on their own, so moving them every frame stays cheap.
+- **Export.** `exportSVG()` writes a standalone document: styles resolved, no external references, and ids that do not depend on which graph drew it, so the same data exports the same file. `exportPNG()` rasterises that document.

@@ -218,6 +218,33 @@ export function slideOut(p, a, b, r) {
   return p
 }
 
+/**
+ * The part of a polyline from its start to a fraction `t` (0 to 1, clamped) of its length.
+ * @param {Point[]} points @param {number} t
+ * @returns {Point[]}
+ */
+export function partAlong(points, t) {
+  const lengths = points.slice(1).map((p, i) => Math.hypot(p.x - points[i].x, p.y - points[i].y))
+  let left = Math.min(1, Math.max(0, t)) * lengths.reduce((a, b) => a + b, 0)
+  for (let i = 0; i < lengths.length; i++) {
+    if (left <= lengths[i] && lengths[i] > 0) {
+      const f = left / lengths[i]
+      const a = points[i]
+      const b = points[i + 1]
+      return [...points.slice(0, i + 1), { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f }]
+    }
+    left -= lengths[i]
+  }
+  return points.map(p => ({ x: p.x, y: p.y }))
+}
+
+/**
+ * The point a fraction `t` (0 to 1, clamped) of the way along a polyline, by length.
+ * @param {Point[]} points @param {number} t
+ * @returns {Point}
+ */
+export const pointAlong = (points, t) => /** @type {Point} */ (partAlong(points, t).at(-1))
+
 /** Rounds a value to a grid step (grid <= 0 leaves it unchanged). @param {number} v @param {number} grid */
 export function snap(v, grid) {
   return grid > 0 ? Math.round(v / grid) * grid : v
