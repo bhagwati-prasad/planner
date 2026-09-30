@@ -25,14 +25,21 @@ import { tokenize } from './tokenize.js'
  * @property {() => number} random  a seeded number in [0, 1)
  * @property {(dist: unknown) => number} sample  a draw from a distribution
  * @property {(name: string, args?: unknown) => any} call  calls a private method, as a child span
- * @property {(port: string, method: string, args?: unknown) => Promise<any>} send  calls a
- *   public method across a port's edge; resolves when the response arrives in simulated time
- * @property {(port: string, method: string, args?: unknown) => void} emit  sends without waiting
+ * @property {(port: string, method: string|null, args?: unknown, options?: SendOptions) => Promise<any>} send
+ *   calls a public method across a port's edge, or the edge's own method when it names none;
+ *   resolves when the response arrives in simulated time
+ * @property {(port: string, method: string|null, args?: unknown, options?: SendOptions) => void} emit
+ *   sends without waiting
  * @property {(code: string, details?: unknown) => Failure} fail  an error response, to return
  * @property {(delay: number, name: string, data?: unknown) => void} schedule  a timer that calls
  *   onTimer
  * @property {(name: string, value: number) => void} metric
  * @property {(level: string, ...args: unknown[]) => void} log
+ *
+ * @typedef {object} SendOptions  a message's protocol details (ADR 0019)
+ * @property {string} [path]
+ * @property {Record<string, string>} [headers]
+ * @property {number} [sizeBytes]
  *
  * @typedef {{ ok: false, code: string, details: unknown }} Failure  what ctx.fail returns
  * @typedef {(input: any, ctx: BehaviourContext) => any} Method  a public method gets the request
@@ -237,8 +244,9 @@ export function checkModuleState(source, file) {
  * @param {Record<string, unknown>} [options.state]  fields over the initial values
  * @param {number} [options.now]  simulated time in ms
  * @param {number|string} [options.seed]
- * @param {Record<string, unknown>} [options.replies]  answers by 'port.method' for ctx.send,
- *   or by name for ctx.call: a value, or a function of the arguments
+ * @param {Record<string, unknown>} [options.replies]  answers by 'port.method' for ctx.send (by
+ *   'port' alone for a send that names no method, which calls the edge's method, ADR 0019), or
+ *   by name for ctx.call: a value, or a function of the arguments
  * @returns {TestContext}
  * @example
  * const ctx = createTestContext({ manifest, behaviour, replies: { 'db.insert': { id: 7 } } })
@@ -260,7 +268,21 @@ export function createTestContext({
   const fields = /** @type {any} */ (m)?.state ?? null
   const prng = createPrng(seed)
   /** @template T @param {T} value @returns {T} */
-  const clone = value => (value === undefined ? value : structuredClone(value))
+  /**
+   * A deep copy, read through watched parts of state, as the run copies what leaves a method.
+   * @template T @param {T} value @returns {T}
+   */
+  const clone = value => {
+    if (typeof value !== 'object' || value === null) return value
+    const target = targets.get(value) ?? value
+    if (Array.isArray(target)) return /** @type {any} */ (target.map(clone))
+    const proto = Object.getPrototypeOf(target)
+    if (proto !== Object.prototype && proto !== null)
+      return /** @type {any} */ (structuredClone(target))
+    return /** @type {any} */ (
+      Object.fromEntries(Object.entries(target).map(([k, v]) => [k, clone(v)]))
+    )
+  }
   /** @param {string} key @param {unknown} args */
   const answer = (key, args) => {
     const reply = replies[key]
@@ -343,12 +365,22 @@ export function createTestContext({
         `No private method '${name}' in the behaviour, and no reply for it in replies`
       )
     },
-    send(port, method, args) {
-      ctx.sent.push({ port, method, args: clone(args) })
-      return Promise.resolve(answer(`${port}.${method}`, args))
+    send(port, method, args, options) {
+      ctx.sent.push({
+        port,
+        method,
+        args: clone(args),
+        ...(options ? { options: clone(options) } : {}),
+      })
+      return Promise.resolve(answer(method == null ? port : `${port}.${method}`, args))
     },
-    emit(port, method, args) {
-      ctx.emitted.push({ port, method, args: clone(args) })
+    emit(port, method, args, options) {
+      ctx.emitted.push({
+        port,
+        method,
+        args: clone(args),
+        ...(options ? { options: clone(options) } : {}),
+      })
     },
     fail(code, details) {
       ctx.failures.push({ code, details: clone(details) })

@@ -30,6 +30,11 @@ export class EventQueue {
     return this.#heap.length
   }
 
+  /** When the earliest event is due, or Infinity when there is none. */
+  get nextTimeUs() {
+    return this.#heap[0]?.timeUs ?? Infinity
+  }
+
   /**
    * @param {number} timeUs
    * @param {number} priority

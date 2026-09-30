@@ -187,6 +187,35 @@ describe('createTestContext', () => {
     assert.deepEqual(ctx.snapshot(), { messages: [b], inFlight: { a } })
   })
 
+  it('records a send’s protocol details, and answers a send that names no method by its port', async () => {
+    const ctx = createTestContext({
+      manifest: MANIFEST,
+      replies: { out: (/** @type {any} */ body) => `handled ${body}`, 'db.get': 1 },
+    })
+    assert.equal(await ctx.send('out', null, 'job'), 'handled job', 'the edge names the method')
+    assert.equal(await ctx.send('db', 'get', {}, { path: '/rows/1' }), 1)
+    ctx.emit('events', null, 'x', { headers: { key: 'k' } })
+    assert.deepEqual(ctx.sent, [
+      { port: 'out', method: null, args: 'job' },
+      { port: 'db', method: 'get', args: {}, options: { path: '/rows/1' } },
+    ])
+    assert.deepEqual(ctx.emitted, [
+      { port: 'events', method: null, args: 'x', options: { headers: { key: 'k' } } },
+    ])
+  })
+
+  it('records plain copies of arguments that hold parts of state, as the run does', () => {
+    const ctx = createTestContext({
+      manifest: MANIFEST,
+      behaviour: { private: { hold: (/** @type {any} */ args) => args.item.id } },
+    })
+    ctx.state.messages.push({ id: 'a' })
+    assert.equal(ctx.call('hold', { item: ctx.state.messages[0] }), 'a')
+    ctx.schedule(5, 'later', { item: ctx.state.messages[0] })
+    assert.deepEqual(ctx.calls, [{ name: 'hold', args: { item: { id: 'a' } } }])
+    assert.deepEqual(ctx.scheduled, [{ delay: 5, name: 'later', data: { item: { id: 'a' } } }])
+  })
+
   it('rejects state fields the manifest does not declare, and draws seeded numbers', () => {
     const ctx = createTestContext({ manifest: MANIFEST, seed: 42 })
     assert.throws(

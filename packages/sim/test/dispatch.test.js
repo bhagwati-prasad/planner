@@ -228,6 +228,89 @@ describe('method dispatch', () => {
 })
 
 describe('ctx', () => {
+  it('runs each behaviour’s init once, at the start, before any message', async () => {
+    /** @type {number[]} */
+    const ticks = []
+    const run = runOf({
+      api: component(
+        't.api',
+        {
+          ports: [inPort('read')],
+          methods: { public: { read: {} } },
+          state: { ready: { type: 'boolean', initial: false } },
+        },
+        {
+          init(/** @type {any} */ ctx) {
+            ctx.state.ready = true
+            ctx.schedule(5, 'tick')
+          },
+          public: { read: (/** @type {any} */ _msg, /** @type {any} */ ctx) => ctx.state.ready },
+          onTimer: (/** @type {any} */ _t, /** @type {any} */ ctx) => void ticks.push(ctx.now),
+        }
+      ),
+    })
+    const first = run.inject({ node: 'api', port: 'in', method: 'read' })
+    await run.runToEnd()
+    const again = run.inject({ node: 'api', port: 'in', method: 'read', atUs: 10 * MS })
+    await run.runToEnd()
+    assert.deepEqual([first.body, again.body], [true, true], 'the first message saw what init set')
+    assert.deepEqual(ticks, [5], 'the timer init set fired once, so init ran once')
+    const init = run.spans.find(s => s.kind === 'init')
+    assert.deepEqual([init?.node, init?.startUs, init?.status], ['api', 0, 'ok'])
+  })
+
+  it('gives a timer a copy of its data, so later changes to state do not reach it', async () => {
+    /** @type {unknown[]} */
+    const seen = []
+    const run = runOf({
+      api: component(
+        't.api',
+        {
+          ports: [inPort('later')],
+          methods: { public: { later: {} } },
+          state: { jobs: { type: 'list', items: { type: 'string' }, initial: ['j1'] } },
+        },
+        {
+          public: {
+            later(/** @type {any} */ _msg, /** @type {any} */ ctx) {
+              ctx.schedule(5, 'check', { jobs: ctx.state.jobs })
+              ctx.state.jobs.push('j2')
+            },
+          },
+          onTimer: (/** @type {any} */ timer) => void seen.push(timer.data),
+        }
+      ),
+    })
+    run.inject({ node: 'api', port: 'in', method: 'later' })
+    await run.runToEnd()
+    assert.deepEqual(seen, [{ jobs: ['j1'] }])
+    assert.doesNotThrow(() => structuredClone(seen), 'plain data, which snapshots can copy')
+  })
+
+  it('runs until a time, leaving later events for the next call', async () => {
+    /** @type {number[]} */
+    const ticks = []
+    const run = runOf({
+      api: component(
+        't.api',
+        { ports: [inPort('noop')], methods: { public: { noop: {} } } },
+        {
+          init: (/** @type {any} */ ctx) => ctx.schedule(10, 'tick'),
+          public: { noop: () => null },
+          onTimer(/** @type {any} */ _t, /** @type {any} */ ctx) {
+            ticks.push(ctx.now)
+            ctx.schedule(10, 'tick')
+          },
+        }
+      ),
+    })
+    await run.runToEnd({ untilUs: 35 * MS })
+    assert.deepEqual(ticks, [10, 20, 30])
+    assert.equal(run.nowUs, 35 * MS, 'the clock stands at the time asked for')
+    await run.runToEnd({ untilUs: 50 * MS })
+    assert.deepEqual(ticks, [10, 20, 30, 40, 50])
+  })
+
   it('schedules timers that call onTimer, emits without waiting, and fails with a code', async () => {
     /** @type {unknown[]} */
     const received = []

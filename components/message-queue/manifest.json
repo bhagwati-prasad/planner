@@ -6,6 +6,7 @@
   "category": "Messaging",
   "description": "Buffers messages between producers and consumers (SQS, RabbitMQ, Azure Service Bus queues).",
   "icon": "icon.svg",
+  "entry": "index.js",
   "extends": "base:queue",
   "shape": "queue",
   "ports": [
@@ -16,12 +17,88 @@
       "exposes": ["publish", "receive", "ack", "nack"]
     }
   ],
+  "state": {
+    "messages": {
+      "type": "queue",
+      "initial": [],
+      "description": "Visible messages, oldest first"
+    },
+    "inFlight": {
+      "type": "map",
+      "initial": {},
+      "description": "Received messages awaiting ack, by id"
+    },
+    "deadLetters": {
+      "type": "list",
+      "initial": [],
+      "description": "Messages received maxReceives times"
+    },
+    "blocked": {
+      "type": "queue",
+      "initial": [],
+      "description": "Publishes waiting for space under block-producer"
+    },
+    "published": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Messages accepted, which numbers their ids"
+    },
+    "bytes": {
+      "type": "integer",
+      "initial": 0,
+      "unit": "bytes",
+      "description": "Size of the visible messages"
+    },
+    "dedup": {
+      "type": "map",
+      "initial": {},
+      "description": "Message ids by dedupId, for exactly-once delivery"
+    },
+    "expiryArmed": {
+      "type": "boolean",
+      "initial": false,
+      "description": "Whether the retention timer is set"
+    },
+    "tokens": {
+      "type": "number",
+      "initial": 0,
+      "description": "Receives the egress rate still allows"
+    },
+    "tokensAt": {
+      "type": "number",
+      "initial": -1,
+      "unit": "ms",
+      "description": "When tokens was last refilled; -1 before the first receive"
+    }
+  },
   "methods": {
     "public": {
-      "publish": {},
-      "receive": {},
-      "ack": {},
-      "nack": {}
+      "publish": {
+        "input": "message",
+        "output": "{ id, blocked?, duplicate? }",
+        "errors": ["QUEUE_FULL", "MESSAGE_TOO_LARGE"],
+        "latency": "deliveryDelay"
+      },
+      "receive": {
+        "input": {
+          "max": "integer"
+        },
+        "output": "message[]"
+      },
+      "ack": {
+        "input": {
+          "id": "string"
+        },
+        "output": "{ ok }",
+        "errors": ["UNKNOWN_MESSAGE"]
+      },
+      "nack": {
+        "input": {
+          "id": "string"
+        },
+        "output": "{ ok }",
+        "errors": ["UNKNOWN_MESSAGE"]
+      }
     },
     "private": {
       "expire": {},
@@ -179,6 +256,11 @@
     "rejected": {
       "unit": "messages",
       "rollup": "sum"
+    },
+    "dropped": {
+      "unit": "messages",
+      "rollup": "sum",
+      "description": "Dropped by the drop-oldest overflow policy"
     }
   }
 }

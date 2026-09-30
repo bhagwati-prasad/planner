@@ -161,6 +161,28 @@ describe('npm test', () => {
     assert.match(tests.stdout, /# pass 4/)
   })
 
+  it('lets component self-tests import strata/testing, as strata test-component does', () => {
+    write(
+      'components/cache/tests/context.test.js',
+      [
+        "import { it } from 'node:test'",
+        "import assert from 'node:assert/strict'",
+        "import { createTestContext } from 'strata/testing'",
+        "it('gets a context', () => assert.equal(typeof createTestContext().fail, 'function'))",
+        '',
+      ].join('\n')
+    )
+    try {
+      const run = spawnSync(process.execPath, [RUNNER, '--root', fixture, 'context.test'], {
+        encoding: 'utf8',
+      })
+      assert.equal(run.status, 0, run.stdout + run.stderr)
+      assert.match(run.stdout, /# pass 1/)
+    } finally {
+      rmSync(join(fixture, 'components/cache'), { recursive: true, force: true })
+    }
+  })
+
   it('exits non-zero when a discovered test fails', () => {
     write(
       'components/broken/tests/broken.test.js',

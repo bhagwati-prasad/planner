@@ -6,6 +6,7 @@
   "category": "Compute",
   "description": "Consumers that pull messages from a queue or topic in batches.",
   "icon": "icon.svg",
+  "entry": "index.js",
   "extends": "base:service",
   "shape": "component",
   "ports": [
@@ -17,12 +18,44 @@
     },
     {
       "name": "out",
-      "direction": "out"
+      "direction": "out",
+      "description": "The handler each message goes to; the edge names its method"
+    },
+    {
+      "name": "source",
+      "direction": "out",
+      "accepts": ["async-message"],
+      "description": "The queue it receives from and acknowledges to"
     }
   ],
+  "state": {
+    "busy": {
+      "type": "integer",
+      "initial": 0,
+      "unit": "workers",
+      "description": "Workers processing or waiting to retry a message"
+    },
+    "buffer": {
+      "type": "queue",
+      "initial": [],
+      "description": "Received messages waiting for a free worker"
+    },
+    "batches": {
+      "type": "map",
+      "initial": {},
+      "description": "Each open batch: when it arrived and how many of its messages are left"
+    },
+    "received": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Batches received, which numbers them"
+    }
+  },
   "methods": {
     "public": {
-      "status": {}
+      "status": {
+        "output": "{ consumers, busy, buffered, idle }"
+      }
     },
     "private": {
       "poll": {},
