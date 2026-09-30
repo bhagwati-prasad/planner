@@ -96,7 +96,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0402 Worker hosts, sandbox and protocol](M04-simulation-core/0402-worker-host.md) (after 0401, 0303)
 - [x] [0418 Simulation code only in the worker bundle](M04-simulation-core/0418-sim-in-worker-only.md) (after 0402)
 - [x] [0403 ctx API and method dispatch](M04-simulation-core/0403-ctx-dispatch.md) (after 0402, 0111)
-- [ ] [0404 Typed state at run time](M04-simulation-core/0404-state-runtime.md) (after 0403)
+- [x] [0404 Typed state at run time](M04-simulation-core/0404-state-runtime.md) (after 0403)
 - [ ] [0405 Edges, routing and the network model](M04-simulation-core/0405-edges-network.md) (after 0403, 0308)
 - [ ] [0406 Black-box and expanded composites](M04-simulation-core/0406-black-box-expanded.md) (after 0403, 0112)
 - [ ] [0407 Base behaviours](M04-simulation-core/0407-base-behaviours.md) (after 0404, 0405)

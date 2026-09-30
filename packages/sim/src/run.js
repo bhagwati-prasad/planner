@@ -21,6 +21,7 @@ import {
 import { Kernel } from './kernel.js'
 import { createStreams } from './random.js'
 import { sample } from './sample.js'
+import { copy, initialState, stateView } from './state.js'
 
 /**
  * @typedef {object} RunNode
@@ -29,6 +30,8 @@ import { sample } from './sample.js'
  * @property {any} [behaviour]  the behaviour module's default export
  * @property {Record<string, unknown>} [props]  property values in canonical units, over the
  *   manifest's defaults
+ * @property {Record<string, unknown>} [state]  initial state over the manifest's initial values
+ * @property {Record<string, { csv: string }>} [fixtures]  initial rows of table fields, as CSV
  *
  * @typedef {object} RunEdge
  * @property {string} id
@@ -172,6 +175,11 @@ export class Run {
   metrics = []
   /** @type {{ atUs: number, node: string, level: string, args: unknown[] }[]} */
   logs = []
+  /**
+   * Every state change, for the debugger (spec §6).
+   * @type {{ event: number, spanId: string, node: string, op: 'set'|'delete', path: (string|number)[], value?: unknown }[]}
+   */
+  changes = []
   /** Counts what behaviour code does, so the run can tell when microtasks have settled. */
   activity = 0
   #woken = false
@@ -188,21 +196,18 @@ export class Run {
    */
   constructor({ seed = 1, nodes, edges = [] }) {
     const streams = createStreams(seed)
-    const checked = isDevelopment()
+    const strict = isDevelopment()
     for (const n of nodes) {
       const manifest = normalizeManifest(n.manifest)
-      const fields = /** @type {Record<string, { initial?: unknown }>} */ (
-        /** @type {any} */ (manifest).state ?? {}
-      )
-      const state = Object.fromEntries(
-        Object.entries(fields).map(([k, f]) => [k, structuredClone(f.initial)])
-      )
+      const fields = /** @type {any} */ (manifest).state ?? {}
       this.#nodes.set(n.id, {
         id: n.id,
         manifest,
         behaviour: n.behaviour ?? {},
         props: { ...defaultProps(manifest.properties ?? {}), ...n.props },
-        state: checked ? declaredOnly(n.id, state, fields) : state,
+        fields,
+        strict,
+        state: initialState(fields, n),
         random: streams.stream(n.id),
         latency: streams.stream(`${n.id}:latency`),
       })
@@ -236,7 +241,7 @@ export class Run {
         traceId: this.#id(32),
         parentSpanId: null,
         method,
-        body,
+        body: copy(body),
         to: { node, port },
         reply,
       },
@@ -379,7 +384,7 @@ export class Run {
     this.activity++
     const atUs = Math.max(call.busyUntil, this.nowUs) + call.ownUs
     const failed = !ok || FAILURES.has(/** @type {any} */ (value))
-    const body = failed ? errorBody(call.span.node, value) : value
+    const body = failed ? errorBody(call.span.node, value) : copy(value)
     this.#end(
       call.span,
       failed ? 'error' : 'ok',
@@ -436,10 +441,25 @@ export class Run {
     const run = this
     const touch = () => run.activity++
     const random = () => node.random.nextU32() / 2 ** 32
+    /** @type {Record<string, unknown>|undefined} */
+    let state
     const ctx = {
       props: node.props,
       get state() {
-        return node.state
+        return (state ??= stateView(node.state, {
+          node: node.id,
+          fields: node.fields,
+          strict: node.strict,
+          record: (op, path, value) =>
+            run.changes.push({
+              event: run.kernel.processed,
+              spanId: span.spanId,
+              node: node.id,
+              op,
+              path,
+              ...(op === 'set' ? { value: copy(value) } : {}),
+            }),
+        }))
       },
       /** Simulated time in ms. */
       get now() {
@@ -492,7 +512,7 @@ export class Run {
       },
       log: (/** @type {string} */ level, /** @type {unknown[]} */ ...args) => {
         touch()
-        run.logs.push({ atUs: run.nowUs, node: node.id, level, args })
+        run.logs.push({ atUs: run.nowUs, node: node.id, level, args: copy(args) })
       },
     }
     return ctx
@@ -542,7 +562,7 @@ export class Run {
         traceId: span.traceId,
         parentSpanId: span.spanId,
         method,
-        body,
+        body: copy(body),
         from: edge.from,
         to: edge.to,
         edge,
@@ -590,32 +610,6 @@ export class Run {
   #id(digits) {
     return (++this.#ids).toString(16).padStart(digits, '0')
   }
-}
-
-/**
- * State that refuses fields the manifest does not declare (development builds).
- * @param {string} node @param {Record<string, unknown>} state
- * @param {Record<string, unknown>} fields
- */
-function declaredOnly(node, state, fields) {
-  /** @param {string|symbol} key */
-  const check = key => {
-    if (typeof key === 'string' && !(key in fields))
-      throw new StrataError(
-        'E_BEHAVIOUR_UNDECLARED_STATE',
-        `state.${key} is not declared in the manifest of ${node}; declare it under state with a type and an initial value`
-      )
-  }
-  return new Proxy(state, {
-    set(target, key, value) {
-      check(key)
-      return Reflect.set(target, key, value)
-    },
-    defineProperty(target, key, descriptor) {
-      check(key)
-      return Reflect.defineProperty(target, key, descriptor)
-    },
-  })
 }
 
 /**
