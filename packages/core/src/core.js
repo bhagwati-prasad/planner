@@ -385,10 +385,12 @@ export class Core {
   /**
    * Follows a public method's bindings down through every level to the component that
    * implements it (spec §7): `{ nodeId, method, path }`, where `path` lists each hop from this
-   * component down. Fails with E_METHOD_UNBOUND at a composite that has not bound it.
+   * component down. Fails with E_METHOD_UNBOUND at a composite that has not bound it. With
+   * `levels`, it stops that many hops down.
    * @param {string} nodeId
    * @param {string} method
-   * @param {{ port?: string }} [options]  the exposing port's name, when there are several
+   * @param {{ port?: string, levels?: number }} [options]  `port` is the exposing port's name,
+   *   when there are several
    */
   resolveBinding(nodeId, method, options) {
     return resolveBinding(this.#store, this.#registry, nodeId, method, options)

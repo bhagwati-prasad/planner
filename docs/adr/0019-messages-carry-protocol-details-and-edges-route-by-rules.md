@@ -59,3 +59,7 @@ Chosen option: 1 for protocol details, with the `route` property and the in-hous
 
 - Good, because it is the smallest change now.
 - Bad, because 0405 would not meet its goal, and a new task would be needed before 0407.
+
+## Amendment, 2026-09-30: messages that name no method
+
+Decided by the human on 2026-09-30, for task 0407. A proxy, such as a load balancer or a gateway, forwards a message without knowing the method it should call downstream. The edge names that method (ADR 0011). So an edge that names a method carries messages that name that method or no method at all, and a message that names none calls the edge's method. A message that names a method still travels only on edges that name that method or name none.

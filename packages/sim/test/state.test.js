@@ -26,7 +26,8 @@ function nodeRun({ state, methods, privates = {}, instance, fixtures, extra = []
           id: 't.store',
           name: 'Store',
           version: '1.0.0',
-          extends: 'base:store',
+          // The abstract root type, so no base behaviour adds state fields (task 0407).
+          extends: 'base:component',
           ports: [{ name: 'in', direction: 'in', exposes: names }],
           methods: {
             public: Object.fromEntries(names.map(n => [n, {}])),

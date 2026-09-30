@@ -15,14 +15,25 @@
  * "Routing and resources"). A request that gets no response within its edge's timeout is sent
  * again after a backoff that doubles each time and moves by the jitter, and each attempt is a
  * `send` span. Route rules choose which edge leaving a port carries a message (ADR 0019).
+ *
+ * A composite runs expanded or as a black box (spec §6, task 0406). Expanded, a message to it
+ * goes on, with no span of its own, to the component its binding names one level down, and a
+ * message from the inner port behind one of its out ports leaves through that port. As a black
+ * box, its own behaviour answers, or, for a System, its contract.
+ *
+ * A component that extends a base type gets its base behaviour (task 0407) under its own: the
+ * base's state fields and methods, which its manifest and its entry override, and the base's
+ * latency properties for methods its manifest gives no latency.
  */
 import {
   StrataError,
+  contractValue,
   defaultProps,
   fail,
   isDevelopment,
   normalizeManifest,
 } from '../../core/src/index.js'
+import { baseLatency, baseOf } from './base.js'
 import { Kernel } from './kernel.js'
 import { createStreams } from './random.js'
 import { parseRoute, pickEdge } from './route.js'
@@ -38,6 +49,18 @@ import { copy, initialState, stateView } from './state.js'
  *   manifest's defaults
  * @property {Record<string, unknown>} [state]  initial state over the manifest's initial values
  * @property {Record<string, { csv: string }>} [fixtures]  initial rows of table fields, as CSV
+ * @property {Composite} [composite]  how a composite runs
+ *
+ * @typedef {object} Composite  a component with an inner system, in a run (spec §6)
+ * @property {'expanded'|'blackbox'} mode
+ * @property {Record<string, Record<string, Binding>>} [bindings]  expanded: by port and public
+ *   method, where each goes one level down
+ * @property {Record<string, { node: string, port: string }>} [exits]  expanded: by out port,
+ *   the inner port whose messages leave through it
+ * @property {Record<string, { equals?: number, max?: number, min?: number }>} [contract]  its
+ *   system's contract, a System's black-box model
+ *
+ * @typedef {{ node: string, port: string, method: string } | { unbound: string }} Binding
  *
  * @typedef {object} RunEdge
  * @property {string} id
@@ -111,6 +134,26 @@ function errorBody(node, err) {
   if (e instanceof StrataError || e instanceof CallError)
     return { code: e.code, message: e.message, details: e.details }
   return { code: 'E_METHOD_FAILED', message: `${node} threw: ${e?.message ?? String(e)}` }
+}
+
+/**
+ * A component's behaviour over its base behaviour: its own methods win.
+ * @param {import('./base.js').BaseBehaviour|null} base @param {any} own
+ */
+function merged(base, own = {}) {
+  if (!base) return own
+  return { ...own, public: { ...base.public, ...own.public } }
+}
+
+/**
+ * The service time a System's contract states, in whole µs: its bound on `serviceTime` or on
+ * one of its statistics (spec §7 "Black-box models for composites"), or none.
+ * @param {Composite} composite
+ */
+function contractUs({ contract = {} }) {
+  const key = Object.keys(contract).find(k => k === 'serviceTime' || k.startsWith('serviceTime.'))
+  const ms = key ? Number(contractValue({ contract }, key) ?? 0) : 0
+  return Math.round(Math.max(0, ms) * 1000)
 }
 
 /**
@@ -227,6 +270,8 @@ export class Run {
   #nodes = new Map()
   /** @type {Map<string, { edges: Edge[], random: { nextU32(): number } }>} `node.port` → the edges leaving it */
   #ports = new Map()
+  /** @type {Map<string, string>} `node.port` inside an expanded composite → the composite's port it leaves by */
+  #exits = new Map()
   /** @type {Set<Call>} async calls not yet finished */
   #live = new Set()
 
@@ -238,19 +283,25 @@ export class Run {
     const strict = isDevelopment()
     for (const n of nodes) {
       const manifest = normalizeManifest(n.manifest)
-      const fields = /** @type {any} */ (manifest).state ?? {}
+      const base = baseOf(manifest)
+      const fields = { ...base?.state, .../** @type {any} */ (manifest).state }
       this.#nodes.set(n.id, {
         id: n.id,
         manifest,
-        behaviour: n.behaviour ?? {},
+        behaviour: merged(base, n.behaviour),
+        base,
         props: { ...defaultProps(manifest.properties ?? {}), ...n.props },
         fields,
         strict,
         state: initialState(fields, n),
+        composite: n.composite ?? null,
         random: streams.stream(n.id),
         latency: streams.stream(`${n.id}:latency`),
       })
     }
+    for (const n of nodes)
+      for (const [port, inner] of Object.entries(n.composite?.exits ?? {}))
+        this.#exits.set(`${inner.node}.${inner.port}`, `${n.id}.${port}`)
     for (const e of edges) {
       const key = `${e.from.node}.${e.from.port}`
       const port = this.#ports.get(key) ?? { edges: [], random: streams.stream(`${key}:route`) }
@@ -350,58 +401,71 @@ export class Run {
     const node =
       this.#nodes.get(message.to.node) ??
       fail('E_SIM_COMPONENT_NOT_FOUND', `Component '${message.to.node}' is not in the run`)
-    const span = this.#span(
-      node.id,
-      message.method ?? '',
-      'public',
-      message.traceId,
-      message.parentSpanId
-    )
+    const port = node.manifest.ports.find((/** @type {any} */ p) => p.name === message.to.port)
+    const method = message.method ?? port?.default
+    let refusal = this.#refusal(node, port, method, message.to.port)
+    if (!refusal && node.composite?.mode === 'expanded') {
+      const binding = node.composite.bindings?.[port.name]?.[method]
+      if (binding && 'node' in binding)
+        return this.#deliver({
+          ...message,
+          method: binding.method,
+          to: { node: binding.node, port: binding.port },
+        })
+      refusal = new StrataError(
+        'E_METHOD_UNBOUND',
+        binding?.unbound ?? `'${method}' of ${node.id} is not bound to a component inside`
+      )
+    }
+    const span = this.#span(node.id, method ?? '', 'public', message.traceId, message.parentSpanId)
     /** @type {Call['respond']} */
     const respond =
       message.kind === 'event' ? null : (ok, value, atUs) => this.#respond(message, ok, value, atUs)
-    const port = node.manifest.ports.find((/** @type {any} */ p) => p.name === message.to.port)
-    const method = message.method ?? port?.default
-    span.method = method ?? ''
-    const publicMethods = node.manifest.methods?.public ?? {}
-    if (!port)
-      return this.#refuse(
-        span,
-        respond,
-        new StrataError('E_PORT_NOT_FOUND', `${node.id} has no port '${message.to.port}'`)
-      )
-    if (!method || !port.exposes?.includes(method) || !(method in publicMethods)) {
-      const isPrivate = method && method in (node.manifest.methods?.private ?? {})
-      return this.#refuse(
-        span,
-        respond,
-        new StrataError(
-          'E_METHOD_NOT_EXPOSED',
-          `'${method}' is not exposed by port '${port.name}' of ${node.id}${isPrivate ? '; it is a private method, which no edge reaches' : ''}`
-        )
+    if (refusal) return this.#refuse(span, respond, refusal)
+    const fn = node.behaviour.public?.[method] ?? node.base?.any
+    if (typeof fn === 'function') {
+      const msg = {
+        kind: message.kind,
+        traceId: message.traceId,
+        spanId: span.spanId,
+        parentSpanId: message.parentSpanId,
+        method,
+        path: message.path,
+        headers: message.headers,
+        body: message.body,
+        sizeBytes: message.sizeBytes,
+        attempt: message.attempt,
+      }
+      const declared = node.manifest.methods.public[method]
+      const cost = { latency: declared?.latency ?? baseLatency(node.base, method) }
+      return this.#start(node, span, respond, this.#latency(node, cost), call =>
+        fn.call(node.behaviour.public, msg, this.#context(node, call, span))
       )
     }
-    const fn = node.behaviour.public?.[method]
-    if (typeof fn !== 'function')
-      return this.#refuse(
-        span,
-        respond,
-        new StrataError('E_METHOD_UNKNOWN', `${node.id} has no behaviour for '${method}'`)
-      )
-    const msg = {
-      kind: message.kind,
-      traceId: message.traceId,
-      spanId: span.spanId,
-      parentSpanId: message.parentSpanId,
-      method,
-      path: message.path,
-      headers: message.headers,
-      body: message.body,
-      sizeBytes: message.sizeBytes,
-      attempt: message.attempt,
-    }
-    this.#start(node, span, respond, this.#latency(node, publicMethods[method]), call =>
-      fn.call(node.behaviour.public, msg, this.#context(node, call, span))
+    // A black box without behaviour of its own answers from its contract: after the service
+    // time the contract states, with no body.
+    if (node.composite)
+      return this.#start(node, span, respond, contractUs(node.composite), () => null)
+    this.#refuse(
+      span,
+      respond,
+      new StrataError('E_METHOD_UNKNOWN', `${node.id} has no behaviour for '${method}'`)
+    )
+  }
+
+  /**
+   * Why a node refuses a message on a port, if it does: the port is not its own, or does not
+   * expose the method.
+   * @param {any} node @param {any} port @param {string|undefined} method @param {string} portName
+   */
+  #refusal(node, port, method, portName) {
+    if (!port) return new StrataError('E_PORT_NOT_FOUND', `${node.id} has no port '${portName}'`)
+    if (method && port.exposes?.includes(method) && method in (node.manifest.methods?.public ?? {}))
+      return null
+    const isPrivate = method && method in (node.manifest.methods?.private ?? {})
+    return new StrataError(
+      'E_METHOD_NOT_EXPOSED',
+      `'${method}' is not exposed by port '${port.name}' of ${node.id}${isPrivate ? '; it is a private method, which no edge reaches' : ''}`
     )
   }
 
@@ -639,7 +703,7 @@ export class Run {
     if (!node.manifest.ports.some((/** @type {any} */ p) => p.name === portName))
       throw new StrataError('E_PORT_NOT_FOUND', `${node.id} has no port '${portName}'`)
     const port =
-      this.#ports.get(`${node.id}.${portName}`) ??
+      this.#leaving(`${node.id}.${portName}`) ??
       fail('E_SIM_NO_EDGE', `Port '${portName}' of ${node.id} has no edge to send over`)
     const message = {
       kind: wait ? 'request' : 'event',
@@ -658,6 +722,8 @@ export class Run {
         `No edge leaving port '${portName}' of ${node.id} carries '${method}'${message.path ? ` to ${message.path}` : ''}; check the edges' route rules`
       )
     Object.assign(message, {
+      // A message that names no method calls the edge's (ADR 0019).
+      method: method ?? edge.method ?? undefined,
       sizeBytes: message.sizeBytes ?? edge.props.payloadSize ?? 0,
       to: edge.to,
       edge,
@@ -674,6 +740,18 @@ export class Run {
     const request = { node: node.id, edge, message, pending: new Pending(call, this), attempts: 0 }
     this.#attempt(request, departs)
     return request.pending
+  }
+
+  /**
+   * The edges leaving a port: its own, or, for the inner port behind an expanded composite's
+   * out port, those leaving the composite's port.
+   * @param {string} key  `node.port`
+   */
+  #leaving(key) {
+    for (let at = /** @type {string|undefined} */ (key); at; at = this.#exits.get(at)) {
+      const port = this.#ports.get(at)
+      if (port) return port
+    }
   }
 
   /**
@@ -760,13 +838,16 @@ export class Run {
   }
 
   /**
-   * A method's declared latency in whole µs: a distribution, or the property that holds one.
+   * A method's declared latency in whole µs: a distribution, or the property that holds one, or
+   * the first of several properties that the component has.
    * @param {any} node @param {{ latency?: unknown } | undefined} declared
    */
   #latency(node, declared) {
     const latency = declared?.latency
     if (latency === undefined || latency === null) return 0
-    const dist = typeof latency === 'string' ? node.props[latency] : latency
+    const names = typeof latency === 'string' ? [latency] : Array.isArray(latency) ? latency : null
+    const dist = names ? names.map(k => node.props[k]).find(v => v != null) : latency
+    if (dist === undefined || dist === null) return 0
     const ms = typeof dist === 'number' ? dist : sample(dist, node.latency.nextU32() / 2 ** 32)
     return Math.round(Math.max(0, ms) * 1000)
   }

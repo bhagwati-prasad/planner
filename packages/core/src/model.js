@@ -315,21 +315,23 @@ export function reachableFrom(src, bp) {
 /**
  * Follows a public method's bindings down through every level to the component that
  * implements it (spec §7, eng §9). A component without an inner system implements its own.
+ * With `levels`, it stops that many hops down, so a run can expand one composite at a time.
  * @param {Source} src
  * @param {import('./registry.js').Registry|undefined} registry
  * @param {string} nodeId
  * @param {string} method
- * @param {{ port?: string }} [options]  the name of the exposing port, when there are several
+ * @param {{ port?: string, levels?: number }} [options]  `port` names the exposing port, when
+ *   there are several
  * @returns {{ nodeId: string, method: string, path: { nodeId: string, method: string }[] }}
  */
-export function resolveBinding(src, registry, nodeId, method, { port } = {}) {
+export function resolveBinding(src, registry, nodeId, method, { port, levels = Infinity } = {}) {
   const path = []
   let node = src.require('node', nodeId)
   let name = method
   let portName = port
   for (;;) {
     path.push({ nodeId: node.id, method: name })
-    if (!node.innerSystemRef) return { nodeId: node.id, method: name, path }
+    if (!node.innerSystemRef || path.length > levels) return { nodeId: node.id, method: name, path }
     if (path.length > MAX_SYSTEM_DEPTH)
       fail('E_SYSTEM_TOO_DEEP', `Bindings of '${method}' go deeper than ${MAX_SYSTEM_DEPTH} levels`)
     const ports = portsOf(src, node.id).filter(
