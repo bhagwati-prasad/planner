@@ -112,6 +112,13 @@ const connection = {
       max: 100,
       group: 'Reliability',
     },
+    route: {
+      type: 'list',
+      items: { type: 'string' },
+      default: [],
+      group: 'Routing',
+      description: 'Rules for what this edge carries: method, path, header, weight or when',
+    },
   },
 }
 

@@ -74,6 +74,7 @@ const DESCRIPTIONS = {
   E_METHOD_UNREACHABLE:
     'A binding targets a component that the matching boundary port does not reach',
   E_METHOD_UNKNOWN: 'The component has no public method of that name',
+  E_METHOD_FAILED: 'A method threw an error instead of returning a response or ctx.fail',
   E_EDGE_DIRECTION: 'An edge starts at an input-only port or ends at an output-only one',
   E_EDGE_SELF_LOOP: 'An edge starts and ends on the same component; that is a private method call',
   E_EDGE_CROSS_LEVEL:
@@ -103,6 +104,10 @@ const DESCRIPTIONS = {
   E_SIM_METHOD_HUNG: 'A method ran for 2 s without returning, so its worker was stopped',
   E_SIM_STOPPED: 'The simulation worker was stopped before it answered',
   E_SIM_NO_HOST: 'Simulations need a simulation host, which createStrata was not given',
+  E_SIM_NO_ROUTE: 'No edge leaving the port carries the message; check their route rules',
+  E_SIM_ROUTE_INVALID: 'An edge route rule is malformed',
+  E_SIM_EXPRESSION_INVALID: 'An expression is malformed or uses a name it cannot',
+  E_SIM_TIMEOUT: 'A request got no response within its edge timeout, after every retry',
 
   E_PROTOCOL_VERSION: 'A worker message uses a protocol version this build does not speak',
   E_PROTOCOL_UNKNOWN_TYPE: 'A worker message has a type the worker does not handle',
