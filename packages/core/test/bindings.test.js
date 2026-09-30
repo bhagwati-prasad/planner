@@ -176,6 +176,27 @@ describe('method bindings', () => {
     )
   })
 
+  it('resolveBinding with levels stops that many hops down, so each composite can run in its own mode', () => {
+    const { core: c, shop: shopId, orders, bind } = shop()
+    const inner = c.dispatch({ type: 'component.openAsSystem', payload: { id: orders } })
+    const worker = add(c, inner, 'test.worker', 'Journal')
+    mapIn(c, orders, worker)
+    bind('checkout', orders, 'checkout')
+    assert.deepEqual(c.resolveBinding(shopId, 'checkout', { levels: 1 }), {
+      nodeId: orders,
+      method: 'checkout',
+      path: [
+        { nodeId: shopId, method: 'checkout' },
+        { nodeId: orders, method: 'checkout' },
+      ],
+    })
+    assert.throws(
+      () => c.resolveBinding(orders, 'checkout', { levels: 1 }),
+      err => err.code === 'E_METHOD_UNBOUND' && /Orders/.test(err.message),
+      'Orders itself has not bound checkout'
+    )
+  })
+
   it('a manifest declares public and private methods, and its ports expose only public ones', () => {
     const registry = testRegistry()
     const refused = (/** @type {any} */ changes) => {
