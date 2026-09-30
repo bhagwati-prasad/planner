@@ -109,10 +109,11 @@ const src = (root, pkg) => join(root, 'packages', pkg, 'src')
  * @type {Record<string, (root: string) => number|null>}
  */
 export const MEASURES = {
+  // strata-sim ships only in the worker bundle, which its own line measures (ADR 0018).
   'Core, facade and non-UI packages (minified)': root =>
     minified(
       packages(root)
-        .filter(p => !VIEW_PACKAGES.has(p) && !NODE_PACKAGES.has(p))
+        .filter(p => !VIEW_PACKAGES.has(p) && !NODE_PACKAGES.has(p) && p !== 'sim')
         .map(p => src(root, p)),
       file => file !== join(root, HELP_DATA)
     ),

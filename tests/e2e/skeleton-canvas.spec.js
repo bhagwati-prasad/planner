@@ -45,6 +45,27 @@ test('clicking Run animates a dot along the edge and shows the response time', a
   await expect(dot).toHaveCount(0)
 })
 
+test('the app starts its simulation worker as it boots, before any run', async ({
+  page,
+  urlFor,
+}) => {
+  // A run must load nothing: WebKit refuses to start a Blob-URL worker once it is offline.
+  await page.addInitScript(() => {
+    const w = /** @type {any} */ (window)
+    w.workersStarted = 0
+    const Native = w.Worker
+    w.Worker = class extends Native {
+      /** @param {any[]} args */
+      constructor(...args) {
+        super(...args)
+        w.workersStarted++
+      }
+    }
+  })
+  await openSkeleton(page, urlFor)
+  expect(await page.evaluate(() => /** @type {any} */ (window).workersStarted)).toBe(1)
+})
+
 test("the page works with Playwright's offline mode enabled", async ({
   page,
   context,

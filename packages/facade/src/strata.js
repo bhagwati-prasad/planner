@@ -20,7 +20,7 @@ import { formatTarget } from './format.js'
 import { helpText, PLANNED } from './help.js'
 import { copyNodes } from './clipboard.js'
 import { ComponentsApi } from './components.js'
-import { SimApi, inProcessSimHost } from './sim.js'
+import { SimApi } from './sim.js'
 
 /**
  * @typedef {object} Identity  local identity that signs operations (becomes an account in R4)
@@ -35,7 +35,9 @@ import { SimApi, inProcessSimHost } from './sim.js'
  * @property {import('../../core/src/types.js').Clock} clock  required: the clock adapter (eng §6)
  * @property {import('../../core/src/types.js').RandomBytes} [random]  random bytes for ids (default: Web Crypto)
  * @property {(text: string) => void} [output]  where print() and help() write (default: nowhere)
- * @property {import('./sim.js').SimHost} [simHost]  runs simulations (default: in the calling thread)
+ * @property {import('./sim.js').SimHost} [simHost]  runs simulations: the app's Blob-URL worker, a
+ *   worker_threads worker in Node, or strata-sim's inProcessSimHost in tests; without one,
+ *   simulations fail with E_SIM_NO_HOST
  */
 
 export class Strata {
@@ -63,7 +65,7 @@ export class Strata {
       clock,
       random,
       output = () => {},
-      simHost = inProcessSimHost,
+      simHost,
     } = /** @type {any} */ ({})
   ) {
     if (typeof clock !== 'function')

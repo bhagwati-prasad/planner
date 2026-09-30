@@ -1,0 +1,21 @@
+{
+  "strataApi": "^1.0",
+  "id": "test.probe",
+  "name": "Sandbox probe",
+  "version": "1.0.0",
+  "category": "Testing",
+  "icon": "icon.svg",
+  "entry": "index.js",
+  "extends": "base:service",
+  "ports": [
+    { "name": "in", "direction": "in", "exposes": ["globals", "clock", "spin", "samples"] }
+  ],
+  "methods": {
+    "public": {
+      "globals": { "input": "message", "output": "reachable globals" },
+      "clock": { "input": "message", "output": "random numbers and times" },
+      "spin": { "input": "message", "output": "never returns" },
+      "samples": { "input": "message", "output": "a typed array" }
+    }
+  }
+}

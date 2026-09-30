@@ -5,37 +5,32 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { Worker } from 'node:worker_threads'
 import { PROTOCOL_VERSION, handleMessage, simulate } from '../src/index.js'
 import { simWorkerSource } from '../../../scripts/build.js'
+import { spawnThreadWorker } from '../../server/src/index.js'
 
 const input = () =>
   JSON.parse(readFileSync(new URL('./fixtures/skeleton-run.json', import.meta.url), 'utf8'))
-
-/**
- * Lets the browser-style worker bundle talk through worker_threads' parentPort. The semicolons
- * matter: the bundle starts with `(`, which would otherwise call the last line's result.
- */
-const NODE_PRELUDE = `const { parentPort } = require('node:worker_threads');
-globalThis.postMessage = message => parentPort.postMessage(message);
-parentPort.on('message', data => globalThis.onmessage({ data }));
-`
 
 /**
  * Runs one protocol request in a worker_threads worker and returns its reply.
  * @param {unknown} payload
  */
 async function inWorkerThread(payload) {
-  const worker = new Worker(NODE_PRELUDE + (await simWorkerSource()), { eval: true })
-  try {
-    return await new Promise((resolve, reject) => {
-      worker.once('message', resolve)
-      worker.once('error', reject)
-      worker.postMessage({ v: PROTOCOL_VERSION, type: 'run', id: 7, payload })
+  const spawn = spawnThreadWorker(await simWorkerSource())
+  return new Promise((resolve, reject) => {
+    const worker = spawn({
+      message: reply => {
+        worker.terminate()
+        resolve(reply)
+      },
+      error: err => {
+        worker.terminate()
+        reject(err)
+      },
     })
-  } finally {
-    await worker.terminate()
-  }
+    worker.post({ v: PROTOCOL_VERSION, type: 'run', id: 7, payload })
+  })
 }
 
 describe('walking skeleton simulation', () => {

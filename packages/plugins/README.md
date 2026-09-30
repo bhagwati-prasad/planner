@@ -51,3 +51,10 @@ A connection type is a plugin folder with `"kind": "connection-type"`, extending
 ```
 
 `joins.from` and `joins.to` list the component types the source and target must be, or extend. `registry.joins(type, from, to)` answers `true`, or why not. Without `joins`, any components may be joined.
+
+## Bundler
+
+`bundleModules(files, entries)` builds the module graph from the entries, and `emitScript` turns it into one classic script (IIFE or CommonJS) with a small module runtime.
+
+- **Re-export pruning.** A module made only of named re-exports, such as a package's `index.js`, is looked through. Importing some of its names bundles the modules that define them and leaves out the rest. Such a module requires each target the first time one of its names is read, not when it starts, which is the one difference from native modules. A namespace import, `export *` or `import()` of it bundles every target. The simulation worker reaches `core` through `core`'s `index.js` this way, and carries only the five `core` modules it uses (task 0402).
+- **Behaviour scripts.** `behaviourScript(bundle)` is the script the simulation worker evaluates to load a component's behaviour: one call to `__strataDefine(key, entry, runtime)`. The runtime runs none of the modules until the worker loads the entry, after it has sealed itself (spec §8 "Sandbox").

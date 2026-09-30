@@ -7,6 +7,10 @@
  *   export function f () {}           →  function f () {}        + getter f → f
  *   export default expr               →  const __default = expr  + getter default → __default
  *   export * from './y.js'            →  exports every name of ./y.js except default
+ *
+ * A module made only of named re-exports, such as a package's index.js, requires each target
+ * when one of its names is first read instead of when it starts, so the bundler can leave out
+ * the targets nothing imports (bundle.js). The other modules evaluate as native modules do.
  *   import.meta / import('./z.js')    →  __meta / __import('./z.js')
  *
  * Imported bindings are captured when the importing module starts, not live: the bundler
@@ -36,6 +40,7 @@ const RESERVED = new Set([...MODULE_PARAMS, '__default'])
  * @property {string[]} exports   names the module exports (not counting `export *`)
  * @property {string[]} [functionExports]  exports that are hoisted function declarations
  * @property {{ specifier: string|null, line: number }[]} dynamic  dynamic import() calls
+ * @property {boolean} [reexportsOnly]  the module is only named re-exports, read lazily
  */
 
 export class ModuleError extends Error {
@@ -366,6 +371,14 @@ export function transformModule(source) {
   }
   body += source.slice(pos)
   if (body.startsWith('#!')) body = body.replace(/^#![^\n]*/, '')
+  const reexportsOnly =
+    imports.length > 0 &&
+    getters.size === 0 &&
+    dynamic.length === 0 &&
+    imports.every(
+      i => !i.bindings.length && !i.star && i.reexports.every(r => r.imported !== '*')
+    ) &&
+    tokenize(body).length === 0
 
   // The module's own getters are registered before its imports run, so a module that imports
   // it back through a cycle can already reach its (hoisted) functions, as with native modules.
@@ -380,8 +393,9 @@ export function transformModule(source) {
   const reexported = new Map()
   const stars = []
   imports.forEach((imp, i) => {
-    const m = `__m${i}`
-    header.push(`const ${m} = __require(${JSON.stringify(imp.specifier)});`)
+    const required = `__require(${JSON.stringify(imp.specifier)})`
+    const m = reexportsOnly ? required : `__m${i}`
+    if (!reexportsOnly) header.push(`const ${m} = ${required};`)
     for (const b of imp.bindings)
       header.push(`const ${b.local} = ${b.imported === '*' ? m : `${m}${access(b.imported)}`};`)
     for (const r of imp.reexports) {
@@ -403,6 +417,7 @@ export function transformModule(source) {
     exports: [...getters.keys(), ...reexported.keys()],
     functionExports,
     dynamic,
+    ...(reexportsOnly ? { reexportsOnly } : {}),
   }
 }
 

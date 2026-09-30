@@ -1,8 +1,9 @@
 // @ts-check
 /**
  * The discrete-event kernel (spec §11 "Kernel", eng §13): a simulated clock in integer
- * microseconds and a queue of events, each handled by the handler registered for its type.
- * It grows into the full kernel in M04 (task 0401).
+ * microseconds and a pooled queue of events ordered by `(timeUs, priority, seq)`, each handled
+ * by the handler registered for its type (task 0401). Method dispatch, state and snapshots
+ * build on it in tasks 0402–0417.
  */
 import { fail } from '../../core/src/index.js'
 import { EventQueue } from './queue.js'

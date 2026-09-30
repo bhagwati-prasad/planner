@@ -21,6 +21,8 @@
  *   body whose end it cannot place.
  * - New names appear nowhere else in the file, and two bindings share one only when their
  *   regions do not overlap, so a renamed reference never resolves to a different binding.
+ * - A binding keeps its name when the shortest free name is longer than it, as in a large
+ *   bundle where every one-letter name already appears somewhere.
  *
  * A file that uses `eval`, `with` or escaped identifiers is returned unchanged.
  */
@@ -233,15 +235,20 @@ class Renamer {
     for (const b of safe) {
       for (let i = active.length - 1; i >= 0; i--) if (active[i].end <= b.start) active.splice(i, 1)
       const taken = new Set(active.map(a => a.short))
-      b.short = pool.first(name => !taken.has(name))
-      active.push(b)
+      const short = pool.first(name => !taken.has(name))
+      // A longer name than the binding's own would grow the code, so it keeps its own.
+      if (short.length <= b.name.length) {
+        b.short = short
+        active.push(b)
+      }
     }
     for (const b of safe)
-      for (const k of b.tokens) {
-        const role = this.#role(k)
-        if (role === 'ref') out[k] = /** @type {string} */ (b.short)
-        else if (role === 'shorthand') out[k] = `${b.name}:${b.short}`
-      }
+      if (b.short)
+        for (const k of b.tokens) {
+          const role = this.#role(k)
+          if (role === 'ref') out[k] = /** @type {string} */ (b.short)
+          else if (role === 'shorthand') out[k] = `${b.name}:${b.short}`
+        }
     this.#privates(out)
     return out
   }

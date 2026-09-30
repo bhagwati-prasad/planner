@@ -22,6 +22,35 @@ describe('benchmark runner', () => {
     )
   })
 
+  it('fails a throughput measure under its budget and passes one at or above it', () => {
+    assert.deepEqual(
+      overBudget([
+        {
+          name: 'kernel: simple events',
+          value: 150_000,
+          unit: 'events/s',
+          budget: 200_000,
+          better: 'higher',
+        },
+        {
+          name: 'kernel: at budget',
+          value: 200_000,
+          unit: 'events/s',
+          budget: 200_000,
+          better: 'higher',
+        },
+        { name: 'kernel: fast', value: 5e6, unit: 'events/s', budget: 200_000, better: 'higher' },
+      ]),
+      ['kernel: simple events is 150000 events/s, under its 200000 events/s budget']
+    )
+    assert.equal(
+      overBudget([
+        { name: 'kernel', value: Number.NaN, unit: 'events/s', budget: 1, better: 'higher' },
+      ]).length,
+      1
+    )
+  })
+
   it('treats a measure that is not a number as over its budget', () => {
     assert.equal(overBudget([{ name: 'pan', value: Number.NaN, unit: 'ms', budget: 16 }]).length, 1)
   })
@@ -35,6 +64,7 @@ describe('benchmark runner', () => {
     const dir = join(ROOT, 'tools/bench')
     const files = readdirSync(dir).filter(f => f.endsWith('.bench.js'))
     assert.ok(files.includes('graph-pan.bench.js'), files.join(', '))
+    assert.ok(files.includes('kernel.bench.js'), files.join(', '))
     for (const file of files) {
       const mod = await import(pathToFileURL(join(dir, file)).href)
       assert.equal(typeof mod.bench, 'function', `${file} exports bench`)
