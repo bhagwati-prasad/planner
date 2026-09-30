@@ -15,7 +15,7 @@ afterEach(() => setDevelopment(development))
  * A component type for a run: its manifest's ports, methods, state and properties, and its
  * behaviour module's default export.
  * @param {string} id
- * @param {{ ports?: object[], methods?: object, state?: object, properties?: object }} parts
+ * @param {{ extends?: string, ports?: object[], methods?: object, state?: object, properties?: object }} parts
  * @param {object} behaviour
  */
 function component(id, parts, behaviour) {
@@ -388,6 +388,8 @@ describe('ctx', () => {
       api: component(
         't.api',
         {
+          // The abstract root type has no base behaviour to answer 'bare' (task 0407).
+          extends: 'base:component',
           ports: [inPort('bare', 'secret', 'lonely', 'broken', 'later'), outPort],
           methods: { public: { bare: {}, secret: {}, lonely: {}, broken: {}, later: {} } },
         },

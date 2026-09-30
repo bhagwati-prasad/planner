@@ -82,7 +82,7 @@ describe('ok() and err()', () => {
   })
 })
 
-/** Every code the packages raise: fail('X', …), new StrataError('X', …) and code: 'E_…'. */
+/** Every code the packages raise: fail('X', …) (but not ctx.fail), new StrataError('X', …) and code: 'E_…'. */
 function codesInSource() {
   const codes = new Set()
   for (const pkg of readdirSync(PACKAGES)) {
@@ -95,7 +95,11 @@ function codesInSource() {
     }
     for (const file of files) {
       const text = readFileSync(join(src, file), 'utf8')
-      for (const [, code] of text.matchAll(/(?:fail|StrataError|err)\(\s*'([A-Z][A-Z_]+)'/g))
+      // `ctx.fail('X')`, a member call however the renamer names `ctx`, answers with a
+      // component's own failure code, which its manifest declares (spec §8), not one Strata
+      // raises, so it reaches callers as a CallError (task 0403). Strata's `fail` is never a
+      // member call.
+      for (const [, code] of text.matchAll(/(?<!\.)(?:fail|StrataError|err)\(\s*'([A-Z][A-Z_]+)'/g))
         codes.add(code)
       for (const [, code] of text.matchAll(/code: '(E_[A-Z_]+)'/g)) codes.add(code)
     }

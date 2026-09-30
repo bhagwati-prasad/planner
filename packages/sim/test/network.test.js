@@ -303,6 +303,36 @@ describe('edges and the network model', () => {
     assert.equal(event?.node, 'users', 'events are routed too')
   })
 
+  it('sends a message that names no method over an edge that names one, which then calls it', async () => {
+    const run = network(
+      [server('orders'), server('audit')],
+      [
+        { to: 'orders', method: 'report', props: { route: ['path /orders'] } },
+        { to: 'audit', method: 'audit', props: { route: ['path /audit'] } },
+      ]
+    )
+    const replies = [
+      go(run, { method: null, options: { path: '/orders/1' } }, 0),
+      go(run, { method: null, options: { path: '/audit' } }, MS),
+      go(run, { method: 'report', options: { path: '/orders/3' } }, 2 * MS),
+      go(run, { method: 'purge', options: { path: '/orders/2' } }, 3 * MS),
+    ]
+    await run.runToEnd()
+    assert.deepEqual(
+      replies.map(r => r.body.at ?? r.body.code),
+      ['orders', 'audit', 'orders', 'E_SIM_NO_ROUTE'],
+      'a message that names a method takes only edges naming it or none'
+    )
+    const called = run.spans
+      .filter(s => s.kind === 'public' && s.node !== 'client')
+      .map(s => [s.node, s.method])
+    assert.deepEqual(called, [
+      ['orders', 'report'],
+      ['audit', 'audit'],
+      ['orders', 'report'],
+    ])
+  })
+
   it('fails a send no edge carries with E_SIM_NO_ROUTE, and a malformed rule with E_SIM_ROUTE_INVALID', async () => {
     const run = network([server('orders')], [{ to: 'orders', props: { route: ['path /orders'] } }])
     const reply = go(run, { options: { path: '/users' } })

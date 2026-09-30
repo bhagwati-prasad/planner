@@ -3,7 +3,8 @@
  * Routing rules (spec §11 "Routing and resources", ADR 0019). An edge's `route` property lists
  * rules: `method getOrder, listOrders`, `path /orders` (a prefix, by whole segments),
  * `header x-canary = 1` (names in any case), `weight 30` and `when <expression>`. An edge's
- * `method` (ADR 0011) is a method rule too. A message leaving a port can travel on the edges
+ * `method` (ADR 0011) is a method rule too, which a message naming no method also meets: it
+ * then calls the edge's method (ADR 0019's amendment). A message leaving a port can travel on the edges
  * whose rules all hold; edges with conditions beat edges with none, and a draw weighted by
  * their weights picks among several.
  */
@@ -64,7 +65,7 @@ const CONDITIONS = {
  */
 export function parseRoute({ id, method, props }) {
   /** @type {Route['conditions']} */
-  const conditions = method ? [msg => msg.method === method] : []
+  const conditions = method ? [msg => msg.method == null || msg.method === method] : []
   let weight = 1
   for (const rule of /** @type {string[]} */ (props?.route ?? [])) {
     /** @param {string} why @returns {never} */

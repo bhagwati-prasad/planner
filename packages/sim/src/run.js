@@ -20,6 +20,10 @@
  * goes on, with no span of its own, to the component its binding names one level down, and a
  * message from the inner port behind one of its out ports leaves through that port. As a black
  * box, its own behaviour answers, or, for a System, its contract.
+ *
+ * A component that extends a base type gets its base behaviour (task 0407) under its own: the
+ * base's state fields and methods, which its manifest and its entry override, and the base's
+ * latency properties for methods its manifest gives no latency.
  */
 import {
   StrataError,
@@ -29,6 +33,7 @@ import {
   isDevelopment,
   normalizeManifest,
 } from '../../core/src/index.js'
+import { baseLatency, baseOf } from './base.js'
 import { Kernel } from './kernel.js'
 import { createStreams } from './random.js'
 import { parseRoute, pickEdge } from './route.js'
@@ -129,6 +134,15 @@ function errorBody(node, err) {
   if (e instanceof StrataError || e instanceof CallError)
     return { code: e.code, message: e.message, details: e.details }
   return { code: 'E_METHOD_FAILED', message: `${node} threw: ${e?.message ?? String(e)}` }
+}
+
+/**
+ * A component's behaviour over its base behaviour: its own methods win.
+ * @param {import('./base.js').BaseBehaviour|null} base @param {any} own
+ */
+function merged(base, own = {}) {
+  if (!base) return own
+  return { ...own, public: { ...base.public, ...own.public } }
 }
 
 /**
@@ -269,11 +283,13 @@ export class Run {
     const strict = isDevelopment()
     for (const n of nodes) {
       const manifest = normalizeManifest(n.manifest)
-      const fields = /** @type {any} */ (manifest).state ?? {}
+      const base = baseOf(manifest)
+      const fields = { ...base?.state, .../** @type {any} */ (manifest).state }
       this.#nodes.set(n.id, {
         id: n.id,
         manifest,
-        behaviour: n.behaviour ?? {},
+        behaviour: merged(base, n.behaviour),
+        base,
         props: { ...defaultProps(manifest.properties ?? {}), ...n.props },
         fields,
         strict,
@@ -406,7 +422,7 @@ export class Run {
     const respond =
       message.kind === 'event' ? null : (ok, value, atUs) => this.#respond(message, ok, value, atUs)
     if (refusal) return this.#refuse(span, respond, refusal)
-    const fn = node.behaviour.public?.[method]
+    const fn = node.behaviour.public?.[method] ?? node.base?.any
     if (typeof fn === 'function') {
       const msg = {
         kind: message.kind,
@@ -421,7 +437,8 @@ export class Run {
         attempt: message.attempt,
       }
       const declared = node.manifest.methods.public[method]
-      return this.#start(node, span, respond, this.#latency(node, declared), call =>
+      const cost = { latency: declared?.latency ?? baseLatency(node.base, method) }
+      return this.#start(node, span, respond, this.#latency(node, cost), call =>
         fn.call(node.behaviour.public, msg, this.#context(node, call, span))
       )
     }
@@ -705,6 +722,8 @@ export class Run {
         `No edge leaving port '${portName}' of ${node.id} carries '${method}'${message.path ? ` to ${message.path}` : ''}; check the edges' route rules`
       )
     Object.assign(message, {
+      // A message that names no method calls the edge's (ADR 0019).
+      method: method ?? edge.method ?? undefined,
       sizeBytes: message.sizeBytes ?? edge.props.payloadSize ?? 0,
       to: edge.to,
       edge,
@@ -819,13 +838,16 @@ export class Run {
   }
 
   /**
-   * A method's declared latency in whole µs: a distribution, or the property that holds one.
+   * A method's declared latency in whole µs: a distribution, or the property that holds one, or
+   * the first of several properties that the component has.
    * @param {any} node @param {{ latency?: unknown } | undefined} declared
    */
   #latency(node, declared) {
     const latency = declared?.latency
     if (latency === undefined || latency === null) return 0
-    const dist = typeof latency === 'string' ? node.props[latency] : latency
+    const names = typeof latency === 'string' ? [latency] : Array.isArray(latency) ? latency : null
+    const dist = names ? names.map(k => node.props[k]).find(v => v != null) : latency
+    if (dist === undefined || dist === null) return 0
     const ms = typeof dist === 'number' ? dist : sample(dist, node.latency.nextU32() / 2 ** 32)
     return Math.round(Math.max(0, ms) * 1000)
   }
