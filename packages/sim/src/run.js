@@ -92,7 +92,7 @@ import { copy, initialState, stateView } from './state.js'
  * @property {string} traceId
  * @property {string} node
  * @property {string} method
- * @property {'public'|'private'|'timer'|'send'} kind  `send` is one attempt of a request
+ * @property {'public'|'private'|'timer'|'send'|'init'} kind  `send` is one attempt of a request
  *   over an edge, a child of the caller's span
  * @property {number} startUs
  * @property {number|null} endUs
@@ -265,6 +265,7 @@ export class Run {
   /** Counts what behaviour code does, so the run can tell when microtasks have settled. */
   activity = 0
   #woken = false
+  #started = false
   #ids = 0
   /** @type {Map<string, any>} */
   #nodes = new Map()
@@ -355,21 +356,28 @@ export class Run {
   }
 
   /**
-   * Handles events until none are left.
-   * @param {{ maxEvents?: number }} [limits]
+   * Handles events until none are left, or none are due by `untilUs`, when the clock moves to
+   * it and later events wait for the next call.
+   * @param {{ maxEvents?: number, untilUs?: number }} [limits]
    */
-  async runToEnd({ maxEvents = 10_000_000 } = {}) {
+  async runToEnd({ maxEvents = 10_000_000, untilUs = Infinity } = {}) {
     const handlers = {
       deliver: (/** @type {any} */ e) => this.#deliver(e.message),
       timer: (/** @type {any} */ e) => this.#timer(e),
       timeout: (/** @type {any} */ e) => this.#timeout(e.attempt),
       retry: (/** @type {any} */ e) => this.#attempt(e.request, this.nowUs),
     }
-    while (this.kernel.step(handlers)) {
+    if (!this.#started) {
+      this.#started = true
+      this.#init()
+      if (this.#woken) await this.#settle()
+    }
+    while (this.kernel.nextUs <= untilUs && this.kernel.step(handlers)) {
       if (this.#woken) await this.#settle()
       if (this.kernel.processed >= maxEvents)
         fail('INVALID', `The run stopped after ${maxEvents} events`)
     }
+    if (Number.isFinite(untilUs)) this.kernel.nowUs = Math.max(this.kernel.nowUs, untilUs)
   }
 
   /**
@@ -467,6 +475,18 @@ export class Run {
       'E_METHOD_NOT_EXPOSED',
       `'${method}' is not exposed by port '${port.name}' of ${node.id}${isPrivate ? '; it is a private method, which no edge reaches' : ''}`
     )
+  }
+
+  /** Runs each behaviour's `init` hook once, at the start, as an `init` span (spec §8). */
+  #init() {
+    for (const node of this.#nodes.values()) {
+      const fn = node.behaviour.init
+      if (typeof fn !== 'function') continue
+      const span = this.#span(node.id, 'init', 'init', this.#id(32), null)
+      this.#start(node, span, null, 0, call =>
+        fn.call(node.behaviour, this.#context(node, call, span))
+      )
+    }
   }
 
   /** @param {{ node: string, name: string, data: unknown, traceId: string, parentSpanId: string }} e */
@@ -652,7 +672,7 @@ export class Run {
           type: 'timer',
           node: node.id,
           name,
-          data,
+          data: copy(data),
           traceId: span.traceId,
           parentSpanId: span.spanId,
         })

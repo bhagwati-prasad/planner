@@ -38,8 +38,9 @@ Manifest validation, the in-house bundler and minifier, the component packer, an
 - **`checkModuleState(source, file)`** flags module-level mutable state in a module's source: a module-level `let` or `var`, or a module-level object, array, map or set that the module changes. One worker runs every instance of a component, so such state leaks between nodes.
 - **`createTestContext(options)`** gives component authors a `ctx` for unit tests, with no kernel:
   - props start from the manifest's defaults, and state from its initial values;
-  - `ctx.call` runs the behaviour's private methods, and `ctx.send` answers from `replies`;
-  - it records what a method sends, emits, calls, fails, measures, logs and schedules, and every state change with its path;
+  - `ctx.call` runs the behaviour's private methods, and `ctx.send` answers from `replies`, by `'port.method'`, or by `'port'` for a send that names no method (ADR 0019);
+  - it records what a method sends and emits (with their protocol details, ADR 0019), calls, fails, measures, logs and schedules, as plain copies, and every state change with its path;
+  - `ctx.now` is a plain property, so a self-test can move the clock;
   - setting a state field the manifest does not declare throws.
 
 ## Connection types

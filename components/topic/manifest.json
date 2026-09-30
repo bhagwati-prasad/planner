@@ -6,6 +6,7 @@
   "category": "Messaging",
   "description": "A partitioned stream that every consumer group reads (Kafka, Kinesis, Pub/Sub, SNS).",
   "icon": "icon.svg",
+  "entry": "index.js",
   "extends": "base:topic",
   "shape": "queue",
   "ports": [
@@ -16,12 +17,69 @@
       "exposes": ["publish", "subscribe", "poll", "commit"]
     }
   ],
+  "state": {
+    "logs": {
+      "type": "map",
+      "initial": {},
+      "description": "Each partition’s retained messages and its next offset"
+    },
+    "offsets": {
+      "type": "map",
+      "initial": {},
+      "description": "Each consumer group’s partitions, positions and committed offsets"
+    },
+    "published": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Messages published, which spreads keyless ones over the partitions"
+    },
+    "bytes": {
+      "type": "integer",
+      "initial": 0,
+      "unit": "bytes",
+      "description": "Size of the retained messages, before replication"
+    },
+    "buckets": {
+      "type": "map",
+      "initial": {},
+      "description": "Each partition’s throughput allowance in bytes"
+    },
+    "dedup": {
+      "type": "map",
+      "initial": {},
+      "description": "Partition and offset by dedupId, for exactly-once delivery"
+    }
+  },
   "methods": {
     "public": {
-      "publish": {},
-      "subscribe": {},
-      "poll": {},
-      "commit": {}
+      "publish": {
+        "input": "message",
+        "output": "{ partition, offset, duplicate? }",
+        "errors": ["PARTITION_THROTTLED"]
+      },
+      "subscribe": {
+        "input": {
+          "group": "string"
+        },
+        "output": "{ group, partitions }"
+      },
+      "poll": {
+        "input": {
+          "group": "string",
+          "max": "integer"
+        },
+        "output": "{ partition, offset, body }[]",
+        "errors": ["UNKNOWN_GROUP"]
+      },
+      "commit": {
+        "input": {
+          "group": "string",
+          "partition": "integer",
+          "offset": "integer"
+        },
+        "output": "{ ok }",
+        "errors": ["UNKNOWN_GROUP", "OFFSET_OUT_OF_RANGE"]
+      }
     },
     "private": {
       "assignPartitions": {},

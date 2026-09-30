@@ -100,7 +100,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0405 Edges, routing and the network model](M04-simulation-core/0405-edges-network.md) (after 0403, 0308)
 - [x] [0406 Black-box and expanded composites](M04-simulation-core/0406-black-box-expanded.md) (after 0403, 0112)
 - [x] [0407 Base behaviours](M04-simulation-core/0407-base-behaviours.md) (after 0404, 0405)
-- [ ] [0408 Starter library: messaging and workers](M04-simulation-core/0408-starter-messaging.md) (after 0407)
+- [x] [0408 Starter library: messaging and workers](M04-simulation-core/0408-starter-messaging.md) (after 0407)
 - [ ] [0409 Starter library: services, functions, gateways and balancers](M04-simulation-core/0409-starter-compute.md) (after 0407)
 - [ ] [0410 Starter library: data stores](M04-simulation-core/0410-starter-data.md) (after 0407)
 - [ ] [0411 Starter library: edge, clients and external](M04-simulation-core/0411-starter-edge.md) (after 0407)

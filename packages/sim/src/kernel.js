@@ -24,6 +24,11 @@ export class Kernel {
   /** @type {EventQueue<SimEvent>} */
   #queue = new EventQueue()
 
+  /** When the next event is due, in µs, or Infinity when there is none. */
+  get nextUs() {
+    return this.#queue.nextTimeUs
+  }
+
   /**
    * Schedules an event `delayUs` after now.
    * @param {number} delayUs a non-negative integer

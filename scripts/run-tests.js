@@ -3,7 +3,8 @@
 // Runs every Node test file with Node's built-in test runner:
 //   packages/*/test/**/*.test.js   package tests
 //   tools/**/test/**/*.test.js     tests of the tools (bundler, lint rules, this scaffold)
-//   components/*/tests/**/*.test.js  component self-tests
+//   components/*/tests/**/*.test.js  component self-tests, which import `strata/testing` as
+//                                    under `strata test-component` (strata-cli's testing loader)
 // Listing files explicitly keeps helpers and fixtures out of the run and works on Node 20+.
 //
 //   node scripts/run-tests.js [filter...] [--root <dir>] [--list]
@@ -88,7 +89,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   console.log(`Running ${files.length} test file(s):\n  ${shown.join('\n  ')}\n`)
   // A parent test runner's context would redirect the report; drop it.
   const { NODE_TEST_CONTEXT, ...env } = process.env
-  const result = spawnSync(process.execPath, ['--test', ...files], {
+  const loader = new URL('../packages/cli/src/testing-loader.js', import.meta.url).href
+  const result = spawnSync(process.execPath, ['--import', loader, '--test', ...files], {
     stdio: 'inherit',
     cwd: root,
     env,
