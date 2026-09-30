@@ -74,6 +74,7 @@ const DESCRIPTIONS = {
   E_METHOD_UNREACHABLE:
     'A binding targets a component that the matching boundary port does not reach',
   E_METHOD_UNKNOWN: 'The component has no public method of that name',
+  E_METHOD_FAILED: 'A method threw an error instead of returning a response or ctx.fail',
   E_EDGE_DIRECTION: 'An edge starts at an input-only port or ends at an output-only one',
   E_EDGE_SELF_LOOP: 'An edge starts and ends on the same component; that is a private method call',
   E_EDGE_CROSS_LEVEL:

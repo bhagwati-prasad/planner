@@ -42,13 +42,25 @@ export class Kernel {
    * @param {{ maxEvents?: number }} [limits]
    */
   run(handlers, { maxEvents = 1_000_000 } = {}) {
-    for (let next = this.#queue.pop(); next; next = this.#queue.pop()) {
+    while (this.#queue.size) {
       if (this.processed >= maxEvents) fail('INVALID', `The run stopped after ${maxEvents} events`)
-      this.nowUs = next.timeUs
-      this.processed++
-      const handler = handlers[next.event.type]
-      if (!handler) fail('INVALID', `No handler for simulation event '${next.event.type}'`)
-      handler(next.event, this)
+      this.step(handlers)
     }
+  }
+
+  /**
+   * Handles the earliest event, if there is one.
+   * @param {Record<string, Handler>} handlers by event type
+   * @returns {boolean} false when no event was left
+   */
+  step(handlers) {
+    const next = this.#queue.pop()
+    if (!next) return false
+    this.nowUs = next.timeUs
+    this.processed++
+    const handler = handlers[next.event.type]
+    if (!handler) fail('INVALID', `No handler for simulation event '${next.event.type}'`)
+    handler(next.event, this)
+    return true
   }
 }
