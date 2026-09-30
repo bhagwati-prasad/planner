@@ -61,10 +61,10 @@ A run can cover all or part of the architecture.
 
 ## Routing and resources
 
-- Edge rules match method, path prefix, header, weight % or an expression. Component code can choose a port explicitly with `ctx.send`.
+- Edge rules match method, path prefix, header, weight % or an expression (ADR 0019). Component code chooses the port with `ctx.send`, and the rules of the edges leaving it choose the edge: edges whose conditions match beat edges with none, and weights split the rest.
 - Services are multi-server queues: instances × concurrency servers, a bounded backlog, timeouts, retries with backoff and jitter, and circuit breakers.
 - Autoscalers read metrics with a configurable delay and cooldown, so scale-up lag shows up in results.
-- Every edge adds network latency, transmission delay (size ÷ bandwidth) and loss.
+- Every edge adds network latency, transmission delay (size ÷ bandwidth) and loss. A request with no response within its edge's timeout is retried after a backoff that doubles each time and moves by the jitter, and every attempt is a span in the trace.
 
 ## Functional behaviour
 

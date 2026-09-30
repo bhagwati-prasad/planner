@@ -209,7 +209,7 @@ describe('state at run time', () => {
           id: 'e1',
           from: { node: 'reader', port: 'out' },
           to: { node: 'store', port: 'in' },
-          latencyUs: 0,
+          props: {},
         },
       ],
     })

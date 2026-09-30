@@ -26,7 +26,7 @@ function withTypes() {
   return registry
 }
 
-/** Spec §9: what every connection carries. */
+/** Spec §9: what every connection carries, and its routing rules (spec §5, ADR 0019). */
 const COMMON = [
   'mode',
   'latency',
@@ -38,6 +38,7 @@ const COMMON = [
   'retryBackoff',
   'retryJitter',
   'tlsOverhead',
+  'route',
 ]
 
 describe('connection types', () => {

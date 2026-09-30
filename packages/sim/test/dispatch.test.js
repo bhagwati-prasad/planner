@@ -53,7 +53,7 @@ function runOf(nodes, edges = [], seed = 1) {
         const [node, port] = end.split('.')
         return { node, port }
       })
-      return { id: `e${i + 1}`, from, to, latencyUs: ms * MS }
+      return { id: `e${i + 1}`, from, to, props: { latency: ms } }
     }),
   })
 }

@@ -61,7 +61,7 @@ Every starter component ships typed state and a default cost model for each publ
 
 ## Connection types
 
-Every connection carries network latency, bandwidth Mbps, packet loss %, payload size KB, timeout ms, retries with backoff and jitter, TLS overhead ms, and sync or async mode. Transmission delay is payload size divided by bandwidth.
+Every connection carries network latency, bandwidth Mbps, packet loss %, payload size KB, timeout ms, retries with backoff and jitter, TLS overhead ms, sync or async mode, and route rules (ADR 0019). Transmission delay is payload size divided by bandwidth.
 
 | Type | Additional properties |
 | --- | --- |

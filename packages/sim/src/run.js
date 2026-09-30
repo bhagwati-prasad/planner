@@ -10,6 +10,11 @@
  * that starts an async method, the run lets microtasks settle before it takes the next event:
  * the method resumes at the event's simulated time, and other messages keep being processed
  * while it waits (eng §13 "Method dispatch, scope and stubs").
+ *
+ * Every edge adds its network latency, transmission delay (size ÷ bandwidth) and loss (spec §11
+ * "Routing and resources"). A request that gets no response within its edge's timeout is sent
+ * again after a backoff that doubles each time and moves by the jitter, and each attempt is a
+ * `send` span. Route rules choose which edge leaving a port carries a message (ADR 0019).
  */
 import {
   StrataError,
@@ -20,6 +25,7 @@ import {
 } from '../../core/src/index.js'
 import { Kernel } from './kernel.js'
 import { createStreams } from './random.js'
+import { parseRoute, pickEdge } from './route.js'
 import { sample } from './sample.js'
 import { copy, initialState, stateView } from './state.js'
 
@@ -37,7 +43,25 @@ import { copy, initialState, stateView } from './state.js'
  * @property {string} id
  * @property {{ node: string, port: string }} from
  * @property {{ node: string, port: string }} to
- * @property {number} latencyUs  one-way latency in integer microseconds
+ * @property {string|null} [method]  the one method it carries (ADR 0011)
+ * @property {EdgeProps} [props]  its connection's property values in canonical units; a
+ *   property it lacks costs nothing
+ *
+ * @typedef {object} EdgeProps
+ * @property {unknown} [latency]  one-way network latency in ms, or a distribution of ms
+ * @property {number} [bandwidth]  bits per second
+ * @property {number} [packetLoss]  the fraction of messages lost
+ * @property {number} [payloadSize]  the bytes of a message that sets no size
+ * @property {number} [timeout]  ms a request waits for its response; 0 waits for ever
+ * @property {number} [retries]  attempts after the first, when one times out
+ * @property {number} [retryBackoff]  ms before the first retry, doubling for each one after
+ * @property {number} [retryJitter]  the fraction of its backoff a retry may move either way
+ * @property {string[]} [route]  the rules for what it carries (ADR 0019)
+ *
+ * @typedef {object} SendOptions  a message's protocol details (ADR 0019)
+ * @property {string} [path]
+ * @property {Record<string, string>} [headers]
+ * @property {number} [sizeBytes]  its size, over the edge's payloadSize
  *
  * @typedef {object} Span  a method call in the trace (OpenTelemetry's shape, spec §11)
  * @property {string} spanId
@@ -45,11 +69,14 @@ import { copy, initialState, stateView } from './state.js'
  * @property {string} traceId
  * @property {string} node
  * @property {string} method
- * @property {'public'|'private'|'timer'} kind
+ * @property {'public'|'private'|'timer'|'send'} kind  `send` is one attempt of a request
+ *   over an edge, a child of the caller's span
  * @property {number} startUs
  * @property {number|null} endUs
  * @property {'running'|'ok'|'error'} status
  * @property {string} [code]  the error code of a failed call
+ * @property {string} [edge]  the edge a `send` span went over
+ * @property {number} [attempt]  a `send` span's attempt, from 1
  *
  * @typedef {{ code: string, message: string, details?: unknown }} ErrorBody
  *
@@ -165,6 +192,18 @@ class Pending {
  * @property {boolean} done
  * @property {Span} span
  * @property {((ok: boolean, value: unknown, atUs: number) => void) | null} respond
+ *
+ * @typedef {RunEdge & { props: EdgeProps, route: import('./route.js').Route, network: { nextU32(): number } }} Edge
+ *
+ * A request over an edge, sent once per attempt until one is answered or none are left.
+ * @typedef {object} Request
+ * @property {string} node  the sender
+ * @property {Edge} edge
+ * @property {any} message
+ * @property {Pending} pending  what the sender's ctx.send returned
+ * @property {number} attempts  made so far
+ *
+ * @typedef {{ request: Request, span: Span, answered: boolean }} Attempt
  */
 
 export class Run {
@@ -186,8 +225,8 @@ export class Run {
   #ids = 0
   /** @type {Map<string, any>} */
   #nodes = new Map()
-  /** @type {Map<string, RunEdge>} `node.port` → the edge leaving it */
-  #edges = new Map()
+  /** @type {Map<string, { edges: Edge[], random: { nextU32(): number } }>} `node.port` → the edges leaving it */
+  #ports = new Map()
   /** @type {Set<Call>} async calls not yet finished */
   #live = new Set()
 
@@ -212,7 +251,18 @@ export class Run {
         latency: streams.stream(`${n.id}:latency`),
       })
     }
-    for (const e of edges) this.#edges.set(`${e.from.node}.${e.from.port}`, e)
+    for (const e of edges) {
+      const key = `${e.from.node}.${e.from.port}`
+      const port = this.#ports.get(key) ?? { edges: [], random: streams.stream(`${key}:route`) }
+      const props = e.props ?? {}
+      port.edges.push({
+        ...e,
+        props,
+        route: parseRoute(e),
+        network: streams.stream(`${e.id}:edge`),
+      })
+      this.#ports.set(key, port)
+    }
   }
 
   /** Simulated time in µs. */
@@ -228,10 +278,10 @@ export class Run {
   /**
    * Sends a request to a node's port from outside the run: a unit-style injection (spec §11
    * "Sources and load"). The reply fills in when the response leaves.
-   * @param {{ node: string, port: string, method?: string, body?: unknown, atUs?: number }} request
+   * @param {{ node: string, port: string, method?: string, body?: unknown, atUs?: number } & SendOptions} request
    * @returns {Reply}
    */
-  inject({ node, port, method, body, atUs = this.nowUs }) {
+  inject({ node, port, method, body, path, headers, sizeBytes = 0, atUs = this.nowUs }) {
     /** @type {Reply} */
     const reply = { status: 'pending', atUs: null }
     this.kernel.schedule(atUs - this.nowUs, {
@@ -241,7 +291,11 @@ export class Run {
         traceId: this.#id(32),
         parentSpanId: null,
         method,
+        path: path ?? null,
+        headers: copy(headers ?? {}),
         body: copy(body),
+        sizeBytes,
+        attempt: 1,
         to: { node, port },
         reply,
       },
@@ -257,6 +311,8 @@ export class Run {
     const handlers = {
       deliver: (/** @type {any} */ e) => this.#deliver(e.message),
       timer: (/** @type {any} */ e) => this.#timer(e),
+      timeout: (/** @type {any} */ e) => this.#timeout(e.attempt),
+      retry: (/** @type {any} */ e) => this.#attempt(e.request, this.nowUs),
     }
     while (this.kernel.step(handlers)) {
       if (this.#woken) await this.#settle()
@@ -290,7 +346,7 @@ export class Run {
 
   /** @param {any} message */
   #deliver(message) {
-    if (message.kind === 'response') return message.pending.settle(message.ok, message.value)
+    if (message.kind === 'response') return this.#answer(message.attempt, message.ok, message.value)
     const node =
       this.#nodes.get(message.to.node) ??
       fail('E_SIM_COMPONENT_NOT_FOUND', `Component '${message.to.node}' is not in the run`)
@@ -332,8 +388,20 @@ export class Run {
         respond,
         new StrataError('E_METHOD_UNKNOWN', `${node.id} has no behaviour for '${method}'`)
       )
+    const msg = {
+      kind: message.kind,
+      traceId: message.traceId,
+      spanId: span.spanId,
+      parentSpanId: message.parentSpanId,
+      method,
+      path: message.path,
+      headers: message.headers,
+      body: message.body,
+      sizeBytes: message.sizeBytes,
+      attempt: message.attempt,
+    }
     this.#start(node, span, respond, this.#latency(node, publicMethods[method]), call =>
-      fn.call(node.behaviour.public, message, this.#context(node, call, span))
+      fn.call(node.behaviour.public, msg, this.#context(node, call, span))
     )
   }
 
@@ -422,15 +490,32 @@ export class Run {
       )
       return
     }
-    this.kernel.schedule(atUs - this.nowUs + message.edge.latencyUs, {
+    const edge = /** @type {Edge} */ (message.edge)
+    this.#cross(edge, atUs, edge.props.payloadSize ?? 0, {
       type: 'deliver',
       message: {
         kind: 'response',
-        pending: message.pending,
+        attempt: message.current,
         ok,
         value: ok ? value : new CallError(/** @type {ErrorBody} */ (value)),
       },
     })
+  }
+
+  /**
+   * A response reaching its sender: it settles the request, unless its attempt timed out.
+   * @param {Attempt} attempt @param {boolean} ok @param {unknown} value
+   */
+  #answer(attempt, ok, value) {
+    if (attempt.answered) return
+    attempt.answered = true
+    this.#end(
+      attempt.span,
+      ok ? 'ok' : 'error',
+      this.nowUs,
+      ok ? undefined : /** @type {CallError} */ (value).code
+    )
+    attempt.request.pending.settle(ok, value)
   }
 
   /**
@@ -475,15 +560,17 @@ export class Run {
       send: (
         /** @type {string} */ port,
         /** @type {string} */ method,
-        /** @type {unknown} */ args
-      ) => (touch(), run.#send(node, call, span, port, method, args, true)),
+        /** @type {unknown} */ args,
+        /** @type {SendOptions} */ options
+      ) => (touch(), run.#send(node, call, span, port, method, args, true, options)),
       emit: (
         /** @type {string} */ port,
         /** @type {string} */ method,
-        /** @type {unknown} */ args
+        /** @type {unknown} */ args,
+        /** @type {SendOptions} */ options
       ) => {
         touch()
-        run.#send(node, call, span, port, method, args, false)
+        run.#send(node, call, span, port, method, args, false, options)
       },
       fail: (/** @type {string} */ code, /** @type {unknown} */ details) => {
         const failure = { ok: false, code, details }
@@ -542,34 +629,134 @@ export class Run {
   }
 
   /**
-   * A message over the edge leaving a port. With `wait`, a request whose response settles the
-   * returned promise; without, an event nobody answers.
+   * A message from a port, over the edge its route rules choose. With `wait`, a request whose
+   * response settles the returned promise; without, an event nobody answers.
    * @param {any} node @param {Call} call @param {Span} span @param {string} portName
    * @param {string} method @param {unknown} body @param {boolean} wait
+   * @param {SendOptions} [options]
    */
-  #send(node, call, span, portName, method, body, wait) {
+  #send(node, call, span, portName, method, body, wait, options = {}) {
     if (!node.manifest.ports.some((/** @type {any} */ p) => p.name === portName))
       throw new StrataError('E_PORT_NOT_FOUND', `${node.id} has no port '${portName}'`)
-    const edge =
-      this.#edges.get(`${node.id}.${portName}`) ??
+    const port =
+      this.#ports.get(`${node.id}.${portName}`) ??
       fail('E_SIM_NO_EDGE', `Port '${portName}' of ${node.id} has no edge to send over`)
-    const pending = wait ? new Pending(call, this) : null
-    const departs = Math.max(call.busyUntil, this.nowUs)
-    this.kernel.schedule(departs - this.nowUs + edge.latencyUs, {
-      type: 'deliver',
-      message: {
-        kind: wait ? 'request' : 'event',
-        traceId: span.traceId,
-        parentSpanId: span.spanId,
-        method,
-        body: copy(body),
-        from: edge.from,
-        to: edge.to,
-        edge,
-        pending,
-      },
+    const message = {
+      kind: wait ? 'request' : 'event',
+      traceId: span.traceId,
+      parentSpanId: span.spanId,
+      method,
+      path: options.path ?? null,
+      headers: copy(options.headers ?? {}),
+      body: copy(body),
+      sizeBytes: options.sizeBytes,
+    }
+    const edge =
+      pickEdge(port.edges, message, () => port.random.nextU32() / 2 ** 32) ??
+      fail(
+        'E_SIM_NO_ROUTE',
+        `No edge leaving port '${portName}' of ${node.id} carries '${method}'${message.path ? ` to ${message.path}` : ''}; check the edges' route rules`
+      )
+    Object.assign(message, {
+      sizeBytes: message.sizeBytes ?? edge.props.payloadSize ?? 0,
+      to: edge.to,
+      edge,
     })
-    return pending
+    const departs = Math.max(call.busyUntil, this.nowUs)
+    if (!wait) {
+      this.#cross(edge, departs, message.sizeBytes, {
+        type: 'deliver',
+        message: { ...message, attempt: 1 },
+      })
+      return null
+    }
+    /** @type {Request} */
+    const request = { node: node.id, edge, message, pending: new Pending(call, this), attempts: 0 }
+    this.#attempt(request, departs)
+    return request.pending
+  }
+
+  /**
+   * Sends a request once more, as a `send` span, and starts its timeout.
+   * @param {Request} request @param {number} departsUs
+   */
+  #attempt(request, departsUs) {
+    const { edge, message } = request
+    const attempt = ++request.attempts
+    const span = this.#span(
+      request.node,
+      message.method,
+      'send',
+      message.traceId,
+      message.parentSpanId,
+      departsUs
+    )
+    Object.assign(span, { edge: edge.id, attempt })
+    /** @type {Attempt} */
+    const current = { request, span, answered: false }
+    // Each attempt but the last gets its own copy of the body, in case the callee changes it.
+    const body = attempt <= (edge.props.retries ?? 0) ? copy(message.body) : message.body
+    this.#cross(edge, departsUs, message.sizeBytes, {
+      type: 'deliver',
+      message: { ...message, body, attempt, current },
+    })
+    const timeout = edge.props.timeout ?? 0
+    if (timeout > 0)
+      this.kernel.schedule(departsUs - this.nowUs + Math.round(timeout * 1000), {
+        type: 'timeout',
+        attempt: current,
+      })
+  }
+
+  /**
+   * An attempt's timeout: unless it was answered, it fails, and the request is sent again after
+   * its backoff, or fails with E_SIM_TIMEOUT when no retries are left.
+   * @param {Attempt} current
+   */
+  #timeout(current) {
+    if (current.answered) return
+    current.answered = true
+    this.#end(current.span, 'error', this.nowUs, 'E_SIM_TIMEOUT')
+    const { request } = current
+    const { edge, message } = request
+    const { retries = 0, retryBackoff = 0, retryJitter = 0, timeout } = edge.props
+    if (request.attempts <= retries) {
+      const u = retryJitter > 0 ? edge.network.nextU32() / 2 ** 32 : 0.5
+      const ms = retryBackoff * 2 ** (request.attempts - 1) * (1 + retryJitter * (2 * u - 1))
+      this.kernel.schedule(Math.round(ms * 1000), { type: 'retry', request })
+      return
+    }
+    request.pending.settle(
+      false,
+      new CallError({
+        code: 'E_SIM_TIMEOUT',
+        message: `'${message.method}' from ${request.node} over edge ${edge.id} got no response: ${request.attempts} attempts of ${timeout} ms each timed out`,
+        details: { edge: edge.id, attempts: request.attempts, timeoutMs: timeout },
+      })
+    )
+  }
+
+  /**
+   * Puts a message on an edge at `departsUs`. It arrives after the edge's latency and its
+   * transmission delay, size ÷ bandwidth, unless the edge loses it.
+   * @param {Edge} edge @param {number} departsUs @param {number} sizeBytes
+   * @param {import('./kernel.js').SimEvent} event
+   */
+  #cross(edge, departsUs, sizeBytes, event) {
+    const { latency, bandwidth = 0, packetLoss = 0 } = edge.props
+    const random = () => edge.network.nextU32() / 2 ** 32
+    const ms =
+      latency === undefined || latency === null
+        ? 0
+        : typeof latency === 'number'
+          ? latency
+          : sample(latency, random())
+    if (packetLoss > 0 && random() < packetLoss) return
+    const transmitUs = bandwidth > 0 ? (sizeBytes * 8 * 1_000_000) / bandwidth : 0
+    this.kernel.schedule(
+      departsUs - this.nowUs + Math.round(Math.max(0, ms) * 1000 + transmitUs),
+      event
+    )
   }
 
   /**
