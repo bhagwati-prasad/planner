@@ -29,7 +29,7 @@ export {
   formatProblem,
 } from './bundle.js'
 export { validateManifest, checkIcon, PLUGIN_KINDS, MANIFEST_KEYS } from './manifest.js'
-export { validateBehaviour, checkModuleState, createTestContext } from './behaviour.js'
+export { validateBehaviour, checkModuleState } from './behaviour.js'
 export {
   packComponent,
   componentScript,

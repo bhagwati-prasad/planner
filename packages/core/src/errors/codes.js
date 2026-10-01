@@ -57,6 +57,7 @@ const DESCRIPTIONS = {
   E_MANIFEST_PROPERTY: 'A manifest property schema is not valid',
   E_MANIFEST_STATE: 'A manifest state field has a bad type, or a missing or bad initial value',
   E_MANIFEST_METRIC: 'A manifest metric is malformed or has an unknown roll-up rule',
+  E_MANIFEST_SERVERS: "A manifest's servers are malformed or name what it does not have",
   E_MANIFEST_FILE: 'A file a manifest names is missing or of the wrong kind',
 
   E_PORT_NOT_FOUND: 'A port an edge names does not exist',

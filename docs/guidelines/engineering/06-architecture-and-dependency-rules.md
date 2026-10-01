@@ -12,8 +12,10 @@ Dependencies point downward only. The import-boundary lint rule reads this table
 | graph | d3 only; never any Strata package |
 | 3d | three only |
 | ui | facade, graph, 3d |
-| cli | facade, storage, server |
+| cli | facade, storage, server, sim |
 | server | facade, plugins, storage |
+
+The CLI imports `sim` only in Node, for `strata/testing`'s `runComponent`, which runs one component in the kernel for its self-tests (ADR 0020). The CLI is never part of a browser bundle, so strata-sim still ships only in the worker there (ADR 0018).
 
 ## Banned globals
 

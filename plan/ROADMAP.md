@@ -101,7 +101,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0406 Black-box and expanded composites](M04-simulation-core/0406-black-box-expanded.md) (after 0403, 0112)
 - [x] [0407 Base behaviours](M04-simulation-core/0407-base-behaviours.md) (after 0404, 0405)
 - [x] [0408 Starter library: messaging and workers](M04-simulation-core/0408-starter-messaging.md) (after 0407)
-- [ ] [0409 Starter library: service](M04-simulation-core/0409-starter-compute.md) (after 0408)
+- [x] [0409 Starter library: service](M04-simulation-core/0409-starter-compute.md) (after 0408)
 - [ ] [0419 Starter library: serverless function](M04-simulation-core/0419-starter-function.md) (after 0409)
 - [ ] [0420 Starter library: load balancer and API gateway](M04-simulation-core/0420-starter-balancer-gateway.md) (after 0409)
 - [ ] [0410 Starter library: data stores](M04-simulation-core/0410-starter-data.md) (after 0407)

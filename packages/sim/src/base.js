@@ -17,8 +17,17 @@
  * @typedef {object} BaseBehaviour
  * @property {Record<string, object>} [state]  state fields its methods use
  * @property {Record<string, string[]>} [latency]  by method, the properties holding its latency
+ * @property {Servers} [servers]  the servers its public calls queue for (ADR 0020)
  * @property {Record<string, Function>} public
  * @property {Function} [any]  answers public methods it does not know
+ */
+
+/**
+ * The servers a node's public calls queue for (ADR 0020). Each entry names a property, or a
+ * state field as `state.<name>`, or is a number. `count` multiplies its entries, and a node
+ * that lacks one has no limit; `backlog` bounds the calls that wait (none: no bound); `timeout`
+ * is how long, in ms, a call may wait (none: for ever).
+ * @typedef {{ count: (string|number)[], backlog?: string|number, timeout?: string|number }} Servers
  */
 
 /** @typedef {any} Msg @typedef {any} Ctx */
@@ -30,6 +39,7 @@ export const BASE_BEHAVIOURS = {
   'base:client': { public: {} },
 
   'base:service': {
+    servers: { count: ['instances', 'concurrency'], backlog: 'maxBacklog', timeout: 'timeout' },
     latency: { '*': ['serviceTime'] },
     public: { health: () => ({ status: 'up' }) },
     any: nothing,

@@ -7,22 +7,67 @@
   "description": "An API or backend service: instances with limited concurrency that call downstream dependencies.",
   "icon": "icon.svg",
   "extends": "base:service",
+  "entry": "index.js",
   "shape": "box",
   "ports": [
     {
       "name": "in",
       "direction": "in",
       "accepts": ["http", "grpc", "websocket"],
-      "exposes": ["health"]
+      "exposes": ["request", "health"],
+      "default": "request"
     },
     {
       "name": "out",
       "direction": "out"
     }
   ],
+  "servers": {
+    "count": ["state.liveInstances", "concurrency"],
+    "backlog": "maxBacklog",
+    "timeout": "timeout"
+  },
+  "state": {
+    "liveInstances": {
+      "type": "integer",
+      "initial": 1,
+      "description": "Instances running now; autoscaling changes it"
+    },
+    "inFlight": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Requests on a server now"
+    },
+    "health": {
+      "type": "string",
+      "initial": "up"
+    },
+    "circuits": {
+      "type": "map",
+      "initial": {},
+      "description": "By downstream call: its breaker's state and its last outcomes"
+    },
+    "busySince": {
+      "type": "number",
+      "initial": -1,
+      "description": "When utilisation last rose over the target, in ms; -1 when it is not over"
+    },
+    "lastScaledAt": {
+      "type": "number",
+      "initial": -1,
+      "description": "When autoscaling last changed liveInstances, in ms; -1 before it has"
+    }
+  },
   "methods": {
     "public": {
-      "health": {}
+      "request": {
+        "latency": 0,
+        "errors": ["NO_ENDPOINT", "CIRCUIT_OPEN", "DEPENDENCY_FAILED", "BACKLOG_FULL", "TIMEOUT"],
+        "description": "Runs the endpoint the request's path and method header match"
+      },
+      "health": {
+        "latency": 0
+      }
     },
     "private": {
       "admit": {},
@@ -65,7 +110,7 @@
       },
       "default": [],
       "group": "Performance",
-      "description": "Each: { \"name\": \"GET /orders\", \"serviceTime\": {...}, \"calls\": [\"out\"] }"
+      "description": "Each: { \"name\": \"GET /orders\", \"serviceTime\": {...}, \"calls\": [\"out\", \"out.insert\"] }; service time in ms, calls as port or port.method"
     },
     "cpuPerRequest": {
       "type": "number",
@@ -170,6 +215,7 @@
     },
     "circuitState": {
       "unit": "state",
+      "description": "Per downstream call, as circuitState.<call>",
       "rollup": {
         "rule": "worst",
         "order": ["closed", "half-open", "open"]

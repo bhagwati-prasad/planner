@@ -185,7 +185,7 @@ test('every starter component declares the methods of spec §9, and its in ports
     'message-queue': ['publish receive ack nack', 'expire redeliver sendToDlq'],
     topic: ['publish subscribe poll commit', 'assignPartitions compact trimRetention'],
     'worker-pool': ['status', 'poll process retry'],
-    service: ['health', 'admit retry tripCircuit autoscale'],
+    service: ['request health', 'admit retry tripCircuit autoscale'],
     function: ['invoke', 'coldStart reap'],
     'relational-db': [
       'query insert update delete begin commit rollback',

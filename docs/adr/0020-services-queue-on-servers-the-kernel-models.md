@@ -31,3 +31,9 @@ Chosen option: 1, decided by the human on 2026-09-30, together with splitting ta
 - Bad: a new optional `servers` field in manifests (a plugin API addition) and a new kernel mechanism, with its own error code.
 - Bad: `strata/testing` grows by `runComponent`, which runs strata-sim in Node for `strata test-component`.
 - Follow-up tasks: 0409 uses it for the service, the function and the load balancer. 0413's snapshots must capture queued calls.
+
+## Implementation notes (task 0409)
+
+- `count` multiplies its entries. A node lacking one of them, such as a `base:service` that sets no `concurrency`, has no limit, so it runs every call at once and records no server metrics.
+- A count may name a state field, so autoscaling can change it. A count that grows admits waiting calls when a server is released, or when any call or timer of the node ends, whichever comes first. The starter service's autoscale timer relies on this.
+- `BACKLOG_FULL` and `TIMEOUT` are the codes a caller sees, as for a component's own `ctx.fail`. The manifest check reports a malformed `servers` field with `E_MANIFEST_SERVERS`, and warns when it names a property the manifest does not declare but its base type may.

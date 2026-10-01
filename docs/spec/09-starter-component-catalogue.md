@@ -42,7 +42,7 @@ Every starter component ships typed state and a default cost model for each publ
 | Message queue | messages, inFlight, deadLetters | publish, receive, ack, nack | expire, redeliver, sendToDlq |
 | Pub/sub topic | partition logs, offsets per consumer group | publish, subscribe, poll, commit | assignPartitions, compact, trimRetention |
 | Worker / consumer pool | busy workers, batch buffer | status | poll, process, retry |
-| Service | instances and health, backlog, circuit state per dependency, plus any domain state you declare | Your endpoints (such as placeOrder, getOrder), health | admit, retry, tripCircuit, autoscale |
+| Service | instances and health, backlog, circuit state per dependency, plus any domain state you declare | request (runs the endpoint its path and `method` header match), your own endpoints (such as placeOrder, getOrder), health | admit, retry, tripCircuit, autoscale |
 | Serverless function | warm instances, concurrency in use | invoke | coldStart, reap |
 | Relational DB | tables, connections, locks, replica lag | query, insert, update, delete, begin, commit, rollback | acquireConnection, lock, replicate, failover |
 | NoSQL / key-value DB | partitions and their items | get, put, delete, query | route, throttle, replicate |

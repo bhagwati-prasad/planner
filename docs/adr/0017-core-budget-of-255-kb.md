@@ -51,6 +51,10 @@ Chosen option: 1, decided by the human on 2026-09-29, because:
 - Neutral: option 2 stays open, as its own task, and would help core and strata-graph.
 - Follow-up tasks: none. The change that accepted this ADR set eng §15 to 255 KB for core and 230 KB for strata-ui.
 
+## Amendment, 2026-10-01
+
+Task 0409 added the manifest check of `servers` (ADR 0020), which took the measure to 255.3 KB. The human decided to move `createTestContext` from strata-plugins to strata-sim, beside `runComponent` (ADR 0020). Its tests moved with it, changing only their import. Both are used only in Node, through `strata/testing`, and the worker never imports them, so neither budget counts them. The measure fell to 252.4 KB. `checkModuleState` stays in strata-plugins, so the upload dialog still flags module-level state. If in-app component tests ever need the test context, they can load it from strata-sim.
+
 ## Pros and cons of the options
 
 ### Option 1: 255 KB for core, and 230 KB for strata-ui
