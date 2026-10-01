@@ -7,6 +7,7 @@
   "description": "A full-text or vector search cluster (Elasticsearch, OpenSearch, Solr).",
   "icon": "icon.svg",
   "extends": "base:store",
+  "entry": "index.js",
   "shape": "cylinder",
   "ports": [
     {
@@ -16,11 +17,54 @@
       "exposes": ["index", "search", "delete"]
     }
   ],
+  "state": {
+    "docs": {
+      "type": "map",
+      "initial": {},
+      "description": "By id: each searchable document and its size in bytes"
+    },
+    "pending": {
+      "type": "list",
+      "initial": [],
+      "description": "Index and delete operations in order, each with when it arrived and when it is indexed, in ms"
+    },
+    "indexedUntil": {
+      "type": "number",
+      "initial": 0,
+      "description": "When the indexing pipeline is free, in ms"
+    },
+    "buffered": {
+      "type": "number",
+      "initial": 0,
+      "description": "Bytes of documents not yet searchable"
+    },
+    "size": {
+      "type": "number",
+      "initial": 0,
+      "description": "Bytes in the index, deleted documents included until a merge"
+    },
+    "deleted": {
+      "type": "number",
+      "initial": 0,
+      "description": "Bytes of deleted documents a merge would reclaim"
+    },
+    "refreshes": { "type": "integer", "initial": 0 }
+  },
   "methods": {
     "public": {
-      "index": {},
-      "search": {},
-      "delete": {}
+      "index": {
+        "latency": 0,
+        "errors": ["REJECTED"],
+        "description": "{ id, doc } → { id }; searchable after the next refresh once indexed"
+      },
+      "search": {
+        "latency": 0,
+        "description": "{ query } → the documents with every term, best first, as { id, doc }"
+      },
+      "delete": {
+        "latency": 0,
+        "description": "{ id } → null; gone from searches after the next refresh"
+      }
     },
     "private": {
       "refresh": {},
