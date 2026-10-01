@@ -299,8 +299,9 @@ describe('base behaviours', () => {
       JSON.parse(
         readFileSync(new URL(`../../../components/${name}/manifest.json`, import.meta.url), 'utf8')
       )
-    const cache = starter('cache')
-    assert.equal(cache.entry ?? null, null, 'the starter cache has no entry')
+    // The starter cache gained an entry in 0423; without it, its manifest runs on base:cache alone.
+    const { entry: _entry, ...cache } = starter('cache')
+    assert.equal(cache.extends, 'base:cache')
     const { replies } = await answers(cache, [
       ['set', { key: 'k', value: 42 }],
       ['get', { key: 'k' }],
