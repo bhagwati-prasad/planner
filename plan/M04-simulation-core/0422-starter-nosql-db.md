@@ -35,3 +35,4 @@ Write these tests first, in `components/nosql-db/tests`. Run them and confirm ea
   - Requests without a key are synthetic load, drawn over the partitions by a Zipf distribution with exponent `hotKeySkew`.
   - Consistency changes latency by order statistics over the replicas, and eventual reads may see the value before the latest.
   - Throttled requests name their partition, so a test can tell a hot key's throttles from others.
+- **Determinism.** Hot-key skew first used `**` with a fractional exponent, which engines may round differently in the last bit (eng §13). It now uses `math.js`, whose `ln`, `exp` and `pow` use only IEEE 754 arithmetic, with a test against `Math`.

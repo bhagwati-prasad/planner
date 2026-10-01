@@ -12,6 +12,8 @@
  * quorum and sees the latest write a quorum has. Items expire after itemTtl, when it is set.
  */
 
+import { pow } from './math.js'
+
 /** @typedef {any} Ctx @typedef {any} Msg */
 
 /** A 32-bit FNV-1a hash of `text`. @param {string} text */
@@ -141,7 +143,7 @@ export default {
     route(/** @type {{ key?: unknown }} */ { key }, /** @type {Ctx} */ ctx) {
       const { partitions, hotKeySkew } = ctx.props
       if (key !== undefined) return hash(String(key)) % partitions
-      const weights = Array.from({ length: partitions }, (_, k) => 1 / (k + 1) ** hotKeySkew)
+      const weights = Array.from({ length: partitions }, (_, k) => 1 / pow(k + 1, hotKeySkew))
       let u = ctx.random() * weights.reduce((a, b) => a + b, 0)
       for (const [k, w] of weights.entries()) if ((u -= w) < 0) return k
       return partitions - 1
