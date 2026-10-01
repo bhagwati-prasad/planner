@@ -7,6 +7,7 @@
   "description": "A service run by someone else, with its own limits, errors and price (payments, maps, email).",
   "icon": "icon.svg",
   "extends": "base:external",
+  "entry": "index.js",
   "shape": "cloud",
   "ports": [
     {
@@ -16,9 +17,20 @@
       "exposes": ["call"]
     }
   ],
+  "state": {
+    "windows": {
+      "type": "map",
+      "initial": {},
+      "description": "The second and the day calls are counted in, and how many it has accepted in each"
+    }
+  },
   "methods": {
     "public": {
-      "call": {}
+      "call": {
+        "latency": 0,
+        "errors": ["TOO_MANY_REQUESTS", "QUOTA_EXCEEDED", "UNAVAILABLE", "ERROR", "TIMEOUT"],
+        "description": "any body → { status: 200 }"
+      }
     },
     "private": {
       "throttle": {}
