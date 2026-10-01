@@ -7,6 +7,7 @@
   "description": "A partitioned key-value or document store (DynamoDB, Cassandra, MongoDB).",
   "icon": "icon.svg",
   "extends": "base:store",
+  "entry": "index.js",
   "shape": "cylinder",
   "ports": [
     {
@@ -16,12 +17,41 @@
       "exposes": ["get", "put", "delete", "query"]
     }
   ],
+  "state": {
+    "items": {
+      "type": "map",
+      "initial": {},
+      "description": "By key: its value, the value before it, when each replica applied it and when a quorum had, when it was written in ms, and its size in bytes"
+    },
+    "windows": {
+      "type": "map",
+      "initial": {},
+      "description": "By partition: the second its ops are counted in, and how many it has served in it"
+    },
+    "storage": { "type": "number", "initial": 0, "description": "Bytes stored" }
+  },
   "methods": {
     "public": {
-      "get": {},
-      "put": {},
-      "delete": {},
-      "query": {}
+      "get": {
+        "latency": 0,
+        "errors": ["THROTTLED"],
+        "description": "{ key } → its value, or null"
+      },
+      "put": {
+        "latency": 0,
+        "errors": ["THROTTLED"],
+        "description": "{ key, value } → null"
+      },
+      "delete": {
+        "latency": 0,
+        "errors": ["THROTTLED"],
+        "description": "{ key } → null"
+      },
+      "query": {
+        "latency": 0,
+        "errors": ["THROTTLED"],
+        "description": "{ prefix } → the items whose keys start with it, as { key, value }"
+      }
     },
     "private": {
       "route": {},
