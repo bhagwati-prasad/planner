@@ -111,7 +111,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0424 Starter library: object storage](M04-simulation-core/0424-starter-object-storage.md) (after 0423)
 - [x] [0425 Starter library: search index](M04-simulation-core/0425-starter-search-index.md) (after 0424)
 - [x] [0411 Starter library: scheduler, third-party API and external stub](M04-simulation-core/0411-starter-scheduler-external.md) (after 0407)
-- [ ] [0426 Starter library: CDN and DNS](M04-simulation-core/0426-starter-cdn-dns.md) (after 0411)
+- [x] [0426 Starter library: CDN and DNS](M04-simulation-core/0426-starter-cdn-dns.md) (after 0411)
 - [ ] [0427 Starter library: identity provider](M04-simulation-core/0427-starter-identity-provider.md) (after 0426)
 - [ ] [0428 Starter library: client](M04-simulation-core/0428-starter-client.md) (after 0427)
 - [ ] [0412 Scopes, stubs and inbound traffic](M04-simulation-core/0412-scope-stubs.md) (after 0406)

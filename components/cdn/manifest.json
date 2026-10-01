@@ -7,23 +7,52 @@
   "description": "Edge caches close to users in front of an origin (CloudFront, Fastly, Cloudflare).",
   "icon": "icon.svg",
   "extends": "base:proxy",
+  "entry": "index.js",
   "shape": "cloud",
   "ports": [
     {
       "name": "in",
       "direction": "in",
       "accepts": ["http"],
-      "exposes": ["get"]
+      "exposes": ["get"],
+      "default": "get"
     },
     {
       "name": "out",
       "direction": "out",
-      "accepts": ["http"]
+      "accepts": ["http"],
+      "description": "Its origin, which fills each miss"
     }
   ],
+  "state": {
+    "edge": {
+      "type": "map",
+      "initial": {},
+      "description": "By edge location and key: each cached copy's body, size in bytes and expiry in ms"
+    },
+    "shield": {
+      "type": "map",
+      "initial": {},
+      "description": "By key: the origin shield's copy of each object, with its size in bytes and expiry in ms"
+    },
+    "lookups": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Gets so far"
+    },
+    "hits": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Gets its edge cache answered"
+    }
+  },
   "methods": {
     "public": {
-      "get": {}
+      "get": {
+        "latency": 0,
+        "errors": ["BAD_GATEWAY", "ORIGIN_TIMEOUT"],
+        "description": "{ key }, or a path → the object's body, from the edge cache or its origin"
+      }
     },
     "private": {
       "fetchFromOrigin": {},

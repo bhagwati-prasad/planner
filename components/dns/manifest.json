@@ -7,18 +7,40 @@
   "description": "Name resolution with routing policies and health-checked failover (Route 53, Cloud DNS).",
   "icon": "icon.svg",
   "extends": "base:proxy",
+  "entry": "index.js",
   "shape": "hexagon",
   "ports": [
     {
       "name": "in",
       "direction": "in",
       "accepts": [],
-      "exposes": ["resolve"]
+      "exposes": ["resolve"],
+      "default": "resolve"
+    },
+    {
+      "name": "out",
+      "direction": "out",
+      "description": "Its records: each edge leaving it points names at the component at its end"
     }
   ],
+  "state": {
+    "health": {
+      "type": "map",
+      "initial": {},
+      "description": "By edge: whether its record is healthy, and its checks failed or passed in a row"
+    },
+    "answers": {
+      "type": "map",
+      "initial": {},
+      "description": "The resolver cache: by client and name, the address it answered and when that expires, in ms"
+    }
+  },
   "methods": {
     "public": {
-      "resolve": {}
+      "resolve": {
+        "errors": ["NXDOMAIN"],
+        "description": "{ name } → { name, address }, the component a healthy record points at"
+      }
     },
     "private": {
       "healthCheck": {},
