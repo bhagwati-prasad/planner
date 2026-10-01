@@ -491,12 +491,25 @@ export class Run {
   }
 
   /**
+   * Handles events as runToEnd does, and also until `until` holds after one, or before one that
+   * `before` holds for, as a breakpoint does (spec §13). It says why it stopped: `before`,
+   * `until`, `event` at `untilEvent`, `time` at `untilUs`, or `end` when no event is left.
+   * @param {{ maxEvents?: number, untilUs?: number, untilEvent?: number, until?: () => boolean, before?: (event: any) => boolean }} [limits]
+   * @returns {Promise<'before'|'until'|'event'|'time'|'end'>}
+   */
+  advance({ until, before, ...limits } = {}) {
+    return this.#run(limits, until, before)
+  }
+
+  /**
    * Handles events up to a limit, or until `stop` says so after one; moves the clock to `untilUs`
    * when no event is left before it; and takes a snapshot at the pause when the run is quiet.
    * @param {{ maxEvents?: number, untilUs?: number, untilEvent?: number }} limits
    * @param {() => boolean} [stop]
+   * @param {(event: any) => boolean} [before]  stops before an event it holds for
+   * @returns {Promise<'before'|'until'|'event'|'time'|'end'>}
    */
-  async #run({ maxEvents = 10_000_000, untilUs = Infinity, untilEvent = Infinity }, stop) {
+  async #run({ maxEvents = 10_000_000, untilUs = Infinity, untilEvent = Infinity }, stop, before) {
     const handlers = {
       deliver: (/** @type {any} */ e) => this.#deliver(this.#hop(e.message)),
       timer: (/** @type {any} */ e) => this.#timer(e),
@@ -507,8 +520,13 @@ export class Run {
       queueTimeout: (/** @type {any} */ e) => this.#giveUp(e.node, e.waiting),
     }
     await this.#begin()
-    let reachedTime = true
+    /** @type {'before'|'until'|'event'|'time'|'end'} */
+    let why = 'end'
     while (this.kernel.processed < untilEvent && this.kernel.nextUs <= untilUs) {
+      if (before?.(this.kernel.peek())) {
+        why = 'before'
+        break
+      }
       if (!this.kernel.step(handlers)) break
       if (this.#woken) await this.#settle()
       this.#mark()
@@ -517,14 +535,16 @@ export class Run {
       if (this.kernel.processed >= maxEvents)
         fail('INVALID', `The run stopped after ${maxEvents} events`)
       if (stop?.()) {
-        reachedTime = false
+        why = 'until'
         break
       }
     }
-    if (this.kernel.processed >= untilEvent) reachedTime = false
-    if (reachedTime && Number.isFinite(untilUs))
+    if (why === 'end' && this.kernel.processed >= untilEvent) why = 'event'
+    else if (why === 'end' && this.kernel.nextUs !== Infinity) why = 'time'
+    if ((why === 'end' || why === 'time') && Number.isFinite(untilUs))
       this.kernel.nowUs = Math.max(this.kernel.nowUs, untilUs)
     if (this.#quiet()) this.#snapshot()
+    return why
   }
 
   /**

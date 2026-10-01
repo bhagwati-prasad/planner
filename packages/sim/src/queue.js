@@ -86,6 +86,11 @@ export class EventQueue {
     return top
   }
 
+  /** The earliest event, left in the queue, or undefined when there is none. */
+  peek() {
+    return this.#heap[0]?.event
+  }
+
   /**
    * The queued events in order, with the insertion counter, for a snapshot (task 0413). The
    * entries are copies; their events are the queue's own.

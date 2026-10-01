@@ -53,6 +53,11 @@ export class Kernel {
     }
   }
 
+  /** The next event to handle, left in the queue, or undefined when there is none. */
+  peek() {
+    return this.#queue.peek()
+  }
+
   /**
    * The clock, the count of events handled and the queue, for a snapshot (task 0413).
    * @returns {{ nowUs: number, processed: number, entries: import('./queue.js').QueuedEvent<SimEvent>[], seq: number }}
