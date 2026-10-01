@@ -613,7 +613,7 @@ export class Run {
         })
       )
     servers.queue.push(work)
-    this.#gauge(node, 'backlog', servers.queue.length)
+    this.#waiting(node)
     const timeoutMs = this.#setting(node, 'timeout')
     if (Number.isFinite(timeoutMs) && timeoutMs > 0)
       this.kernel.schedule(Math.round(timeoutMs * 1000), {
@@ -647,7 +647,7 @@ export class Run {
   #admit(node, work) {
     const { servers } = node
     servers.busy++
-    this.#gauge(node, 'utilisation', servers.busy / this.#setting(node, 'count'))
+    this.#busy(node)
     if (this.nowUs > work.at) work.span.queuedUs = this.nowUs - work.at
     this.#start(node, work.span, work.respond, work.ownUs, call => {
       call.server = true
@@ -658,7 +658,7 @@ export class Run {
   /** Frees a server, and starts the calls waiting that now fit. @param {any} node */
   #release(node) {
     node.servers.busy--
-    this.#gauge(node, 'utilisation', node.servers.busy / this.#setting(node, 'count'))
+    this.#busy(node)
     this.#drain(node)
   }
 
@@ -667,7 +667,7 @@ export class Run {
     const { servers } = node
     while (servers?.queue.length && servers.busy < this.#setting(node, 'count')) {
       const work = servers.queue.shift()
-      this.#gauge(node, 'backlog', servers.queue.length)
+      this.#waiting(node)
       this.#admit(node, work)
     }
   }
@@ -678,12 +678,25 @@ export class Run {
     const at = servers.queue.indexOf(work)
     if (at < 0) return
     servers.queue.splice(at, 1)
-    this.#gauge(this.#nodes.get(id), 'backlog', servers.queue.length)
+    this.#waiting(this.#nodes.get(id))
     this.#refuse(
       work.span,
       work.respond,
       new CallError({ code: 'TIMEOUT', message: `${id} had no free server for its timeout` })
     )
+  }
+
+  /** Records a node's waiting calls: as `backlog`, or under the name its servers give them. @param {any} node */
+  #waiting(node) {
+    const { spec, queue } = node.servers
+    this.#gauge(node, spec.metrics?.waiting ?? 'backlog', queue.length)
+  }
+
+  /** Records a node's utilisation, and its busy servers under the name its servers give them. @param {any} node */
+  #busy(node) {
+    const { spec, busy } = node.servers
+    this.#gauge(node, 'utilisation', busy / this.#setting(node, 'count'))
+    if (spec.metrics?.busy) this.#gauge(node, spec.metrics.busy, busy)
   }
 
   /** Records a metric the run measures for a node. @param {any} node @param {string} name @param {number} value */

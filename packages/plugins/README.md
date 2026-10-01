@@ -20,7 +20,7 @@ Manifest validation, the in-house bundler and minifier, the component packer, an
 - **Plugin checks.** It adds what a packed plugin must also get right:
   - reserved `base:` ids;
   - templates and migrations that are lists of files and JavaScript modules;
-  - `servers` (ADR 0020): `count` is a list, and each entry is a number of 0 or more, a property, or a state field as `state.<name>` that the manifest declares (`E_MANIFEST_SERVERS`). A property the manifest does not declare is only a warning when it extends a type that may.
+  - `servers` (ADR 0020): `count` is a list, and each entry is a number of 0 or more, a property, or a state field as `state.<name>` that the manifest declares (`E_MANIFEST_SERVERS`). A property the manifest does not declare is only a warning when it extends a type that may. `metrics` may name only `busy` and `waiting`.
   - with `files`, that every file the manifest names is in the folder.
 - **Codes.** Each error carries an `E_MANIFEST_` code from `packages/core/src/errors/codes.js`, such as `E_MANIFEST_UNKNOWN_METHOD`.
 - **Warnings.** Warnings name unknown keys, missing units and missing icons.

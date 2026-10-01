@@ -26,8 +26,9 @@
  * The servers a node's public calls queue for (ADR 0020). Each entry names a property, or a
  * state field as `state.<name>`, or is a number. `count` multiplies its entries, and a node
  * that lacks one has no limit; `backlog` bounds the calls that wait (none: no bound); `timeout`
- * is how long, in ms, a call may wait (none: for ever).
- * @typedef {{ count: (string|number)[], backlog?: string|number, timeout?: string|number }} Servers
+ * is how long, in ms, a call may wait (none: for ever). `metrics` names the gauges of the busy and
+ * the waiting servers; the run records waiting calls as `backlog` without one.
+ * @typedef {{ count: (string|number)[], backlog?: string|number, timeout?: string|number, metrics?: { busy?: string, waiting?: string } }} Servers
  */
 
 /** @typedef {any} Msg @typedef {any} Ctx */

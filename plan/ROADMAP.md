@@ -105,7 +105,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0419 Starter library: serverless function](M04-simulation-core/0419-starter-function.md) (after 0409)
 - [x] [0420 Starter library: API gateway](M04-simulation-core/0420-starter-gateway.md) (after 0409)
 - [x] [0421 Starter library: load balancer](M04-simulation-core/0421-starter-load-balancer.md) (after 0420)
-- [ ] [0410 Starter library: relational DB](M04-simulation-core/0410-starter-relational-db.md) (after 0407)
+- [x] [0410 Starter library: relational DB](M04-simulation-core/0410-starter-relational-db.md) (after 0407)
 - [ ] [0422 Starter library: NoSQL DB](M04-simulation-core/0422-starter-nosql-db.md) (after 0410)
 - [ ] [0423 Starter library: cache](M04-simulation-core/0423-starter-cache.md) (after 0422)
 - [ ] [0424 Starter library: object storage](M04-simulation-core/0424-starter-object-storage.md) (after 0423)

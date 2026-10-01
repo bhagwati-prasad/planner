@@ -59,12 +59,13 @@ const SELF_DESCRIBING = new Set([
 /**
  * Checks a manifest's servers (ADR 0020): `count` is a list, and each entry is a number of 0 or
  * more, a property, or a state field as `state.<name>`. A property may come from the base type.
+ * `metrics` may name the gauges of its busy and waiting servers.
  * @param {Record<string, any>} m
  * @param {(code: 'E_MANIFEST_SERVERS', message: string) => void} error
  * @param {(message: string) => void} warn
  */
 function checkServers(m, error, warn) {
-  const { count = [], backlog, timeout } = m.servers
+  const { count = [], backlog, timeout, metrics = {} } = m.servers
   const fail = (/** @type {string} */ message) => error('E_MANIFEST_SERVERS', message)
   const list = Array.isArray(count)
   if (!list) fail('servers.count must be a list of properties, state fields or numbers')
@@ -75,6 +76,9 @@ function checkServers(m, error, warn) {
     [backlog, 'backlog'],
     [timeout, 'timeout'],
   ]
+  for (const [key, name] of Object.entries(metrics))
+    if (key !== 'busy' && key !== 'waiting') fail(`servers.metrics.${key} is not busy or waiting`)
+    else if (typeof name !== 'string' || !name) fail(`servers.metrics.${key} must be a metric name`)
   for (const [entry, key] of entries) {
     const where = `servers.${key}`
     const field = typeof entry === 'string' && entry.startsWith('state.')

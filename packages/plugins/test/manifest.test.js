@@ -113,6 +113,24 @@ describe('validateManifest', () => {
     )
   })
 
+  it('accepts servers that name their busy and waiting gauges, and fails other metrics', () => {
+    const manifest = specExample()
+    manifest.servers = {
+      count: ['capacity'],
+      metrics: { busy: 'activeConnections', waiting: 'waitingConnections' },
+    }
+    assert.deepEqual(validateManifest(manifest), [], 'ADR 0020 amendment')
+    manifest.servers.metrics = { busy: 3, queued: 'waiting' }
+    const found = errors(validateManifest(manifest))
+    assert.deepEqual(
+      found.map(p => p.code),
+      ['E_MANIFEST_SERVERS', 'E_MANIFEST_SERVERS']
+    )
+    const text = found.map(p => p.message).join('\n')
+    assert.match(text, /servers\.metrics\.busy must be a metric name/)
+    assert.match(text, /servers\.metrics\.queued is not busy or waiting/)
+  })
+
   it('fails templates that are not file lists and migrations that are not modules, without the folder', () => {
     const manifest = specExample()
     manifest.templates.docs = 'templates/runbook.md'

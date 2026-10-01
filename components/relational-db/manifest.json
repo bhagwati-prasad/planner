@@ -7,6 +7,7 @@
   "description": "A SQL database with connections, replicas and locks (PostgreSQL, MySQL, SQL Server).",
   "icon": "icon.svg",
   "extends": "base:store",
+  "entry": "index.js",
   "shape": "cylinder",
   "ports": [
     {
@@ -16,15 +17,113 @@
       "exposes": ["query", "insert", "update", "delete", "begin", "commit", "rollback"]
     }
   ],
+  "servers": {
+    "count": ["maxConnections"],
+    "metrics": { "busy": "activeConnections", "waiting": "waitingConnections" }
+  },
+  "state": {
+    "tables": {
+      "type": "map",
+      "initial": {},
+      "description": "By table, by id: each committed row, when it was committed in ms, and its size in bytes"
+    },
+    "replica": {
+      "type": "map",
+      "initial": {},
+      "description": "By table, by id: the rows the read replicas have applied"
+    },
+    "nextId": {
+      "type": "map",
+      "values": { "type": "integer" },
+      "initial": {},
+      "description": "By table: the last id it gave"
+    },
+    "transactions": {
+      "type": "map",
+      "initial": {},
+      "description": "By id: each open transaction, when it began in ms, and its writes"
+    },
+    "nextTx": { "type": "integer", "initial": 0 },
+    "locks": {
+      "type": "map",
+      "initial": {},
+      "description": "By table and row id: the transaction holding the row"
+    },
+    "waitsFor": {
+      "type": "map",
+      "initial": {},
+      "description": "By transaction: the transaction whose lock it waits for"
+    },
+    "replicatedUntil": {
+      "type": "number",
+      "initial": 0,
+      "description": "When the replicas apply the last write committed, in ms"
+    },
+    "storage": { "type": "number", "initial": 0, "description": "Bytes stored" },
+    "ioWindow": {
+      "type": "integer",
+      "initial": -1,
+      "description": "The second IOPS are counted in"
+    },
+    "ioUsed": { "type": "integer", "initial": 0, "description": "IOs used in that second" },
+    "availableAt": {
+      "type": "number",
+      "initial": 0,
+      "description": "When a failover in progress ends, in ms"
+    }
+  },
   "methods": {
     "public": {
-      "query": {},
-      "insert": {},
-      "update": {},
-      "delete": {},
-      "begin": {},
-      "commit": {},
-      "rollback": {}
+      "query": {
+        "errors": ["NO_TRANSACTION", "UNAVAILABLE"],
+        "description": "{ table, where?, limit?, tx?, primary? } → the rows whose columns equal where's"
+      },
+      "insert": {
+        "errors": [
+          "DUPLICATE_KEY",
+          "STORAGE_FULL",
+          "DEADLOCK",
+          "SERIALIZATION_FAILURE",
+          "LOCK_TIMEOUT",
+          "NO_TRANSACTION",
+          "UNAVAILABLE"
+        ],
+        "description": "{ table, row, tx? } → { id }"
+      },
+      "update": {
+        "errors": [
+          "DEADLOCK",
+          "SERIALIZATION_FAILURE",
+          "LOCK_TIMEOUT",
+          "NO_TRANSACTION",
+          "UNAVAILABLE"
+        ],
+        "description": "{ table, where, set, tx? } → { updated }"
+      },
+      "delete": {
+        "errors": [
+          "DEADLOCK",
+          "SERIALIZATION_FAILURE",
+          "LOCK_TIMEOUT",
+          "NO_TRANSACTION",
+          "UNAVAILABLE"
+        ],
+        "description": "{ table, where, tx? } → { deleted }"
+      },
+      "begin": {
+        "latency": 0,
+        "errors": ["UNAVAILABLE"],
+        "description": "{} → { tx }"
+      },
+      "commit": {
+        "errors": ["NO_TRANSACTION", "UNAVAILABLE"],
+        "description": "{ tx } → { committed }"
+      },
+      "rollback": {
+        "latency": 0,
+        "errors": ["NO_TRANSACTION", "UNAVAILABLE"],
+        "description": "{ tx } → { rolledBack }"
+      }
     },
     "private": {
       "acquireConnection": {},
