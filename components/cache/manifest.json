@@ -7,6 +7,7 @@
   "description": "An in-memory cache in front of an origin (Redis, Memcached).",
   "icon": "icon.svg",
   "extends": "base:cache",
+  "entry": "index.js",
   "shape": "component",
   "ports": [
     {
@@ -14,13 +15,40 @@
       "direction": "in",
       "accepts": [],
       "exposes": ["get", "set", "delete"]
+    },
+    {
+      "name": "origin",
+      "direction": "out",
+      "description": "Where write-through and write-around writes go, and write-back writes when evicted"
     }
   ],
+  "state": {
+    "entries": {
+      "type": "map",
+      "initial": {},
+      "description": "By key: its value, size, expiry in ms (null for none), last use, uses, and whether the origin lacks it"
+    },
+    "memory": {
+      "type": "number",
+      "initial": 0,
+      "description": "Bytes used, counting each replica"
+    },
+    "tick": { "type": "integer", "initial": 0, "description": "Counts uses, to order them" },
+    "lookups": { "type": "integer", "initial": 0 },
+    "hits": { "type": "integer", "initial": 0 }
+  },
   "methods": {
     "public": {
-      "get": {},
-      "set": {},
-      "delete": {}
+      "get": {
+        "description": "{ key } → its value, or null on a miss; without a key, a key drawn by access skew"
+      },
+      "set": {
+        "errors": ["ORIGIN_FAILED"],
+        "description": "{ key, value, ttl? } → null; ttl in ms over the cache's own"
+      },
+      "delete": {
+        "description": "{ key } → null"
+      }
     },
     "private": {
       "evict": {},
