@@ -20,6 +20,7 @@ Manifest validation, the in-house bundler and minifier, the component packer, an
 - **Plugin checks.** It adds what a packed plugin must also get right:
   - reserved `base:` ids;
   - templates and migrations that are lists of files and JavaScript modules;
+  - `servers` (ADR 0020): `count` is a list, and each entry is a number of 0 or more, a property, or a state field as `state.<name>` that the manifest declares (`E_MANIFEST_SERVERS`). A property the manifest does not declare is only a warning when it extends a type that may.
   - with `files`, that every file the manifest names is in the folder.
 - **Codes.** Each error carries an `E_MANIFEST_` code from `packages/core/src/errors/codes.js`, such as `E_MANIFEST_UNKNOWN_METHOD`.
 - **Warnings.** Warnings name unknown keys, missing units and missing icons.
@@ -36,12 +37,7 @@ Manifest validation, the in-house bundler and minifier, the component packer, an
 
   A declared method the behaviour leaves out is an error, or only a warning when the manifest extends a base type that may provide it.
 - **`checkModuleState(source, file)`** flags module-level mutable state in a module's source: a module-level `let` or `var`, or a module-level object, array, map or set that the module changes. One worker runs every instance of a component, so such state leaks between nodes.
-- **`createTestContext(options)`** gives component authors a `ctx` for unit tests, with no kernel:
-  - props start from the manifest's defaults, and state from its initial values;
-  - `ctx.call` runs the behaviour's private methods, and `ctx.send` answers from `replies`, by `'port.method'`, or by `'port'` for a send that names no method (ADR 0019);
-  - it records what a method sends and emits (with their protocol details, ADR 0019), calls, fails, measures, logs and schedules, as plain copies, and every state change with its path;
-  - `ctx.now` is a plain property, so a self-test can move the clock;
-  - setting a state field the manifest does not declare throws.
+- The test context for component self-tests, `createTestContext`, is in strata-sim beside `runComponent`, and `strata/testing` exports both (ADR 0017's amendment).
 
 ## Connection types
 

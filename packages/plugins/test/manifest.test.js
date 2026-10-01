@@ -85,6 +85,34 @@ describe('validateManifest', () => {
     assert.match(text, /methods\.private\.redeliver\.latency/)
   })
 
+  it('accepts servers that name properties, state fields or numbers, and fails others with E_MANIFEST_SERVERS', () => {
+    const manifest = specExample()
+    manifest.servers = { count: ['capacity', 2], backlog: 0, timeout: 'retention' }
+    assert.deepEqual(validateManifest(manifest), [], 'ADR 0020')
+    manifest.state.live = { type: 'integer', initial: 1 }
+    manifest.servers = { count: 'capacity', backlog: 'state.missing', timeout: -5 }
+    const found = errors(validateManifest(manifest))
+    assert.deepEqual(
+      found.map(p => p.code),
+      ['E_MANIFEST_SERVERS', 'E_MANIFEST_SERVERS', 'E_MANIFEST_SERVERS']
+    )
+    const text = found.map(p => p.message).join('\n')
+    assert.match(text, /servers\.count must be a list/)
+    assert.match(text, /servers\.backlog names 'state\.missing', which is not a state field/)
+    assert.match(text, /servers\.timeout must be a number of 0 or more/)
+    manifest.servers = { count: ['state.live', 'instances'] }
+    assert.deepEqual(
+      validateManifest(manifest).map(p => [p.level, p.message]),
+      [
+        [
+          'warning',
+          "servers.count[1] names 'instances', which this manifest does not declare; it must come from the base type",
+        ],
+      ],
+      'a property may come from the base type'
+    )
+  })
+
   it('fails templates that are not file lists and migrations that are not modules, without the folder', () => {
     const manifest = specExample()
     manifest.templates.docs = 'templates/runbook.md'

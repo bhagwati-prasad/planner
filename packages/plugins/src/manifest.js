@@ -28,6 +28,7 @@ export const MANIFEST_KEYS = Object.freeze([
   'state',
   'methods',
   'metrics',
+  'servers',
   'templates',
   'migrations',
   'author',
@@ -54,6 +55,41 @@ const SELF_DESCRIBING = new Set([
 /**
  * @typedef {import('./bundle.js').Problem} Problem
  */
+
+/**
+ * Checks a manifest's servers (ADR 0020): `count` is a list, and each entry is a number of 0 or
+ * more, a property, or a state field as `state.<name>`. A property may come from the base type.
+ * @param {Record<string, any>} m
+ * @param {(code: 'E_MANIFEST_SERVERS', message: string) => void} error
+ * @param {(message: string) => void} warn
+ */
+function checkServers(m, error, warn) {
+  const { count = [], backlog, timeout } = m.servers
+  const fail = (/** @type {string} */ message) => error('E_MANIFEST_SERVERS', message)
+  const list = Array.isArray(count)
+  if (!list) fail('servers.count must be a list of properties, state fields or numbers')
+  const entries = [
+    ...(list
+      ? count.map((/** @type {unknown} */ e, /** @type {number} */ i) => [e, `count[${i}]`])
+      : []),
+    [backlog, 'backlog'],
+    [timeout, 'timeout'],
+  ]
+  for (const [entry, key] of entries) {
+    const where = `servers.${key}`
+    const field = typeof entry === 'string' && entry.startsWith('state.')
+    if (entry === undefined || (typeof entry === 'number' && entry >= 0)) continue
+    if (typeof entry !== 'string')
+      fail(`${where} must be a number of 0 or more, a property or a state field`)
+    else if (field ? entry.slice(6) in (m.state ?? {}) : entry in (m.properties ?? {})) continue
+    else if (field) fail(`${where} names '${entry}', which is not a state field`)
+    else if (m.extends)
+      warn(
+        `${where} names '${entry}', which this manifest does not declare; it must come from the base type`
+      )
+    else fail(`${where} names '${entry}', which is not a property`)
+  }
+}
 
 /**
  * Checks a manifest. With `files` (the plugin folder's paths), also checks that the files it
@@ -136,6 +172,9 @@ export function validateManifest(manifest, { files, file = 'manifest.json' } = {
       } else if (!metric.unit) warn(`metrics.${key}: add a unit, e.g. "unit": "req/s"`)
     }
   }
+
+  if (m.servers && typeof m.servers === 'object') checkServers(m, error, warn)
+  else if (m.servers !== undefined) error('E_MANIFEST_SERVERS', 'servers must be an object')
 
   if (!m.extends && !m.entry && !m.abstract && kind === 'component') {
     warn(

@@ -69,6 +69,7 @@ components/
 - A `distribution` accepts constant, uniform, normal, exponential, lognormal (median + p99) or an empirical histogram.
 - State types add `queue`, `map`, `list` and `table`. Every state field has an initial value.
 - A method's `latency` is a distribution, or the name of a property that holds one.
+- An optional `servers` field gives the servers its public calls queue for (ADR 0020): `count` multiplies its entries, `backlog` bounds the calls waiting and `timeout` how long, in ms, each may wait. Each entry is a property, a state field as `state.<name>`, or a number, as in `{ "count": ["state.liveInstances", "concurrency"], "backlog": "maxBacklog" }`. A base type may give them instead; `base:service` takes `instances × concurrency`.
 - Roll-up rules are those in §7, plus plain `min` and `max`.
 
 ## Behaviour API
@@ -131,6 +132,7 @@ async placeOrder(msg, ctx) {
 | `ctx.emit(port, method, args, options?)` | Send without waiting for a response |
 | `ctx.fail(code, details)` | Return an error response |
 | `ctx.schedule(delay, name, data)` | Timers that call `onTimer` |
+| `await ctx.spend(dist)` | Wait that many ms, or a draw from a distribution, in simulated time, keeping the call's server (ADR 0021) |
 | `ctx.metric(name, value)`, `ctx.log(level, ...args)` | Metrics and per-component logs |
 
 Rules for behaviour code:

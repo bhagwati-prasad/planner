@@ -17,5 +17,4 @@ export {
   tokenize,
   validateBehaviour,
   checkModuleState,
-  createTestContext,
 } from '../../plugins/src/index.js'

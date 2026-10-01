@@ -24,6 +24,12 @@
  * A component that extends a base type gets its base behaviour (task 0407) under its own: the
  * base's state fields and methods, which its manifest and its entry override, and the base's
  * latency properties for methods its manifest gives no latency.
+ *
+ * A node with servers, from its manifest's `servers` or its base behaviour's (ADR 0020), admits
+ * each public call to a free server. When all are busy the call waits first in, first out; a full
+ * backlog refuses it with BACKLOG_FULL, and one that waits past the timeout gives up with
+ * TIMEOUT. A call holds its server until its response leaves. `ctx.spend` waits in simulated
+ * time (ADR 0021).
  */
 import {
   StrataError,
@@ -100,6 +106,7 @@ import { copy, initialState, stateView } from './state.js'
  * @property {string} [code]  the error code of a failed call
  * @property {string} [edge]  the edge a `send` span went over
  * @property {number} [attempt]  a `send` span's attempt, from 1
+ * @property {number} [queuedUs]  how long a public call waited for a server
  *
  * @typedef {{ code: string, message: string, details?: unknown }} ErrorBody
  *
@@ -134,6 +141,16 @@ function errorBody(node, err) {
   if (e instanceof StrataError || e instanceof CallError)
     return { code: e.code, message: e.message, details: e.details }
   return { code: 'E_METHOD_FAILED', message: `${node} threw: ${e?.message ?? String(e)}` }
+}
+
+/**
+ * A node's servers (ADR 0020): its manifest's, or its base behaviour's, with none busy and none
+ * waiting; null when it has neither.
+ * @param {any} manifest @param {import('./base.js').BaseBehaviour|null} base
+ */
+function serversOf(manifest, base) {
+  const spec = manifest.servers ?? base?.servers
+  return spec ? { spec, busy: 0, queue: [] } : null
 }
 
 /**
@@ -235,6 +252,8 @@ class Pending {
  * @property {boolean} done
  * @property {Span} span
  * @property {((ok: boolean, value: unknown, atUs: number) => void) | null} respond
+ * @property {any} node
+ * @property {boolean} server  whether it holds one of its node's servers
  *
  * @typedef {RunEdge & { props: EdgeProps, route: import('./route.js').Route, network: { nextU32(): number } }} Edge
  *
@@ -296,6 +315,7 @@ export class Run {
         strict,
         state: initialState(fields, n),
         composite: n.composite ?? null,
+        servers: serversOf(manifest, base),
         random: streams.stream(n.id),
         latency: streams.stream(`${n.id}:latency`),
       })
@@ -366,6 +386,9 @@ export class Run {
       timer: (/** @type {any} */ e) => this.#timer(e),
       timeout: (/** @type {any} */ e) => this.#timeout(e.attempt),
       retry: (/** @type {any} */ e) => this.#attempt(e.request, this.nowUs),
+      spent: (/** @type {any} */ e) => e.pending.settle(true, undefined),
+      release: (/** @type {any} */ e) => this.#release(this.#nodes.get(e.node)),
+      queueTimeout: (/** @type {any} */ e) => this.#giveUp(e.node, e.waiting),
     }
     if (!this.#started) {
       this.#started = true
@@ -446,14 +469,14 @@ export class Run {
       }
       const declared = node.manifest.methods.public[method]
       const cost = { latency: declared?.latency ?? baseLatency(node.base, method) }
-      return this.#start(node, span, respond, this.#latency(node, cost), call =>
+      return this.#serve(node, span, respond, this.#latency(node, cost), call =>
         fn.call(node.behaviour.public, msg, this.#context(node, call, span))
       )
     }
     // A black box without behaviour of its own answers from its contract: after the service
     // time the contract states, with no body.
     if (node.composite)
-      return this.#start(node, span, respond, contractUs(node.composite), () => null)
+      return this.#serve(node, span, respond, contractUs(node.composite), () => null)
     this.#refuse(
       span,
       respond,
@@ -512,7 +535,16 @@ export class Run {
    */
   #start(node, span, respond, ownUs, body) {
     /** @type {Call} */
-    const call = { busyUntil: this.nowUs, ownUs, waiting: 0, done: false, span, respond }
+    const call = {
+      busyUntil: this.nowUs,
+      ownUs,
+      waiting: 0,
+      done: false,
+      span,
+      respond,
+      node,
+      server: false,
+    }
     let out
     try {
       out = body(call)
@@ -544,9 +576,115 @@ export class Run {
       failed ? /** @type {ErrorBody} */ (body).code : undefined
     )
     call.respond?.(!failed, body, atUs)
+    // A call without a server may have grown a count counted from state.
+    if (!call.server) return this.#drain(call.node)
+    if (atUs > this.nowUs)
+      this.kernel.schedule(atUs - this.nowUs, { type: 'release', node: call.node.id })
+    else this.#release(call.node)
   }
 
-  /** @param {Span} span @param {Call['respond']} respond @param {StrataError} err */
+  /**
+   * Runs a public call on a free server of its node, queues it when all are busy, or refuses it
+   * when the backlog is full (ADR 0020). A node without servers runs every call at once.
+   * @param {any} node @param {Span} span @param {Call['respond']} respond @param {number} ownUs
+   * @param {(call: Call) => unknown} body
+   */
+  #serve(node, span, respond, ownUs, body) {
+    const servers = node.servers
+    if (!servers || this.#setting(node, 'count') === Infinity)
+      return this.#start(node, span, respond, ownUs, body)
+    const work = { span, respond, ownUs, body, at: this.nowUs }
+    if (!servers.queue.length && servers.busy < this.#setting(node, 'count'))
+      return this.#admit(node, work)
+    if (servers.queue.length >= this.#setting(node, 'backlog'))
+      return this.#refuse(
+        span,
+        respond,
+        new CallError({
+          code: 'BACKLOG_FULL',
+          message: `${node.id} has no free server and a full backlog`,
+        })
+      )
+    servers.queue.push(work)
+    this.#gauge(node, 'backlog', servers.queue.length)
+    const timeoutMs = this.#setting(node, 'timeout')
+    if (Number.isFinite(timeoutMs) && timeoutMs > 0)
+      this.kernel.schedule(Math.round(timeoutMs * 1000), {
+        type: 'queueTimeout',
+        node: node.id,
+        waiting: work,
+      })
+  }
+
+  /**
+   * A server setting of a node: its count (the product of its entries, when it has them all), its
+   * backlog or its timeout, or Infinity when it lacks one.
+   * @param {any} node @param {'count'|'backlog'|'timeout'} key
+   */
+  #setting(node, key) {
+    const spec = node.servers.spec
+    const entries = key === 'count' ? spec.count : spec[key] === undefined ? [] : [spec[key]]
+    const values = entries.map((/** @type {string|number} */ entry) =>
+      typeof entry === 'number'
+        ? entry
+        : entry.startsWith('state.')
+          ? node.state[entry.slice(6)]
+          : node.props[entry]
+    )
+    if (!values.length || values.some((/** @type {unknown} */ v) => typeof v !== 'number'))
+      return Infinity
+    return values.reduce((/** @type {number} */ a, /** @type {number} */ b) => a * b, 1)
+  }
+
+  /** Starts queued work on a free server. @param {any} node @param {any} work */
+  #admit(node, work) {
+    const { servers } = node
+    servers.busy++
+    this.#gauge(node, 'utilisation', servers.busy / this.#setting(node, 'count'))
+    if (this.nowUs > work.at) work.span.queuedUs = this.nowUs - work.at
+    this.#start(node, work.span, work.respond, work.ownUs, call => {
+      call.server = true
+      return work.body(call)
+    })
+  }
+
+  /** Frees a server, and starts the calls waiting that now fit. @param {any} node */
+  #release(node) {
+    node.servers.busy--
+    this.#gauge(node, 'utilisation', node.servers.busy / this.#setting(node, 'count'))
+    this.#drain(node)
+  }
+
+  /** Starts the calls waiting that fit on free servers. @param {any} node */
+  #drain(node) {
+    const { servers } = node
+    while (servers?.queue.length && servers.busy < this.#setting(node, 'count')) {
+      const work = servers.queue.shift()
+      this.#gauge(node, 'backlog', servers.queue.length)
+      this.#admit(node, work)
+    }
+  }
+
+  /** Gives up on a call that is still waiting at its timeout. @param {string} id @param {any} work */
+  #giveUp(id, work) {
+    const { servers } = this.#nodes.get(id)
+    const at = servers.queue.indexOf(work)
+    if (at < 0) return
+    servers.queue.splice(at, 1)
+    this.#gauge(this.#nodes.get(id), 'backlog', servers.queue.length)
+    this.#refuse(
+      work.span,
+      work.respond,
+      new CallError({ code: 'TIMEOUT', message: `${id} had no free server for its timeout` })
+    )
+  }
+
+  /** Records a metric the run measures for a node. @param {any} node @param {string} name @param {number} value */
+  #gauge(node, name, value) {
+    this.metrics.push({ atUs: this.nowUs, node: node.id, name, value })
+  }
+
+  /** @param {Span} span @param {Call['respond']} respond @param {StrataError|CallError} err */
   #refuse(span, respond, err) {
     const body = errorBody(span.node, err)
     this.#end(span, 'error', this.nowUs, body.code)
@@ -676,6 +814,15 @@ export class Run {
           traceId: span.traceId,
           parentSpanId: span.spanId,
         })
+      },
+      /** Waits `dist` ms, or a draw from it, in simulated time, holding the call's server (ADR 0021). */
+      spend: (/** @type {unknown} */ dist) => {
+        touch()
+        const ms = typeof dist === 'number' ? dist : sample(dist, node.latency.nextU32() / 2 ** 32)
+        const pending = new Pending(call, run)
+        const at = Math.max(call.busyUntil, run.nowUs) + Math.round(Math.max(0, ms) * 1000)
+        run.kernel.schedule(at - run.nowUs, { type: 'spent', pending })
+        return pending
       },
       metric: (/** @type {string} */ name, /** @type {number} */ value) => {
         touch()

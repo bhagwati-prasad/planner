@@ -1,18 +1,10 @@
 /**
  * The behaviour contract (spec §8 "Behaviour API", eng §10): the `ctx` a behaviour's methods
- * receive, checks of a behaviour module against its manifest and of its source for module-level
- * state, and a test context that records what methods do, so component authors can unit-test
- * them without the kernel.
+ * receive, and checks of a behaviour module against its manifest and of its source for
+ * module-level state. The test context that records what methods do, for component authors'
+ * unit tests, lives in strata-sim beside runComponent, since only Node uses either.
  */
-import {
-  StrataError,
-  createPrng,
-  defaultProps,
-  normalizeManifest,
-  quantile,
-  suggest,
-  validateValue,
-} from '../../core/src/index.js'
+import { suggest } from '../../core/src/index.js'
 import { tokenize } from './tokenize.js'
 
 /**
@@ -33,6 +25,8 @@ import { tokenize } from './tokenize.js'
  * @property {(code: string, details?: unknown) => Failure} fail  an error response, to return
  * @property {(delay: number, name: string, data?: unknown) => void} schedule  a timer that calls
  *   onTimer
+ * @property {(dist: unknown) => Promise<void>} spend  waits that many ms, or a draw from a
+ *   distribution, in simulated time, holding the call's server (ADR 0021)
  * @property {(name: string, value: number) => void} metric
  * @property {(level: string, ...args: unknown[]) => void} log
  *
@@ -53,19 +47,6 @@ import { tokenize } from './tokenize.js'
  * @property {(ctx: BehaviourContext) => void} [init]  runs after the initial state loads
  * @property {(timer: { name: string, data: unknown }, ctx: BehaviourContext) => void} [onTimer]
  * @property {(fault: unknown, ctx: BehaviourContext) => void} [onFault]
- *
- * What createTestContext records, on top of the context itself.
- * @typedef {BehaviourContext & {
- *   sent: { port: string, method: string, args: unknown }[],
- *   emitted: { port: string, method: string, args: unknown }[],
- *   calls: { name: string, args: unknown }[],
- *   failures: { code: string, details: unknown }[],
- *   metrics: { name: string, value: number }[],
- *   logs: { level: string, args: unknown[] }[],
- *   scheduled: { delay: number, name: string, data: unknown }[],
- *   changes: ({ op: 'set', path: (string|number)[], value: unknown } | { op: 'delete', path: (string|number)[] })[],
- *   snapshot: () => Record<string, any>,
- * }} TestContext
  *
  * @typedef {import('./bundle.js').Problem} Problem
  */
@@ -228,182 +209,4 @@ export function checkModuleState(source, file) {
       flag(tokens[at], `'${name}' is changed at line ${change.line}, but it is module-level`)
   }
   return problems.sort((a, b) => (a.line ?? 0) - (b.line ?? 0))
-}
-
-/**
- * A context for unit-testing a behaviour's methods without the kernel. Props start from the
- * manifest's defaults and state from its initial values; `ctx.call` runs the behaviour's
- * private methods; `ctx.send` and a missing private method answer from `replies`. It records
- * what the methods do: messages sent and emitted, calls, failures, metrics, logs, timers and
- * every state change, with its path. Setting a state field the manifest does not declare
- * throws, as development builds do.
- * @param {object} [options]
- * @param {unknown} [options.manifest]
- * @param {Behaviour} [options.behaviour]
- * @param {Record<string, unknown>} [options.props]  values as written, over the defaults
- * @param {Record<string, unknown>} [options.state]  fields over the initial values
- * @param {number} [options.now]  simulated time in ms
- * @param {number|string} [options.seed]
- * @param {Record<string, unknown>} [options.replies]  answers by 'port.method' for ctx.send (by
- *   'port' alone for a send that names no method, which calls the edge's method, ADR 0019), or
- *   by name for ctx.call: a value, or a function of the arguments
- * @returns {TestContext}
- * @example
- * const ctx = createTestContext({ manifest, behaviour, replies: { 'db.insert': { id: 7 } } })
- * await behaviour.public.placeOrder({ body: order }, ctx)
- * assert.deepEqual(ctx.sent, [{ port: 'db', method: 'insert', args: { table: 'orders', row: order } }])
- */
-export function createTestContext({
-  manifest,
-  behaviour,
-  props = {},
-  state = {},
-  now = 0,
-  seed = 1,
-  replies = {},
-} = {}) {
-  const m = manifest ? normalizeManifest(manifest) : null
-  const schemas = m?.properties ?? {}
-  /** @type {Record<string, { initial?: unknown }>|null} */
-  const fields = /** @type {any} */ (m)?.state ?? null
-  const prng = createPrng(seed)
-  /** @template T @param {T} value @returns {T} */
-  /**
-   * A deep copy, read through watched parts of state, as the run copies what leaves a method.
-   * @template T @param {T} value @returns {T}
-   */
-  const clone = value => {
-    if (typeof value !== 'object' || value === null) return value
-    const target = targets.get(value) ?? value
-    if (Array.isArray(target)) return /** @type {any} */ (target.map(clone))
-    const proto = Object.getPrototypeOf(target)
-    if (proto !== Object.prototype && proto !== null)
-      return /** @type {any} */ (structuredClone(target))
-    return /** @type {any} */ (
-      Object.fromEntries(Object.entries(target).map(([k, v]) => [k, clone(v)]))
-    )
-  }
-  /** @param {string} key @param {unknown} args */
-  const answer = (key, args) => {
-    const reply = replies[key]
-    return typeof reply === 'function' ? reply(args) : reply
-  }
-
-  /** @type {WeakMap<object, object>} proxy → the object it watches */
-  const targets = new WeakMap()
-  /** Replaces watched objects inside a value with the objects themselves. @param {any} value */
-  const unwrap = value => {
-    if (typeof value !== 'object' || value === null) return value
-    const target = targets.get(value)
-    if (target) return target
-    for (const key of Object.keys(value)) value[key] = unwrap(value[key])
-    return value
-  }
-  /** @param {any} target @param {(string|number)[]} path */
-  const watch = (target, path) => {
-    /** @param {string|symbol} key */
-    const at = key => [
-      ...path,
-      Array.isArray(target) && /^\d+$/.test(String(key)) ? Number(key) : String(key),
-    ]
-    const proxy = new Proxy(target, {
-      get(obj, key) {
-        const value = obj[key]
-        return typeof value === 'object' && value !== null && typeof key === 'string'
-          ? watch(value, at(key))
-          : value
-      },
-      set(obj, key, value) {
-        if (!path.length && fields && !(String(key) in fields))
-          throw new StrataError(
-            'E_BEHAVIOUR_UNDECLARED_STATE',
-            `state.${String(key)} is not declared in the manifest; declare it under state with a type and an initial value`
-          )
-        obj[key] = unwrap(value)
-        if (typeof key === 'string' && !(Array.isArray(obj) && key === 'length'))
-          ctx.changes.push({ op: 'set', path: at(key), value: clone(obj[key]) })
-        return true
-      },
-      deleteProperty(obj, key) {
-        delete obj[key]
-        if (typeof key === 'string') ctx.changes.push({ op: 'delete', path: at(key) })
-        return true
-      },
-    })
-    targets.set(proxy, target)
-    return proxy
-  }
-  const root = {
-    ...Object.fromEntries(Object.entries(fields ?? {}).map(([k, f]) => [k, clone(f.initial)])),
-    ...clone(state),
-  }
-
-  /** @type {TestContext} */
-  const ctx = {
-    props: {
-      ...defaultProps(schemas),
-      ...Object.fromEntries(
-        Object.entries(props).map(([k, v]) => [
-          k,
-          schemas[k] ? validateValue(schemas[k], v, `props.${k}`) : v,
-        ])
-      ),
-    },
-    get state() {
-      return watch(root, [])
-    },
-    now,
-    random: () => prng.next(),
-    sample: dist => (typeof dist === 'number' ? dist : quantile(dist, prng.next())),
-    call(name, args) {
-      ctx.calls.push({ name, args: clone(args) })
-      const method = behaviour?.private?.[name]
-      if (method) return method(args, ctx)
-      if (name in replies) return answer(name, args)
-      throw new StrataError(
-        'E_BEHAVIOUR_MISSING_METHOD',
-        `No private method '${name}' in the behaviour, and no reply for it in replies`
-      )
-    },
-    send(port, method, args, options) {
-      ctx.sent.push({
-        port,
-        method,
-        args: clone(args),
-        ...(options ? { options: clone(options) } : {}),
-      })
-      return Promise.resolve(answer(method == null ? port : `${port}.${method}`, args))
-    },
-    emit(port, method, args, options) {
-      ctx.emitted.push({
-        port,
-        method,
-        args: clone(args),
-        ...(options ? { options: clone(options) } : {}),
-      })
-    },
-    fail(code, details) {
-      ctx.failures.push({ code, details: clone(details) })
-      return { ok: false, code, details }
-    },
-    schedule(delay, name, data) {
-      ctx.scheduled.push({ delay, name, data: clone(data) })
-    },
-    metric(name, value) {
-      ctx.metrics.push({ name, value })
-    },
-    log(level, ...args) {
-      ctx.logs.push({ level, args: clone(args) })
-    },
-    sent: [],
-    emitted: [],
-    calls: [],
-    failures: [],
-    metrics: [],
-    logs: [],
-    scheduled: [],
-    changes: [],
-    snapshot: () => structuredClone(root),
-  }
-  return ctx
 }
