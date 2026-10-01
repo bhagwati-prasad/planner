@@ -7,6 +7,7 @@
   "description": "Issues and validates tokens (Auth0, Cognito, Keycloak, Entra ID).",
   "icon": "icon.svg",
   "extends": "base:service",
+  "entry": "index.js",
   "shape": "box",
   "ports": [
     {
@@ -17,14 +18,46 @@
     },
     {
       "name": "out",
-      "direction": "out"
+      "direction": "out",
+      "description": "Unused by its behaviour; for user stores and the like you model"
     }
   ],
+  "state": {
+    "tokens": {
+      "type": "map",
+      "initial": {},
+      "description": "By token: the subject of each live token, one neither expired nor revoked, and when it expires, in ms"
+    },
+    "sessions": {
+      "type": "map",
+      "initial": {},
+      "description": "By subject: its live tokens, and whether an MFA challenge is open"
+    },
+    "issued": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Tokens issued so far"
+    },
+    "window": {
+      "type": "map",
+      "initial": {},
+      "description": "The second requests are counted in, and how many it has accepted in it"
+    }
+  },
   "methods": {
     "public": {
-      "issueToken": {},
-      "validateToken": {},
-      "revoke": {}
+      "issueToken": {
+        "errors": ["TOO_MANY_REQUESTS", "MFA_REQUIRED"],
+        "description": "{ subject, otp? } → { token, subject, expiresAt }"
+      },
+      "validateToken": {
+        "errors": ["TOO_MANY_REQUESTS", "INVALID_TOKEN"],
+        "description": "{ token } → { active: true, subject, expiresAt }"
+      },
+      "revoke": {
+        "errors": ["TOO_MANY_REQUESTS"],
+        "description": "{ token } or { subject } → { revoked }, how many tokens it revoked"
+      }
     },
     "private": {
       "mfaChallenge": {}
