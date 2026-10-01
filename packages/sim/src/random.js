@@ -25,13 +25,18 @@ function splitmix32(seed) {
   }
 }
 
+/**
+ * A generator, whose position `save` returns and `load` puts back (task 0413).
+ * @typedef {{ nextU32: () => number, save: () => number[], load: (saved: number[]) => void }} Stream
+ */
+
 /** @param {number} x @param {number} k */
 const rotl = (x, k) => ((x << k) | (x >>> (32 - k))) >>> 0
 
 /**
  * A xoshiro128** generator.
  * @param {number} seed 32-bit seed, expanded through splitmix32
- * @returns {{ nextU32: () => number }}
+ * @returns {Stream}
  */
 export function xoshiro128ss(seed) {
   const init = splitmix32(seed)
@@ -55,6 +60,10 @@ export function xoshiro128ss(seed) {
       c >>>= 0
       return result
     },
+    save: () => [a, b, c, d],
+    load(/** @type {number[]} */ saved) {
+      ;[a, b, c, d] = saved
+    },
   }
 }
 
@@ -63,7 +72,7 @@ export function xoshiro128ss(seed) {
  * @param {number} seed the run seed
  */
 export function createStreams(seed) {
-  /** @type {Map<string, { nextU32: () => number }>} */
+  /** @type {Map<string, Stream>} */
   const streams = new Map()
   return {
     /** @param {string} key */

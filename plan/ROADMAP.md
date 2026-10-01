@@ -115,7 +115,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0427 Starter library: identity provider](M04-simulation-core/0427-starter-identity-provider.md) (after 0426)
 - [x] [0428 Starter library: client](M04-simulation-core/0428-starter-client.md) (after 0427)
 - [x] [0412 Scopes, stubs and inbound traffic](M04-simulation-core/0412-scope-stubs.md) (after 0406)
-- [ ] [0413 Snapshots, step units and time travel](M04-simulation-core/0413-snapshots-stepping.md) (after 0404)
+- [x] [0413 Snapshots, step units and time travel](M04-simulation-core/0413-snapshots-stepping.md) (after 0404)
 - [ ] [0414 Run lifecycle and controls](M04-simulation-core/0414-run-controls.md) (after 0413)
 - [ ] [0415 Editing a paused run and branch runs](M04-simulation-core/0415-edits-branches.md) (after 0414)
 - [ ] [0416 Breakpoints and inspection](M04-simulation-core/0416-breakpoints-inspection.md) (after 0414)
