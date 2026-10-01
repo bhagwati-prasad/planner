@@ -163,4 +163,17 @@ describe('createTestContext', () => {
     assert.deepEqual(ctx.scheduled, [{ delay: 250, name: 'retry', data: { id: 'a' } }])
     assert.deepEqual(ctx.logs, [{ level: 'warn', args: ['slow', 3] }])
   })
+
+  it('answers targets from its targets option, and records the edge a send names', async () => {
+    const target = { edge: 'e1', node: 'primary', weight: 1 }
+    const ctx = createTestContext({
+      manifest: MANIFEST,
+      targets: { db: [target] },
+      replies: { 'db.insert': { id: 1 } },
+    })
+    assert.deepEqual(ctx.targets('db'), [target])
+    assert.deepEqual(ctx.targets('events'), [], 'a port with no targets given has none')
+    assert.deepEqual(await ctx.send('db', 'insert', {}, { edge: 'e1' }), { id: 1 })
+    assert.deepEqual(ctx.sent.at(-1)?.options, { edge: 'e1' })
+  })
 })

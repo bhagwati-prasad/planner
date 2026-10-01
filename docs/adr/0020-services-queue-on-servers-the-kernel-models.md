@@ -36,4 +36,5 @@ Chosen option: 1, decided by the human on 2026-09-30, together with splitting ta
 
 - `count` multiplies its entries. A node lacking one of them, such as a `base:service` that sets no `concurrency`, has no limit, so it runs every call at once and records no server metrics.
 - A count may name a state field, so autoscaling can change it. A count that grows admits waiting calls when a server is released, or when any call or timer of the node ends, whichever comes first. The starter service's autoscale timer relies on this.
+- The serverless function (task 0419) does not use servers, though option 1 names it as an example. As the human decided on 2026-10-01, it throttles in its own code: with no backlog the kernel would refuse before the behaviour runs, so the function could neither answer `THROTTLED` nor report `throttles`.
 - `BACKLOG_FULL` and `TIMEOUT` are the codes a caller sees, as for a component's own `ctx.fail`. The manifest check reports a malformed `servers` field with `E_MANIFEST_SERVERS`, and warns when it names a property the manifest does not declare but its base type may.

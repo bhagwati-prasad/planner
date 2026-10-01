@@ -6,8 +6,12 @@
  * stub that answers from `replies`, as createTestContext's ctx.send does: by 'port.method', or by
  * 'port' for a send that names no method (ADR 0019). A reply is a value, or a function of the
  * body; a function that throws answers with a failure of the thrown `code` (FAILED without one).
+ * `edges` gives the edge from an out port its connection's properties, such as a latency, as a
+ * person writes them. `targets` puts several stubs behind one port, one per name, each answering
+ * by 'name.method' or 'name' before the port's replies (ADR 0022); a reply function gets the
+ * body and `{ node }`, the target's name. Their edges take `edges['port:name']` over `edges.port`.
  */
-import { normalizeManifest, validateValue } from '../../core/src/index.js'
+import { BUILTIN_MANIFESTS, normalizeManifest, validateValue } from '../../core/src/index.js'
 import { createRun } from './run.js'
 
 /**
@@ -23,44 +27,49 @@ import { createRun } from './run.js'
  */
 
 /**
- * A stub node that answers what reaches it from the component's port `port`.
- * @param {string} port @param {Record<string, unknown>} replies
+ * A stub node that answers what reaches it from the component's port `port`: by its own name's
+ * replies first, when it is one of the port's targets, then by the port's.
+ * @param {string} id @param {string} port @param {Record<string, unknown>} replies
+ * @param {string|null} [name]  its target name
  */
-function stub(port, replies) {
-  const prefix = `${port}.`
-  const named = Object.keys(replies)
-    .filter(key => key.startsWith(prefix))
-    .map(key => key.slice(prefix.length))
-  const methods = ['reply', ...named]
-  /** @param {string} key */
-  const answer = key => (/** @type {any} */ msg, /** @type {any} */ ctx) => {
-    const reply = replies[key]
+function stub(id, port, replies, name = null) {
+  const prefixes = name === null ? [port] : [name, port]
+  const methods = [
+    ...new Set([
+      'reply',
+      ...Object.keys(replies).flatMap(key =>
+        prefixes.filter(p => key.startsWith(`${p}.`)).map(p => key.slice(p.length + 1))
+      ),
+    ]),
+  ]
+  /** @param {string} method */
+  const answer = method => (/** @type {any} */ msg, /** @type {any} */ ctx) => {
+    const keys = prefixes.map(p => (method === 'reply' ? p : `${p}.${method}`))
+    const reply = replies[keys.find(key => key in replies) ?? '']
     try {
-      return typeof reply === 'function' ? reply(msg.body) : (reply ?? null)
+      return typeof reply === 'function' ? reply(msg.body, { node: id }) : (reply ?? null)
     } catch (err) {
       const { code, message } = /** @type {any} */ (err) ?? {}
       return ctx.fail(code ?? 'FAILED', { message })
     }
   }
   return {
-    id: `stub:${port}`,
+    id,
     manifest: {
       strataApi: '^1.0',
       id: 'strata.stub',
-      name: `Stub of ${port}`,
+      name: `Stub of ${id}`,
       version: '1.0.0',
       ports: [{ name: 'in', direction: 'in', exposes: methods, default: 'reply' }],
       methods: { public: Object.fromEntries(methods.map(m => [m, {}])) },
     },
-    behaviour: {
-      public: Object.fromEntries(methods.map(m => [m, answer(m === 'reply' ? port : prefix + m)])),
-    },
+    behaviour: { public: Object.fromEntries(methods.map(m => [m, answer(m)])) },
   }
 }
 
 /**
  * Runs one component in the kernel, with its out ports answered from `replies`.
- * @param {{ manifest: object, behaviour?: object, props?: Record<string, unknown>, state?: Record<string, unknown>, fixtures?: Record<string, { csv: string }>, seed?: number, replies?: Record<string, unknown> }} options
+ * @param {{ manifest: object, behaviour?: object, props?: Record<string, unknown>, state?: Record<string, unknown>, fixtures?: Record<string, { csv: string }>, seed?: number, replies?: Record<string, unknown>, edges?: Record<string, Record<string, unknown>>, targets?: Record<string, string[]> }} options
  * @returns {ComponentRun}
  * @example
  * const api = runComponent({ manifest, behaviour, props: { instances: 2, concurrency: 4 } })
@@ -75,18 +84,27 @@ export function runComponent({
   fixtures,
   seed = 1,
   replies = {},
+  edges = {},
+  targets = {},
 }) {
   const m = /** @type {any} */ (normalizeManifest(manifest))
-  const schemas = m.properties ?? {}
-  const canonical = Object.fromEntries(
-    Object.entries(props).map(([key, value]) => [
-      key,
-      schemas[key] ? validateValue(schemas[key], value, `props.${key}`) : value,
-    ])
-  )
-  const outs = m.ports
+  const connection = /** @type {any} */ (BUILTIN_MANIFESTS.find(t => t.id === 'base:connection'))
+  /** Values as written, in canonical units. @param {Record<string, unknown>} values @param {Record<string, any>} schemas @param {string} at */
+  const canonical = (values, schemas, at) =>
+    Object.fromEntries(
+      Object.entries(values).map(([key, value]) => [
+        key,
+        schemas[key] ? validateValue(schemas[key], value, `${at}.${key}`) : value,
+      ])
+    )
+  /** Each out port's stubs: one per target it names, or one for the port. */
+  const stubs = m.ports
     .filter((/** @type {any} */ p) => p.direction !== 'in')
-    .map((/** @type {any} */ p) => p.name)
+    .flatMap((/** @type {any} */ { name: port }) =>
+      targets[port]
+        ? targets[port].map(name => ({ port, name, id: name, edge: `${port}:${name}` }))
+        : [{ port, name: null, id: `stub:${port}`, edge: `stub:${port}` }]
+    )
   const run = createRun({
     seed,
     nodes: /** @type {any} */ ([
@@ -94,16 +112,21 @@ export function runComponent({
         id: 'it',
         manifest,
         behaviour,
-        props: canonical,
+        props: canonical(props, m.properties ?? {}, 'props'),
         ...(state ? { state } : {}),
         ...(fixtures ? { fixtures } : {}),
       },
-      ...outs.map((/** @type {string} */ port) => stub(port, replies)),
+      ...stubs.map(({ port, name, id }) => stub(id, port, replies, name)),
     ]),
-    edges: outs.map((/** @type {string} */ port) => ({
-      id: `stub:${port}`,
+    edges: stubs.map(({ port, id, edge }) => ({
+      id: edge,
       from: { node: 'it', port },
-      to: { node: `stub:${port}`, port: 'in' },
+      to: { node: id, port: 'in' },
+      props: canonical(
+        { ...edges[port], ...edges[edge] },
+        connection.properties,
+        `edges.${edges[edge] ? edge : port}`
+      ),
     })),
   })
   return {

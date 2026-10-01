@@ -7,22 +7,61 @@
   "description": "Spreads connections or requests across healthy targets (ALB, NLB, HAProxy, nginx).",
   "icon": "icon.svg",
   "extends": "base:proxy",
+  "entry": "index.js",
   "shape": "hexagon",
   "ports": [
     {
       "name": "in",
       "direction": "in",
       "accepts": ["http", "grpc", "websocket"],
-      "exposes": ["forward"]
+      "exposes": ["forward"],
+      "default": "forward"
     },
     {
       "name": "out",
       "direction": "out"
     }
   ],
+  "state": {
+    "health": {
+      "type": "map",
+      "initial": {},
+      "description": "By edge: whether its target is healthy, and its checks failed or passed in a row"
+    },
+    "active": {
+      "type": "map",
+      "values": { "type": "integer" },
+      "initial": {},
+      "description": "By edge: the requests open to its target"
+    },
+    "open": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Requests open through the balancer"
+    },
+    "cursor": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Where round-robin turns next"
+    },
+    "current": {
+      "type": "map",
+      "values": { "type": "number" },
+      "initial": {},
+      "description": "By edge: its current weight, for smooth weighted round-robin"
+    },
+    "affinity": {
+      "type": "map",
+      "initial": {},
+      "description": "By client: the edge it sticks to, and when it last sent, in ms"
+    }
+  },
   "methods": {
     "public": {
-      "forward": {}
+      "forward": {
+        "errors": ["CONNECTION_REJECTED", "NO_HEALTHY_TARGET", "BAD_GATEWAY"],
+        "description": "Sends a request on to the healthy target its algorithm picks"
+      }
     },
     "private": {
       "pickTarget": {},

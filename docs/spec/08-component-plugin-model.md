@@ -128,7 +128,8 @@ async placeOrder(msg, ctx) {
 | `ctx.state` | This instance's typed state; every change is recorded for the debugger |
 | `ctx.now`, `ctx.random()`, `ctx.sample(dist)` | Simulated clock and seeded randomness |
 | `ctx.call(name, args)` | Call a private method; appears as a child span |
-| `ctx.send(port, method, args, options?)` | Call a public method on the component across a port's edge; resolves when the response arrives in simulated time. `options` sets the message's `path`, `headers` and `sizeBytes`, which the receiver reads on `msg` and route rules match (ADR 0019) |
+| `ctx.send(port, method, args, options?)` | Call a public method on the component across a port's edge; resolves when the response arrives in simulated time. `options` sets the message's `path`, `headers` and `sizeBytes`, which the receiver reads on `msg` and route rules match (ADR 0019), and may name the `edge` to send over, skipping route rules (ADR 0022) |
+| `ctx.targets(port)` | The edges leaving a port, in a stable order, as `{ edge, node, weight }`, so a component such as a load balancer can choose its target (ADR 0022) |
 | `ctx.emit(port, method, args, options?)` | Send without waiting for a response |
 | `ctx.fail(code, details)` | Return an error response |
 | `ctx.schedule(delay, name, data)` | Timers that call `onTimer` |
@@ -138,7 +139,7 @@ async placeOrder(msg, ctx) {
 Rules for behaviour code:
 
 - Hooks are `public`, `private`, `init` (runs after initial state loads), `onTimer` and `onFault`.
-- Methods may be `async`, but may await only promises returned by `ctx`. The kernel resolves them in event order, which keeps runs deterministic.
+- Methods may be `async`, but may await only promises returned by `ctx`, or `Promise.all`, `Promise.allSettled` or `Promise.race` of them. The kernel resolves them in event order, which keeps runs deterministic. Racing a reply against `ctx.spend` gives a method its own timeout.
 - Built-in base behaviours implement state, public methods and cost models for common kinds without code: `base:client`, `base:service`, `base:queue`, `base:topic`, `base:store`, `base:cache`, `base:proxy`, `base:timer`, `base:external` and `base:system`. A manifest with `extends` and no `entry` is fully declarative; with an `entry`, its methods override or add to the base.
 
 ## Packed bundle

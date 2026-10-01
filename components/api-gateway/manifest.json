@@ -7,22 +7,55 @@
   "description": "The front door for APIs: routing, authentication, rate limits and caching.",
   "icon": "icon.svg",
   "extends": "base:proxy",
+  "entry": "index.js",
   "shape": "hexagon",
   "ports": [
     {
       "name": "in",
       "direction": "in",
       "accepts": ["http", "grpc", "websocket"],
-      "exposes": ["forward"]
+      "exposes": ["forward"],
+      "default": "forward"
     },
     {
       "name": "out",
       "direction": "out"
     }
   ],
+  "state": {
+    "buckets": {
+      "type": "map",
+      "initial": {},
+      "description": "By key: the tokens its rate-limit bucket holds, and when they were counted, in ms"
+    },
+    "cache": {
+      "type": "map",
+      "initial": {},
+      "description": "By path: a cached response body, and when it was cached, in ms"
+    },
+    "cacheLookups": {
+      "type": "integer",
+      "initial": 0
+    },
+    "cacheHits": {
+      "type": "integer",
+      "initial": 0
+    }
+  },
   "methods": {
     "public": {
-      "forward": {}
+      "forward": {
+        "latency": 0,
+        "errors": [
+          "NO_ROUTE",
+          "PAYLOAD_TOO_LARGE",
+          "AUTH_FAILED",
+          "THROTTLED",
+          "GATEWAY_TIMEOUT",
+          "BAD_GATEWAY"
+        ],
+        "description": "Checks a request, then answers it from the cache or forwards it on out with its path and headers"
+      }
     },
     "private": {
       "authenticate": {},

@@ -28,3 +28,8 @@ Chosen option: 1, decided by the human on 2026-09-30. It is the smallest additio
 - Good: the service's endpoints each take their own service time, and any component can model variable work.
 - Bad: the behaviour API grows by one member, which spec §8's table lists.
 - Follow-up tasks: 0409 (the service's endpoints), and `strata validate` accepts `await ctx.spend(…)` like `await ctx.send(…)`.
+
+## Amendment, 2026-10-01
+
+Task 0420's gateway must answer at its request timeout while its upstream still works, and task 0421's load balancer needs a timeout for its health checks. A method cannot do that by awaiting one promise at a time. The human decided that behaviour code may also await `Promise.race` of ctx promises, as it already may await `Promise.all` and `Promise.allSettled` of them. `await Promise.race([ctx.send(…), ctx.spend(timeout)])` resolves when the first of them settles. Both are settled by kernel events, so the race stays deterministic. The loser settles later, unobserved. `strata validate` accepts it, and spec §8 and eng §10 say so.
+

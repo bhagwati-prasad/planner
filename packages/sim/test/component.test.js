@@ -70,3 +70,50 @@ it('runs one component in the kernel, with its out ports answered from replies',
     'the run’s metrics'
   )
 })
+
+it('gives the edge from each out port the connection properties a test writes', async () => {
+  const api = runComponent({
+    manifest,
+    behaviour: {
+      public: {
+        work: (/** @type {any} */ msg, /** @type {any} */ ctx) => ctx.send('out', null, msg.body),
+      },
+    },
+    props: { serviceTime: 0 },
+    replies: { out: (/** @type {any} */ body) => `stub: ${body}` },
+    edges: { out: { latency: 50 } },
+  })
+  const reply = api.call('work', 'a')
+  await api.runUntil(1000)
+  assert.deepEqual([reply.body, reply.atUs], ['stub: a', 100 * MS], '50 ms each way')
+})
+
+it('puts a stub behind each target a test names, answering by target before port', async () => {
+  const api = runComponent({
+    manifest,
+    behaviour: {
+      public: {
+        async work(/** @type {any} */ msg, /** @type {any} */ ctx) {
+          const targets = ctx.targets('out')
+          const replies = []
+          for (const t of targets)
+            replies.push(await ctx.send('out', 'get', msg.body, { edge: t.edge }))
+          return { nodes: targets.map((/** @type {any} */ t) => t.node), replies }
+        },
+      },
+    },
+    props: { serviceTime: 0 },
+    targets: { out: ['a', 'b'] },
+    replies: {
+      'a.get': 'from a',
+      'out.get': (/** @type {any} */ body, /** @type {any} */ { node }) => `${node}: ${body}`,
+    },
+    edges: { 'out:b': { latency: 10 } },
+  })
+  const reply = api.call('work', 'x')
+  await api.runUntil(1000)
+  assert.deepEqual(
+    [reply.body, reply.atUs],
+    [{ nodes: ['a', 'b'], replies: ['from a', 'b: x'] }, 20 * MS]
+  )
+})

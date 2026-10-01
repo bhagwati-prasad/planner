@@ -7,6 +7,7 @@
   "description": "Code that runs per invocation with cold starts and concurrency limits (Lambda, Cloud Functions).",
   "icon": "icon.svg",
   "extends": "base:service",
+  "entry": "index.js",
   "shape": "box",
   "ports": [
     {
@@ -20,9 +21,25 @@
       "direction": "out"
     }
   ],
+  "state": {
+    "running": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Executions running now: the concurrency in use"
+    },
+    "idle": {
+      "type": "list",
+      "items": { "type": "number" },
+      "initial": [],
+      "description": "The warm instances not running, as when each last finished, in ms"
+    }
+  },
   "methods": {
     "public": {
-      "invoke": {}
+      "invoke": {
+        "errors": ["THROTTLED", "TIMEOUT", "DEPENDENCY_FAILED"],
+        "description": "Runs once, on a warm instance or after a cold start, then makes its calls"
+      }
     },
     "private": {
       "coldStart": {},
@@ -52,7 +69,8 @@
       "unit": "executions",
       "default": 0,
       "min": 0,
-      "group": "Concurrency"
+      "group": "Concurrency",
+      "description": "When above 0, caps concurrency in place of maxConcurrency"
     },
     "executionTime": {
       "type": "distribution",
@@ -63,6 +81,13 @@
         "p99": 300
       },
       "group": "Performance"
+    },
+    "calls": {
+      "type": "list",
+      "items": { "type": "string" },
+      "default": [],
+      "group": "Performance",
+      "description": "Downstream calls each invocation makes in order after its execution time, as port or port.method"
     },
     "coldStartProbability": {
       "type": "percent",

@@ -30,6 +30,8 @@ import {
  * @property {(port: string, method: string|null, args?: unknown, options?: object) => Promise<any>} send
  *   answers from `replies`
  * @property {(port: string, method: string|null, args?: unknown, options?: object) => void} emit
+ * @property {(port: string) => { edge: string, node: string, weight: number }[]} targets  the
+ *   edges leaving a port, from the `targets` option (ADR 0022)
  * @property {(code: string, details?: unknown) => { ok: false, code: string, details: unknown }} fail
  * @property {(delay: number, name: string, data?: unknown) => void} schedule
  * @property {(dist: unknown) => Promise<void>} spend
@@ -64,6 +66,8 @@ import {
  * @param {Record<string, unknown>} [options.replies]  answers by 'port.method' for ctx.send (by
  *   'port' alone for a send that names no method, which calls the edge's method, ADR 0019), or
  *   by name for ctx.call: a value, or a function of the arguments
+ * @param {Record<string, { edge: string, node: string, weight: number }[]>} [options.targets]
+ *   what ctx.targets answers, by port (ADR 0022)
  * @returns {TestContext}
  * @example
  * const ctx = createTestContext({ manifest, behaviour, replies: { 'db.insert': { id: 7 } } })
@@ -78,6 +82,7 @@ export function createTestContext({
   now = 0,
   seed = 1,
   replies = {},
+  targets: edgesOut = {},
 } = {}) {
   const m = manifest ? normalizeManifest(manifest) : null
   const schemas = m?.properties ?? {}
@@ -190,6 +195,7 @@ export function createTestContext({
       })
       return Promise.resolve(answer(method == null ? port : `${port}.${method}`, args))
     },
+    targets: port => clone(edgesOut[port] ?? []),
     emit(port, method, args, options) {
       ctx.emitted.push({
         port,

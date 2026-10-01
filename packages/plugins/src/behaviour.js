@@ -22,6 +22,8 @@ import { tokenize } from './tokenize.js'
  *   resolves when the response arrives in simulated time
  * @property {(port: string, method: string|null, args?: unknown, options?: SendOptions) => void} emit
  *   sends without waiting
+ * @property {(port: string) => { edge: string, node: string, weight: number }[]} targets  the
+ *   edges leaving a port, in a stable order (ADR 0022)
  * @property {(code: string, details?: unknown) => Failure} fail  an error response, to return
  * @property {(delay: number, name: string, data?: unknown) => void} schedule  a timer that calls
  *   onTimer
@@ -34,6 +36,7 @@ import { tokenize } from './tokenize.js'
  * @property {string} [path]
  * @property {Record<string, string>} [headers]
  * @property {number} [sizeBytes]
+ * @property {string} [edge]  the edge leaving the port to send over, skipping route rules (ADR 0022)
  *
  * @typedef {{ ok: false, code: string, details: unknown }} Failure  what ctx.fail returns
  * @typedef {(input: any, ctx: BehaviourContext) => any} Method  a public method gets the request

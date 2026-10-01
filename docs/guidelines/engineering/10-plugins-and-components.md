@@ -21,7 +21,7 @@ These rules apply to built-in components and are published to external component
 - Declare every state field with a type and an initial value. Code must not add undeclared fields; development builds reject them.
 - Declare every public method with input and output schemas, errors and a cost model. A public method's return value is its response; errors go through `ctx.fail(code, details)`.
 - Put internal operations under `private` and call them only with `ctx.call`. Declare a private method in the manifest when it has its own latency or should appear by name in docs.
-- Methods may be `async`, but may await only promises returned by `ctx`. Awaiting anything else breaks determinism, and `strata validate` flags it.
+- Methods may be `async`, but may await only promises returned by `ctx`, or `Promise.all`, `Promise.allSettled` or `Promise.race` of them. Awaiting anything else breaks determinism, and `strata validate` flags it.
 - List on each port the public methods it exposes (`exposes`). A port with no exposed methods only sends.
 
 ## Behaviour code
