@@ -7,6 +7,7 @@
   "description": "Durable blob storage addressed by key (S3, GCS, Azure Blob).",
   "icon": "icon.svg",
   "extends": "base:store",
+  "entry": "index.js",
   "shape": "cylinder",
   "ports": [
     {
@@ -16,12 +17,41 @@
       "exposes": ["put", "get", "delete", "list"]
     }
   ],
+  "state": {
+    "objects": {
+      "type": "map",
+      "initial": {},
+      "description": "By key: its body, size in bytes, storage class, and when it was put in ms"
+    },
+    "windows": {
+      "type": "map",
+      "initial": {},
+      "description": "By prefix: the second its requests are counted in, and how many it has served in it"
+    },
+    "stored": { "type": "number", "initial": 0, "description": "Bytes stored" }
+  },
   "methods": {
     "public": {
-      "put": {},
-      "get": {},
-      "delete": {},
-      "list": {}
+      "put": {
+        "latency": 0,
+        "errors": ["THROTTLED", "UNAVAILABLE"],
+        "description": "{ key, body?, storageClass? } → { key, size }"
+      },
+      "get": {
+        "latency": 0,
+        "errors": ["NO_SUCH_KEY", "ARCHIVED", "THROTTLED", "UNAVAILABLE"],
+        "description": "{ key } → its body"
+      },
+      "delete": {
+        "latency": 0,
+        "errors": ["THROTTLED", "UNAVAILABLE"],
+        "description": "{ key } → null"
+      },
+      "list": {
+        "latency": 0,
+        "errors": ["THROTTLED", "UNAVAILABLE"],
+        "description": "{ prefix } → the objects under it, as { key, size, storageClass }"
+      }
     },
     "private": {
       "throttle": {},
