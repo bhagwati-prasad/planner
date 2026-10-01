@@ -42,8 +42,8 @@ export function checkIconRules(svg, file = 'icon.svg') {
 /**
  * Flags each `await` in behaviour code whose operand is not a promise from ctx (eng §10): the
  * kernel resolves ctx's promises in event order, which keeps runs deterministic, and anything
- * else resolves on the real clock. `Promise.all` and `Promise.allSettled` of ctx promises are
- * allowed. Awaiting a variable that holds a ctx promise is flagged too; await the call itself.
+ * else resolves on the real clock. `Promise.all`, `Promise.allSettled` and `Promise.race` of ctx
+ * promises are allowed. Awaiting a variable that holds a ctx promise is flagged too; await the call itself.
  * @param {string} source a module as written
  * @param {string} file
  * @returns {Problem[]}
@@ -62,7 +62,7 @@ export function checkAwaits(source, file) {
     const [a, b, c] = [tokens[i + 1], tokens[i + 2], tokens[i + 3]]
     const fromCtx = a?.value === 'ctx' && b?.value === '.'
     const combined =
-      a?.value === 'Promise' && b?.value === '.' && /^all(Settled)?$/.test(c?.value ?? '')
+      a?.value === 'Promise' && b?.value === '.' && /^(all(Settled)?|race)$/.test(c?.value ?? '')
     if (fromCtx || combined) continue
     problems.push({
       level: 'error',

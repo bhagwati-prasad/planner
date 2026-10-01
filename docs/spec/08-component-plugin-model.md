@@ -138,7 +138,7 @@ async placeOrder(msg, ctx) {
 Rules for behaviour code:
 
 - Hooks are `public`, `private`, `init` (runs after initial state loads), `onTimer` and `onFault`.
-- Methods may be `async`, but may await only promises returned by `ctx`. The kernel resolves them in event order, which keeps runs deterministic.
+- Methods may be `async`, but may await only promises returned by `ctx`, or `Promise.all`, `Promise.allSettled` or `Promise.race` of them. The kernel resolves them in event order, which keeps runs deterministic. Racing a reply against `ctx.spend` gives a method its own timeout.
 - Built-in base behaviours implement state, public methods and cost models for common kinds without code: `base:client`, `base:service`, `base:queue`, `base:topic`, `base:store`, `base:cache`, `base:proxy`, `base:timer`, `base:external` and `base:system`. A manifest with `extends` and no `entry` is fully declarative; with an `entry`, its methods override or add to the base.
 
 ## Packed bundle

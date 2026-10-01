@@ -6,8 +6,10 @@
  * stub that answers from `replies`, as createTestContext's ctx.send does: by 'port.method', or by
  * 'port' for a send that names no method (ADR 0019). A reply is a value, or a function of the
  * body; a function that throws answers with a failure of the thrown `code` (FAILED without one).
+ * `edges` gives the edge from an out port its connection's properties, such as a latency, as a
+ * person writes them.
  */
-import { normalizeManifest, validateValue } from '../../core/src/index.js'
+import { BUILTIN_MANIFESTS, normalizeManifest, validateValue } from '../../core/src/index.js'
 import { createRun } from './run.js'
 
 /**
@@ -60,7 +62,7 @@ function stub(port, replies) {
 
 /**
  * Runs one component in the kernel, with its out ports answered from `replies`.
- * @param {{ manifest: object, behaviour?: object, props?: Record<string, unknown>, state?: Record<string, unknown>, fixtures?: Record<string, { csv: string }>, seed?: number, replies?: Record<string, unknown> }} options
+ * @param {{ manifest: object, behaviour?: object, props?: Record<string, unknown>, state?: Record<string, unknown>, fixtures?: Record<string, { csv: string }>, seed?: number, replies?: Record<string, unknown>, edges?: Record<string, Record<string, unknown>> }} options
  * @returns {ComponentRun}
  * @example
  * const api = runComponent({ manifest, behaviour, props: { instances: 2, concurrency: 4 } })
@@ -75,15 +77,18 @@ export function runComponent({
   fixtures,
   seed = 1,
   replies = {},
+  edges = {},
 }) {
   const m = /** @type {any} */ (normalizeManifest(manifest))
-  const schemas = m.properties ?? {}
-  const canonical = Object.fromEntries(
-    Object.entries(props).map(([key, value]) => [
-      key,
-      schemas[key] ? validateValue(schemas[key], value, `props.${key}`) : value,
-    ])
-  )
+  const connection = /** @type {any} */ (BUILTIN_MANIFESTS.find(t => t.id === 'base:connection'))
+  /** Values as written, in canonical units. @param {Record<string, unknown>} values @param {Record<string, any>} schemas @param {string} at */
+  const canonical = (values, schemas, at) =>
+    Object.fromEntries(
+      Object.entries(values).map(([key, value]) => [
+        key,
+        schemas[key] ? validateValue(schemas[key], value, `${at}.${key}`) : value,
+      ])
+    )
   const outs = m.ports
     .filter((/** @type {any} */ p) => p.direction !== 'in')
     .map((/** @type {any} */ p) => p.name)
@@ -94,7 +99,7 @@ export function runComponent({
         id: 'it',
         manifest,
         behaviour,
-        props: canonical,
+        props: canonical(props, m.properties ?? {}, 'props'),
         ...(state ? { state } : {}),
         ...(fixtures ? { fixtures } : {}),
       },
@@ -104,6 +109,7 @@ export function runComponent({
       id: `stub:${port}`,
       from: { node: 'it', port },
       to: { node: `stub:${port}`, port: 'in' },
+      props: canonical(edges[port] ?? {}, connection.properties, `edges.${port}`),
     })),
   })
   return {

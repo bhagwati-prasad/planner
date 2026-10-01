@@ -17,7 +17,7 @@ The `strata` command: `new component`, `pack`, `validate`, `test-component`, `se
   - the manifest;
   - the icon rules of design system §13: a `0 0 24 24` viewBox, vector paths only with no raster image or script, and under 4 KB;
   - the behaviour contract: hooks, and public methods as the manifest declares them;
-  - determinism: module-level mutable state, and awaits on anything but a promise from `ctx`, with the file and line.
+  - determinism: module-level mutable state, and awaits on anything but a promise from `ctx` (or `Promise.all`, `Promise.allSettled` or `Promise.race` of them), with the file and line.
 - **`strata test-component <dir>`** loads the behaviour in a sandbox, checks it against the manifest, and runs `tests/*.test.js` with `node --test`. Self-tests import the test context, or `runComponent` to run the component in the kernel with simulated time and servers (ADR 0020), as `strata/testing`. Both come from strata-sim, which the CLI may import in Node (eng §6):
 
   ```js
