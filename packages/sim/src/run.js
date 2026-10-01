@@ -30,6 +30,9 @@
  * backlog refuses it with BACKLOG_FULL, and one that waits past the timeout gives up with
  * TIMEOUT. A call holds its server until its response leaves. `ctx.spend` waits in simulated
  * time (ADR 0021).
+ *
+ * `ctx.targets(port)` lists the edges leaving a port, and a send that names one of them as its
+ * `edge` goes over it, skipping the route rules, so a component can choose its target (ADR 0022).
  */
 import {
   StrataError,
@@ -91,6 +94,10 @@ import { copy, initialState, stateView } from './state.js'
  * @property {string} [path]
  * @property {Record<string, string>} [headers]
  * @property {number} [sizeBytes]  its size, over the edge's payloadSize
+ * @property {string} [edge]  the edge leaving the port to send over, skipping route rules (ADR 0022)
+ *
+ * @typedef {{ edge: string, node: string, weight: number }} Target  an edge leaving a port, the
+ *   component at its end and its route weight (ADR 0022)
  *
  * @typedef {object} Span  a method call in the trace (OpenTelemetry's shape, spec §11)
  * @property {string} spanId
@@ -785,6 +792,8 @@ export class Run {
         /** @type {unknown} */ args,
         /** @type {SendOptions} */ options
       ) => (touch(), run.#send(node, call, span, port, method, args, true, options)),
+      /** The edges leaving a port, in the order the run was given them (ADR 0022). */
+      targets: (/** @type {string} */ port) => (touch(), run.#targets(node, port)),
       emit: (
         /** @type {string} */ port,
         /** @type {string} */ method,
@@ -867,10 +876,8 @@ export class Run {
    * @param {SendOptions} [options]
    */
   #send(node, call, span, portName, method, body, wait, options = {}) {
-    if (!node.manifest.ports.some((/** @type {any} */ p) => p.name === portName))
-      throw new StrataError('E_PORT_NOT_FOUND', `${node.id} has no port '${portName}'`)
     const port =
-      this.#leaving(`${node.id}.${portName}`) ??
+      this.#port(node, portName) ??
       fail('E_SIM_NO_EDGE', `Port '${portName}' of ${node.id} has no edge to send over`)
     const message = {
       kind: wait ? 'request' : 'event',
@@ -883,11 +890,17 @@ export class Run {
       sizeBytes: options.sizeBytes,
     }
     const edge =
-      pickEdge(port.edges, message, () => port.random.nextU32() / 2 ** 32) ??
-      fail(
-        'E_SIM_NO_ROUTE',
-        `No edge leaving port '${portName}' of ${node.id} carries '${method}'${message.path ? ` to ${message.path}` : ''}; check the edges' route rules`
-      )
+      options.edge != null
+        ? (port.edges.find((/** @type {Edge} */ e) => e.id === options.edge) ??
+          fail(
+            'E_SIM_EDGE_NOT_FOUND',
+            `Edge '${options.edge}' does not leave port '${portName}' of ${node.id}`
+          ))
+        : (pickEdge(port.edges, message, () => port.random.nextU32() / 2 ** 32) ??
+          fail(
+            'E_SIM_NO_ROUTE',
+            `No edge leaving port '${portName}' of ${node.id} carries '${method}'${message.path ? ` to ${message.path}` : ''}; check the edges' route rules`
+          ))
     Object.assign(message, {
       // A message that names no method calls the edge's (ADR 0019).
       method: method ?? edge.method ?? undefined,
@@ -907,6 +920,29 @@ export class Run {
     const request = { node: node.id, edge, message, pending: new Pending(call, this), attempts: 0 }
     this.#attempt(request, departs)
     return request.pending
+  }
+
+  /**
+   * A node's port and the edges leaving it, or undefined when none do.
+   * @param {any} node @param {string} portName
+   */
+  #port(node, portName) {
+    if (!node.manifest.ports.some((/** @type {any} */ p) => p.name === portName))
+      throw new StrataError('E_PORT_NOT_FOUND', `${node.id} has no port '${portName}'`)
+    return this.#leaving(`${node.id}.${portName}`)
+  }
+
+  /**
+   * The edges leaving a port, as targets (ADR 0022).
+   * @param {any} node @param {string} portName
+   * @returns {Target[]}
+   */
+  #targets(node, portName) {
+    return (this.#port(node, portName)?.edges ?? []).map((/** @type {Edge} */ e) => ({
+      edge: e.id,
+      node: e.to.node,
+      weight: e.route.weight,
+    }))
   }
 
   /**

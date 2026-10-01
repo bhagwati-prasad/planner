@@ -128,7 +128,8 @@ async placeOrder(msg, ctx) {
 | `ctx.state` | This instance's typed state; every change is recorded for the debugger |
 | `ctx.now`, `ctx.random()`, `ctx.sample(dist)` | Simulated clock and seeded randomness |
 | `ctx.call(name, args)` | Call a private method; appears as a child span |
-| `ctx.send(port, method, args, options?)` | Call a public method on the component across a port's edge; resolves when the response arrives in simulated time. `options` sets the message's `path`, `headers` and `sizeBytes`, which the receiver reads on `msg` and route rules match (ADR 0019) |
+| `ctx.send(port, method, args, options?)` | Call a public method on the component across a port's edge; resolves when the response arrives in simulated time. `options` sets the message's `path`, `headers` and `sizeBytes`, which the receiver reads on `msg` and route rules match (ADR 0019), and may name the `edge` to send over, skipping route rules (ADR 0022) |
+| `ctx.targets(port)` | The edges leaving a port, in a stable order, as `{ edge, node, weight }`, so a component such as a load balancer can choose its target (ADR 0022) |
 | `ctx.emit(port, method, args, options?)` | Send without waiting for a response |
 | `ctx.fail(code, details)` | Return an error response |
 | `ctx.schedule(delay, name, data)` | Timers that call `onTimer` |
