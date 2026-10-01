@@ -141,6 +141,34 @@ describe('servers', () => {
     )
   })
 
+  it('reports busy and waiting servers under the names its manifest gives them', async () => {
+    const run = service({
+      props: { slots: 1 },
+      manifest: {
+        servers: {
+          count: ['slots'],
+          metrics: { busy: 'activeConnections', waiting: 'waitingConnections' },
+        },
+        methods: { public: { work: { latency: { kind: 'constant', value: 100 } } } },
+      },
+    })
+    calls(run, 2)
+    await run.runToEnd()
+    /** @param {string} name */
+    const named = name => run.metrics.filter(m => m.name === name).map(m => [m.atUs / MS, m.value])
+    assert.deepEqual(named('waitingConnections'), [
+      [0, 1],
+      [100, 0],
+    ])
+    assert.deepEqual(named('activeConnections'), [
+      [0, 1],
+      [100, 0],
+      [100, 1],
+      [200, 0],
+    ])
+    assert.deepEqual(named('backlog'), [], 'in place of backlog')
+  })
+
   it('lets a method spend simulated time with ctx.spend, holding its server', async () => {
     const run = service({
       props: { instances: 1, concurrency: 1, serviceTime: 0 },
