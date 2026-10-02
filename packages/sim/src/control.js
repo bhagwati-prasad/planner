@@ -16,8 +16,9 @@ import { createRun } from './run.js'
 /**
  * @typedef {'ready'|'playing'|'paused'|'finished'|'stopped'} RunState
  * @typedef {{ setTimeout: (fn: () => void, ms: number) => unknown, clearTimeout: (id: any) => void }} Scheduler
- * @typedef {{ node: string, method?: string }} Breakpoint  a message arriving at a component, for
- *   one of its methods or any
+ * @typedef {{ node: string, method?: string } | { when: (happening: import('./run.js').Happening) => boolean }} Breakpoint
+ *   a message arriving at a component, for one of its methods or any; or anything that happens
+ *   inside an event (spec §13), which pauses before that event
  * @typedef {import('./run.js').Edit} Edit
  * @typedef {{ event: number, timeUs: number }} Moment
  *
@@ -323,6 +324,11 @@ export class RunControl {
     return this.#run
   }
 
+  /** The trace of the request being followed, or null. */
+  get following() {
+    return this.#trace
+  }
+
   /** The call the debugger is in, in the followed request; null when none is followed. */
   get frame() {
     return this.#frame
@@ -467,7 +473,13 @@ export class RunControl {
     this.#refocus()
   }
 
-  /** Pauses before a message arrives at a component, for a method or any. @param {Breakpoint} breakpoint */
+  /**
+   * Pauses before a message arrives at a component, for a method or any; or, with `when`,
+   * before the event in which something it holds for happens: a call starting, a message
+   * arriving or leaving, a log. Such a call runs inside its event, so the run finds the event,
+   * then steps back to just before it.
+   * @param {Breakpoint} breakpoint
+   */
   setBreakpoint(breakpoint) {
     this.#breakpoints.push(breakpoint)
   }
@@ -533,10 +545,30 @@ export class RunControl {
    * @param {Parameters<import('./run.js').Run['advance']>[0]} limits
    */
   async #advance(limits) {
-    const why = await this.#run.advance({
-      ...limits,
-      before: event => this.#run.position.event !== this.#pausedBefore && this.#breaks(event),
-    })
+    const watches = this.#breakpoints.flatMap(b => ('when' in b ? [b.when] : []))
+    let hit = false
+    const stop = watches.length
+      ? this.#run.observe(happening => {
+          // The event a breakpoint paused before runs this time.
+          if (this.#run.position.event - 1 === this.#pausedBefore) return
+          if (watches.some(when => when(happening))) hit = true
+        })
+      : () => {}
+    let why
+    try {
+      why = await this.#run.advance({
+        ...limits,
+        until: () => hit || (limits.until?.() ?? false),
+        before: event => this.#run.position.event !== this.#pausedBefore && this.#breaks(event),
+      })
+    } finally {
+      stop()
+    }
+    if (hit) {
+      // Back to just before the event the breakpoint holds for (ADR 0023: replay is exact).
+      await this.#run.seek({ event: this.#run.position.event - 1 })
+      why = 'before'
+    }
     this.#pausedBefore = why === 'before' ? this.#run.position.event : -1
     this.#refocus()
     return why
@@ -547,7 +579,7 @@ export class RunControl {
     if (event?.type !== 'deliver' || event.message.kind === 'response') return false
     const { to, method } = event.message
     return this.#breakpoints.some(
-      b => b.node === to.node && (b.method === undefined || b.method === method)
+      b => 'node' in b && b.node === to.node && (b.method === undefined || b.method === method)
     )
   }
 

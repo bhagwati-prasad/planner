@@ -4,4 +4,4 @@
  * Runs in: Worker and facade. Specified in spec §13; built in M04 and M10.
  * This is the package's only public entry point (eng §4).
  */
-export {}
+export { createDebugger } from './debugger.js'

@@ -80,8 +80,32 @@ import { copy, initialState, stateView } from './state.js'
  * @property {RunEdge[]} [edges]
  * @property {boolean} [record]  keep each message that crosses an edge, for recorded stubs and
  *   inbound replay (task 0412)
+ * @property {boolean} [inspect]  keep every message that arrives, for hop inspection (spec §13)
  * @property {number} [snapshotEvery]  events between snapshots, 10,000 by default (ADR 0023)
  * @property {number} [snapshotBytes]  the memory snapshots may hold, 256 MB by default
+ *
+ * What happens inside an event, for breakpoints (spec §13, task 0416): a public or private call
+ * starting, a message arriving at a component, or leaving one over an edge, or a log.
+ * @typedef {{ type: 'call', kind: 'public'|'private', node: string, method: string, span: Span }
+ *   | { type: 'arrive', node: string, port: string, method: string, message: any }
+ *   | { type: 'depart', node: string, port: string, edge: string, method: string, message: any }
+ *   | { type: 'log', node: string, level: string, args: unknown[] }} Happening
+ *
+ * A message as it arrived at a component, for hop inspection (spec §13).
+ * @typedef {object} Hop
+ * @property {number} event  the event it arrived in
+ * @property {number} atUs
+ * @property {string} traceId
+ * @property {string} node
+ * @property {string} port
+ * @property {string} method
+ * @property {'request'|'event'|'response'} kind
+ * @property {string|null} path
+ * @property {Record<string, string>} headers
+ * @property {unknown} body
+ * @property {number} sizeBytes
+ * @property {number} attempt
+ * @property {string|null} edge
  *
  * A run-only edit (spec §12 "Editing a paused run", task 0415): property values in canonical
  * units; a state field by its path; a component's behaviour code; or components and edges added
@@ -344,6 +368,13 @@ export class Run {
    * @type {Snapshot[]}
    */
   snapshots = []
+  /**
+   * Every message that arrived at a component, when the run inspects (spec §13); null when not.
+   * @type {Hop[] | null}
+   */
+  messages = null
+  /** @type {Set<(happening: Happening) => void>} */
+  #observers = new Set()
   /** Counts what behaviour code does, so the run can tell when microtasks have settled. */
   activity = 0
   #seed = 1
@@ -400,8 +431,10 @@ export class Run {
     record = false,
     snapshotEvery = 10_000,
     snapshotBytes = 256_000_000,
+    inspect = false,
   }) {
     if (record) this.recordings = {}
+    if (inspect) this.messages = []
     this.#every = snapshotEvery
     this.#cap = snapshotBytes
     this.#seed = seed
@@ -652,6 +685,7 @@ export class Run {
         binding?.unbound ?? `'${method}' of ${node.id} is not bound to a component inside`
       )
     }
+    this.#arrived(node.id, message.to.port, method ?? '', message)
     const span = this.#span(node.id, method ?? '', 'public', message.traceId, message.parentSpanId)
     /** @type {Call['respond']} */
     const respond =
@@ -716,6 +750,7 @@ export class Run {
       seed: this.#seed,
       ...this.#input,
       record: this.recordings !== null,
+      inspect: this.messages !== null,
       snapshotEvery: this.#every,
       snapshotBytes: this.#cap,
     })
@@ -726,6 +761,24 @@ export class Run {
   /** The ids of the run's components. */
   get components() {
     return [...this.#nodes.keys()]
+  }
+
+  /** The input a component was given, or undefined for one an edit added. @param {string} id */
+  inputOf(id) {
+    return this.#input.nodes.find(n => n.id === id)
+  }
+
+  /** A copy of a component's property values, as they are now. @param {string} id */
+  propsOf(id) {
+    return copy(this.#nodes.get(id)?.props)
+  }
+
+  /** The run-only edits made so far, with the moment each was made. */
+  get appliedEdits() {
+    return this.#injections
+      .slice(0, this.#applied)
+      .filter(i => i.edit)
+      .map(i => ({ at: i.at, edit: /** @type {Edit} */ (i.edit) }))
   }
 
   /** A copy of a component's state. @param {string} id */
@@ -769,6 +822,7 @@ export class Run {
     this.metrics.push(...parent.metrics.slice(0, d.outputs[0]))
     this.logs.push(...parent.logs.slice(0, d.outputs[1]))
     this.changes.push(...parent.changes.slice(0, d.outputs[2]))
+    this.messages?.push(...(parent.messages ?? []).slice(0, d.outputs[3]))
     for (const [id, list] of Object.entries(parent.recordings ?? {})) {
       const kept = structuredClone(list.slice(0, d.recordings?.[id]?.length ?? 0))
       kept.forEach((r, i) => this.#recordingAt.set(r, [id, i]))
@@ -920,7 +974,12 @@ export class Run {
           edges: [...this.#edges].map(([id, edge]) => [id, edge.network.save()]),
           queue: k.entries.map(e => [e.timeUs, e.priority, e.seq, e.event.type]),
           spans: this.spans,
-          outputs: [this.metrics.length, this.logs.length, this.changes.length],
+          outputs: [
+            this.metrics.length,
+            this.logs.length,
+            this.changes.length,
+            this.messages?.length ?? 0,
+          ],
         })
       )
     )
@@ -956,7 +1015,58 @@ export class Run {
     this.#hops++
     this.#hopTrace =
       message.kind === 'response' ? message.attempt.request.message.traceId : message.traceId
+    if (message.kind === 'response') {
+      const { request, span } = message.attempt
+      this.#arrived(request.node, request.edge.from.port, request.message.method, {
+        kind: 'response',
+        traceId: request.message.traceId,
+        path: null,
+        headers: {},
+        body: message.ok ? message.value : errorBody(request.node, message.value),
+        sizeBytes: request.edge.props.payloadSize ?? 0,
+        attempt: span.attempt ?? 1,
+        edge: request.edge,
+      })
+    }
     return message
+  }
+
+  /**
+   * A message arriving at a component: tells the observers, and keeps it when the run inspects.
+   * @param {string} node @param {string} port @param {string} method @param {any} message
+   */
+  #arrived(node, port, method, message) {
+    if (this.#observers.size) this.#tell({ type: 'arrive', node, port, method, message })
+    this.messages?.push({
+      event: this.kernel.processed,
+      atUs: this.nowUs,
+      traceId: message.traceId,
+      node,
+      port,
+      method,
+      kind: message.kind,
+      path: message.path ?? null,
+      headers: copy(message.headers ?? {}),
+      body: copy(message.body),
+      sizeBytes: message.sizeBytes ?? 0,
+      attempt: message.attempt ?? 1,
+      edge: message.edge?.id ?? null,
+    })
+  }
+
+  /** @param {Happening} happening */
+  #tell(happening) {
+    for (const listener of this.#observers) listener(happening)
+  }
+
+  /**
+   * Calls `listener` with what happens inside each event (spec §13): calls starting, messages
+   * arriving and leaving, and logs. It returns a function that stops it.
+   * @param {(happening: Happening) => void} listener
+   */
+  observe(listener) {
+    this.#observers.add(listener)
+    return () => void this.#observers.delete(listener)
   }
 
   /** Records, for the event just handled, the step units so far. */
@@ -1105,7 +1215,12 @@ export class Run {
         const { endUs, status, code, queuedUs } = spans[i]
         return [i, { endUs, status, code, queuedUs }]
       }),
-      outputs: [this.metrics.length, this.logs.length, this.changes.length],
+      outputs: [
+        this.metrics.length,
+        this.logs.length,
+        this.changes.length,
+        this.messages?.length ?? 0,
+      ],
       recordings:
         recordings &&
         Object.fromEntries(
@@ -1234,6 +1349,7 @@ export class Run {
         else span[key] = fields[key]
     }
     ;[this.metrics.length, this.logs.length, this.changes.length] = d.outputs
+    if (this.messages) this.messages.length = d.outputs[3]
     for (const [id, list] of Object.entries(this.recordings ?? {})) {
       const kept = d.recordings?.[id]
       list.length = kept?.length ?? 0
@@ -1735,6 +1851,7 @@ export class Run {
       log: (/** @type {string} */ level, /** @type {unknown[]} */ ...args) => {
         touch()
         run.logs.push({ atUs: run.nowUs, node: node.id, level, args: copy(args) })
+        if (run.#observers.size) run.#tell({ type: 'log', node: node.id, level, args: copy(args) })
       },
     }
     return ctx
@@ -1803,6 +1920,15 @@ export class Run {
       to: edge.to,
       edge,
     })
+    if (this.#observers.size)
+      this.#tell({
+        type: 'depart',
+        node: node.id,
+        port: portName,
+        edge: edge.id,
+        method: message.method,
+        message,
+      })
     const departs = Math.max(call.busyUntil, this.nowUs)
     if (!wait) {
       this.#cross(edge, departs, message.sizeBytes, {
@@ -1971,7 +2097,10 @@ export class Run {
     this.#spanIndex.set(span, this.spans.length)
     this.#open.add(this.spans.length)
     this.spans.push(span)
-    if (kind === 'public' || kind === 'private') this.#calls++
+    if (kind === 'public' || kind === 'private') {
+      this.#calls++
+      if (this.#observers.size) this.#tell({ type: 'call', kind, node, method, span })
+    }
     return span
   }
 
