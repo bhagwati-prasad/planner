@@ -159,10 +159,10 @@ describe('browser tests', () => {
 describe('size check', () => {
   it('reads every size budget from eng §15', () => {
     assert.deepEqual(budgets(), [
-      { label: 'Core, facade and non-UI packages (minified)', bytes: 255_000 },
+      { label: 'Core, facade and non-UI packages (minified)', bytes: 265_000 },
       { label: 'strata-graph (minified)', bytes: 115_000 },
-      { label: 'strata-ui (minified)', bytes: 230_000 },
-      { label: 'Simulation worker bundle (minified)', bytes: 120_000 },
+      { label: 'strata-ui (minified)', bytes: 220_000 },
+      { label: 'Simulation worker bundle (minified)', bytes: 160_000 },
       { label: 'Bundled fonts (woff2, Latin subset)', bytes: 120_000 },
       { label: 'Console help metadata (minified)', bytes: 25_000 },
     ])
@@ -271,10 +271,10 @@ describe('size check', () => {
     assert.match(result.problems[0], /within its budget: remove its exception/)
   })
 
-  it('measures core, facade and the non-UI packages under 255 KB, and passes without an exception for them', () => {
+  it('measures core, facade and the non-UI packages under 265 KB, and passes without an exception for them (ADR 0026)', () => {
     const { rows, problems } = checkSizes()
     const core = rows.find(r => r.label.startsWith('Core'))
-    assert.ok(core?.bytes && core.bytes < 255_000, `${core?.bytes} bytes`)
+    assert.ok(core?.bytes && core.bytes < 265_000, `${core?.bytes} bytes`)
     assert.equal(core.exception, undefined, 'no exception is recorded for them')
     assert.deepEqual(problems, [])
   })
