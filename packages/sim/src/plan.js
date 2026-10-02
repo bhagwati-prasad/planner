@@ -14,6 +14,7 @@
  * resolveSystem and boundary ports through resolvePort (eng §9).
  */
 import { SYSTEM_TYPE_REF } from '../../core/src/index.js'
+import { stubNode } from './stubs.js'
 
 /**
  * @typedef {'expanded'|'blackbox'} RunMode
@@ -22,6 +23,13 @@ import { SYSTEM_TYPE_REF } from '../../core/src/index.js'
  * @property {Record<string, RunMode>} [modes]  by component path; by default a System runs
  *   expanded and any other composite as a black box
  * @property {Record<string, object>} [behaviours]  behaviour modules by component type id
+ * @property {Scope} [scope]  what runs; the whole project by default
+ * @property {Record<string, import('./stubs.js').Stub>} [stubs]  by the id of an edge leaving
+ *   the scope, the stub at its end; a fixed stub that answers null at once by default
+ *
+ * @typedef {{ kind: 'project' } | { kind: 'system', node: string } | { kind: 'selection', nodes: string[] }} Scope
+ *   a whole project; one composite and its system at any depth, which runs expanded; or the
+ *   components selected, such as a request path's
  */
 
 /**
@@ -94,12 +102,9 @@ function exitsOf(core, ports, id) {
 
 /**
  * A run's nodes and edges for the whole project, each composite in its mode.
- * @param {any} core  a Core, or anything with its read API
- * @param {PlanOptions} [options]
- * @returns {{ nodes: import('./run.js').RunNode[], edges: import('./run.js').RunEdge[] }}
- * @example createRun({ seed: 7, ...planRun(core, { modes: { [paymentsId]: 'blackbox' }, behaviours }) })
+ * @param {any} core @param {Record<string, RunMode>} modes @param {Record<string, object>} behaviours
  */
-export function planRun(core, { modes = {}, behaviours = {} } = {}) {
+function planAll(core, modes, behaviours) {
   /** @type {import('./run.js').RunNode[]} */
   const nodes = []
   /** @type {import('./run.js').RunEdge[]} */
@@ -143,4 +148,68 @@ export function planRun(core, { modes = {}, behaviours = {} } = {}) {
   }
   plan([])
   return { nodes, edges }
+}
+
+/**
+ * Whether a component, by its path, is in a scope.
+ * @param {Scope} scope
+ * @returns {(id: string) => boolean}
+ */
+function inScope(scope) {
+  if (scope.kind === 'system') return id => id === scope.node || id.startsWith(`${scope.node}/`)
+  if (scope.kind === 'selection') {
+    const selected = new Set(scope.nodes)
+    return id => selected.has(id)
+  }
+  return () => true
+}
+
+/**
+ * A run's nodes and edges (spec §11 "Scope", eng §13): the components in its scope, each
+ * composite in its mode, the edges between them, and a stub at the end of each edge leaving the
+ * scope. Nothing outside the scope is planned. The edges entering it come back as `inbound`, for
+ * a scenario or replayed traffic to drive.
+ * @param {any} core  a Core, or anything with its read API
+ * @param {PlanOptions} [options]
+ * @returns {{ nodes: import('./run.js').RunNode[], edges: import('./run.js').RunEdge[], inbound: import('./run.js').RunEdge[] }}
+ * @example createRun({ seed: 7, ...planRun(core, { scope: { kind: 'selection', nodes: [serviceId] }, behaviours }) })
+ */
+export function planRun(
+  core,
+  { modes = {}, behaviours = {}, scope = { kind: 'project' }, stubs = {} } = {}
+) {
+  const inside = inScope(scope)
+  /** @type {Record<string, RunMode>} */
+  const own = scope.kind === 'system' ? { ...modes, [scope.node]: 'expanded' } : modes
+  // A black-box stub runs the component outside as a black box.
+  const boxing = Object.values(stubs).some(stub => stub.mode === 'blackbox')
+  /** @type {Record<string, RunMode>} */
+  const boxed = boxing
+    ? Object.fromEntries(
+        planAll(core, own, behaviours)
+          .edges.filter(e => inside(e.from.node) && !inside(e.to.node))
+          .filter(e => stubs[e.id]?.mode === 'blackbox')
+          .map(e => [e.to.node, /** @type {RunMode} */ ('blackbox')])
+      )
+    : {}
+  const whole = planAll(core, { ...own, ...boxed }, behaviours)
+  const nodes = whole.nodes.filter(n => inside(n.id) || n.id in boxed)
+  /** @type {import('./run.js').RunEdge[]} */
+  const edges = []
+  /** @type {import('./run.js').RunEdge[]} */
+  const inbound = []
+  for (const edge of whole.edges) {
+    const [from, to] = [inside(edge.from.node), inside(edge.to.node)]
+    if (from && (to || edge.to.node in boxed)) edges.push(edge)
+    else if (to) inbound.push(edge)
+    else if (from) {
+      const target = /** @type {any} */ (whole.nodes.find(n => n.id === edge.to.node)).manifest
+      const port = target.ports.find((/** @type {any} */ p) => p.name === edge.to.port)
+      const id = `stub:${edge.id}`
+      const stub = /** @type {import('./stubs.js').FixedStub} */ (stubs[edge.id] ?? {})
+      nodes.push(stubNode(id, port, stub))
+      edges.push({ ...edge, to: { node: id, port: edge.to.port } })
+    }
+  }
+  return { nodes, edges, inbound }
 }

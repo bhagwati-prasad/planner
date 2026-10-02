@@ -7,7 +7,45 @@
   "description": "A population of users on web or mobile clients that start the traffic.",
   "icon": "icon.svg",
   "extends": "base:client",
+  "entry": "index.js",
   "shape": "person",
+  "ports": [
+    {
+      "name": "out",
+      "direction": "out",
+      "description": "Where its scenarios' steps go"
+    }
+  ],
+  "state": {
+    "sessions": {
+      "type": "map",
+      "initial": {},
+      "description": "By session: its scenario, its step, and its variables, such as tokens it extracted and its user"
+    },
+    "pending": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Requests in flight"
+    },
+    "finished": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Steps finished, after their retries"
+    },
+    "succeeded": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Steps that succeeded"
+    },
+    "latencies": {
+      "type": "map",
+      "values": {
+        "type": "integer"
+      },
+      "initial": {},
+      "description": "How many finished steps took each span of end-to-end latency, in log-sized buckets"
+    }
+  },
   "methods": {
     "public": {},
     "private": {
@@ -32,6 +70,18 @@
       "min": 0,
       "group": "Load",
       "rollup": "sum"
+    },
+    "scenarios": {
+      "type": "map",
+      "values": {
+        "type": "list",
+        "items": {
+          "type": "map"
+        }
+      },
+      "default": {},
+      "group": "Load",
+      "description": "Steps by scenario name, each { call, path, headers, body, extract, think }"
     },
     "scenarioMix": {
       "type": "map",

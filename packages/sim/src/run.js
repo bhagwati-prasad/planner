@@ -99,6 +99,16 @@ import { copy, initialState, stateView } from './state.js'
  * @typedef {{ edge: string, node: string, weight: number }} Target  an edge leaving a port, the
  *   component at its end and its route weight (ADR 0022)
  *
+ * @typedef {object} Recording  a message that reached a component over an edge, in a run that
+ *   records (task 0412)
+ * @property {string} method
+ * @property {string|null} path
+ * @property {Record<string, string>} headers
+ * @property {unknown} body
+ * @property {number} atUs  when it arrived
+ * @property {{ ok: boolean, body?: unknown, error?: ErrorBody, atUs: number }} [response]  the
+ *   response to a request, and when it left
+ *
  * @typedef {object} Span  a method call in the trace (OpenTelemetry's shape, spec §11)
  * @property {string} spanId
  * @property {string|null} parentSpanId
@@ -288,6 +298,12 @@ export class Run {
    * @type {{ event: number, spanId: string, node: string, op: 'set'|'delete', path: (string|number)[], value?: unknown }[]}
    */
   changes = []
+  /**
+   * By edge, every message that reached a component over it, and the response to each request,
+   * when the run records (task 0412); null when it does not.
+   * @type {Record<string, Recording[]> | null}
+   */
+  recordings = null
   /** Counts what behaviour code does, so the run can tell when microtasks have settled. */
   activity = 0
   #woken = false
@@ -303,9 +319,11 @@ export class Run {
   #live = new Set()
 
   /**
-   * @param {{ seed?: number, nodes: RunNode[], edges?: RunEdge[] }} input
+   * @param {{ seed?: number, nodes: RunNode[], edges?: RunEdge[], record?: boolean }} input
+   *   `record` keeps each message that crosses an edge, for recorded stubs and inbound replay
    */
-  constructor({ seed = 1, nodes, edges = [] }) {
+  constructor({ seed = 1, nodes, edges = [], record = false }) {
+    if (record) this.recordings = {}
     const streams = createStreams(seed)
     const strict = isDevelopment()
     for (const n of nodes) {
@@ -441,6 +459,16 @@ export class Run {
       fail('E_SIM_COMPONENT_NOT_FOUND', `Component '${message.to.node}' is not in the run`)
     const port = node.manifest.ports.find((/** @type {any} */ p) => p.name === message.to.port)
     const method = message.method ?? port?.default
+    if (this.recordings && message.edge && !message.recording) {
+      message.recording = {
+        method,
+        path: message.path,
+        headers: copy(message.headers),
+        body: copy(message.body),
+        atUs: this.nowUs,
+      }
+      ;(this.recordings[message.edge.id] ??= []).push(message.recording)
+    }
     let refusal = this.#refusal(node, port, method, message.to.port)
     if (!refusal && node.composite?.mode === 'expanded') {
       const binding = node.composite.bindings?.[port.name]?.[method]
@@ -725,6 +753,10 @@ export class Run {
    * @param {any} message @param {boolean} ok @param {unknown} value @param {number} atUs
    */
   #respond(message, ok, value, atUs) {
+    if (message.recording)
+      message.recording.response = ok
+        ? { ok, body: copy(value), atUs }
+        : { ok, error: /** @type {ErrorBody} */ (copy(value)), atUs }
     if (message.reply) {
       Object.assign(
         message.reply,
@@ -1097,8 +1129,9 @@ export class Run {
 }
 
 /**
- * A run of components with the real ctx.
- * @param {{ seed?: number, nodes: RunNode[], edges?: RunEdge[] }} input
+ * A run of components with the real ctx. With `record`, it keeps each message that crosses an
+ * edge in `run.recordings`, for recorded stubs and inbound replay (task 0412).
+ * @param {{ seed?: number, nodes: RunNode[], edges?: RunEdge[], record?: boolean }} input
  * @example const run = createRun({ seed: 42, nodes, edges }); run.inject({ node: 'api', port: 'in', method: 'get' }); await run.runToEnd()
  */
 export function createRun(input) {
