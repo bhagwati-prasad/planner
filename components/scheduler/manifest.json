@@ -7,12 +7,47 @@
   "description": "Starts jobs on a cron schedule.",
   "icon": "icon.svg",
   "extends": "base:timer",
+  "entry": "index.js",
+  "ports": [
+    {
+      "name": "in",
+      "direction": "in",
+      "exposes": ["trigger", "pause", "resume"],
+      "description": "For runs on demand, and to pause and resume the schedule"
+    },
+    {
+      "name": "out",
+      "direction": "out",
+      "description": "Where each run sends its job"
+    }
+  ],
   "shape": "ellipse",
+  "state": {
+    "nextAt": {
+      "type": "number",
+      "initial": 0,
+      "description": "The next time the cron expression matches, in ms, or -1 when it never does"
+    },
+    "active": {
+      "type": "list",
+      "items": { "type": "integer" },
+      "initial": [],
+      "description": "The runs still going"
+    },
+    "missed": {
+      "type": "integer",
+      "initial": 0,
+      "description": "Schedules missed while paused, since it was last resumed"
+    }
+  },
   "methods": {
     "public": {
-      "trigger": {},
-      "pause": {},
-      "resume": {}
+      "trigger": {
+        "errors": ["PAUSED"],
+        "description": "{} → { run }; a run now, by the concurrency policy"
+      },
+      "pause": { "description": "{} → null; schedules are missed until resume" },
+      "resume": { "description": "{} → null; with catchUp, runs once if it missed any" }
     },
     "private": {
       "tick": {},

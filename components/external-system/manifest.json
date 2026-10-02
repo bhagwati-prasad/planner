@@ -7,6 +7,7 @@
   "description": "A stand-in for anything outside the model: fixed latency, capacity and error rate.",
   "icon": "icon.svg",
   "extends": "base:external",
+  "entry": "index.js",
   "shape": "cloud",
   "ports": [
     {
@@ -16,9 +17,20 @@
       "exposes": ["call"]
     }
   ],
+  "state": {
+    "window": {
+      "type": "map",
+      "initial": {},
+      "description": "The second calls are counted in, and how many it has accepted in it"
+    }
+  },
   "methods": {
     "public": {
-      "call": {}
+      "call": {
+        "latency": 0,
+        "errors": ["OVERLOADED", "UNAVAILABLE"],
+        "description": "any body → null"
+      }
     }
   },
   "properties": {
