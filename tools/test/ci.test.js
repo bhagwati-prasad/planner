@@ -185,6 +185,18 @@ describe('size check', () => {
     )
   })
 
+  it('counts strata-sim and strata-debug with the worker, not with core (ADR 0018, ADR 0024)', () => {
+    const fixture = tree({
+      'packages/core/src/index.js': moduleOf(1_000),
+      'packages/sim/src/index.js': moduleOf(30_000),
+      'packages/debug/src/index.js': moduleOf(30_000),
+    })
+    const core = checkSizes({ root: fixture.root, exceptions: {} }).rows.find(r =>
+      r.label.startsWith('Core')
+    )
+    assert.ok(core?.bytes && core.bytes < 2_000, `core counts ${core?.bytes} bytes`)
+  })
+
   it('fails when a fixture bundle exceeds its eng §15 budget', () => {
     const fixture = tree({
       'packages/core/src/index.js': moduleOf(1_000),

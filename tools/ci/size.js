@@ -95,6 +95,9 @@ function bundled(root, entry) {
   return Buffer.byteLength(minify(emitScript(bundle, { entry, format: 'iife' }), { rename: true }))
 }
 
+/** Packages that ship only in the simulation worker bundle (ADR 0018, ADR 0024). */
+const WORKER_PACKAGES = new Set(['sim', 'debug'])
+
 /** @param {string} root */
 const packages = root => {
   const dir = join(root, 'packages')
@@ -109,11 +112,12 @@ const src = (root, pkg) => join(root, 'packages', pkg, 'src')
  * @type {Record<string, (root: string) => number|null>}
  */
 export const MEASURES = {
-  // strata-sim ships only in the worker bundle, which its own line measures (ADR 0018).
+  // strata-sim and strata-debug ship only in the worker bundle, which its own line measures
+  // (ADR 0018, ADR 0024).
   'Core, facade and non-UI packages (minified)': root =>
     minified(
       packages(root)
-        .filter(p => !VIEW_PACKAGES.has(p) && !NODE_PACKAGES.has(p) && p !== 'sim')
+        .filter(p => !VIEW_PACKAGES.has(p) && !NODE_PACKAGES.has(p) && !WORKER_PACKAGES.has(p))
         .map(p => src(root, p)),
       file => file !== join(root, HELP_DATA)
     ),
