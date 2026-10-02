@@ -51,33 +51,14 @@ const recorded = stub => async (/** @type {any} */ msg, /** @type {any} */ ctx) 
 }
 
 /**
- * A stub node standing in for the component at the end of an edge leaving a scope.
- * @param {string} id
- * @param {{ name: string, exposes?: string[], default?: string }} port  the port the edge reaches
+ * The behaviour of a stub standing in for the component at the end of an edge leaving a scope:
+ * each method of its one port answers as its configuration says.
+ * @param {{ ports: { exposes?: string[] }[] }} manifest  the stub's, from core's planModel
  * @param {FixedStub|RecordedStub} stub
- * @returns {import('./run.js').RunNode}
  */
-export function stubNode(id, port, stub) {
-  const methods = port.exposes ?? []
+export function stubBehaviour(manifest, stub) {
   const answer = stub.mode === 'recorded' ? recorded(stub) : fixed(/** @type {FixedStub} */ (stub))
   return {
-    id,
-    manifest: {
-      strataApi: '^1.0',
-      id: 'strata.stub',
-      name: `Stub of ${port.name}`,
-      version: '1.0.0',
-      ports: [
-        {
-          name: port.name,
-          direction: 'in',
-          exposes: methods,
-          ...(port.default ? { default: port.default } : {}),
-        },
-      ],
-      methods: { public: Object.fromEntries(methods.map(m => [m, {}])) },
-      state: { replayed: { type: 'map', initial: {} } },
-    },
-    behaviour: { public: Object.fromEntries(methods.map(m => [m, answer])) },
+    public: Object.fromEntries((manifest.ports[0].exposes ?? []).map(m => [m, answer])),
   }
 }

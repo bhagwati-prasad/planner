@@ -24,7 +24,10 @@ import { SIM_PROTOCOL_VERSION as PROTOCOL_VERSION, StrataError } from '../../cor
  *
  * @typedef {object} SimHost
  * @property {(message: ProtocolMessage, transfer?: any[]) => Promise<ProtocolMessage>} request
- *   posts a request, moving the `transfer` buffers, and resolves with its reply
+ *   posts a request, moving the `transfer` buffers, and resolves with its reply; a read that
+ *   comes in chunks resolves once, with every chunk's data together
+ * @property {(listener: (message: ProtocolMessage) => void) => () => void} listen  calls the
+ *   listener with each message no request asked for, such as a playing run's view
  * @property {() => void} terminate  stops the worker; requests still waiting are rejected
  */
 
@@ -42,10 +45,13 @@ export function createSimHost({ spawn, scheduler, silenceMs = 2000 }) {
   /** @type {SpawnedWorker|null} */
   let worker = null
   /**
-   * Requests waiting for their replies, with what the worker last said it started for each.
-   * @type {Map<unknown, { resolve: (reply: ProtocolMessage) => void, reject: (err: Error) => void, doing: { node: string, method: string } | null }>}
+   * Requests waiting for their replies, with what the worker last said it started for each, and
+   * the data of a chunked reply so far.
+   * @type {Map<unknown, { resolve: (reply: ProtocolMessage) => void, reject: (err: Error) => void, doing: { node?: string, method?: string } | null, parts: unknown[] }>}
    */
   const pending = new Map()
+  /** @type {Set<(message: ProtocolMessage) => void>} */
+  const listeners = new Set()
   /** @type {unknown} */
   let watchdog = null
 
@@ -66,7 +72,7 @@ export function createSimHost({ spawn, scheduler, silenceMs = 2000 }) {
 
   function hung() {
     watchdog = null
-    const doing = [...pending.values()].find(w => w.doing)?.doing
+    const doing = [...pending.values()].find(w => w.doing?.method)?.doing
     const s = silenceMs / 1000
     stop(
       doing
@@ -92,11 +98,21 @@ export function createSimHost({ spawn, scheduler, silenceMs = 2000 }) {
         )
       )
     const waiting = pending.get(data.id)
-    if (data.type === 'heartbeat') {
+    if (data.id === null) for (const listener of listeners) listener(data)
+    else if (data.type === 'heartbeat') {
       if (waiting) waiting.doing = data.payload
+    } else if (waiting && data.payload?.chunk < data.payload?.of - 1) {
+      waiting.parts.push(...data.payload.data)
     } else if (waiting) {
       pending.delete(data.id)
-      waiting.resolve(data)
+      waiting.resolve(
+        waiting.parts.length
+          ? {
+              ...data,
+              payload: { chunk: 0, of: 1, data: [...waiting.parts, ...data.payload.data] },
+            }
+          : data
+      )
     }
     watch()
   }
@@ -104,11 +120,15 @@ export function createSimHost({ spawn, scheduler, silenceMs = 2000 }) {
   return {
     request(message, transfer = []) {
       return new Promise((resolve, reject) => {
-        pending.set(message.id, { resolve, reject, doing: null })
+        pending.set(message.id, { resolve, reject, doing: null, parts: [] })
         worker ??= spawn({ message: received, error: stop })
         watch()
         worker.post(message, transfer)
       })
+    },
+    listen(listener) {
+      listeners.add(listener)
+      return () => void listeners.delete(listener)
     },
     terminate() {
       stop(new StrataError('E_SIM_STOPPED', 'The simulation worker was stopped'))

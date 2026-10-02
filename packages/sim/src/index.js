@@ -18,5 +18,10 @@ export { createTestContext } from './testing.js'
 export { sample, probit } from './sample.js'
 export { runHash } from './hash.js'
 export { simulate } from './skeleton.js'
-export { PROTOCOL_VERSION, handleMessage, inProcessSimHost } from './protocol.js'
+export {
+  PROTOCOL_VERSION,
+  createInProcessSimHost,
+  handleMessage,
+  inProcessSimHost,
+} from './protocol.js'
 export { createWorkerSession } from './worker/session.js'

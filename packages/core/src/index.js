@@ -53,6 +53,7 @@ export { CORE_COMMANDS, registerCoreCommands } from './commands/index.js'
 export { rollup, resolveRule, nodeValue, contractValue, checkContracts } from './rollup.js'
 export { findProblems } from './validate.js'
 export { planExtract, planInline } from './planners.js'
+export { planModel } from './run-plan.js'
 export {
   NODE_STATUSES,
   LEVEL_TAGS,

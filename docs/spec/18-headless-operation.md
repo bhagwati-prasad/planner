@@ -16,10 +16,10 @@ const p = await strata.projects.open('checkout')
 const root = p.root
 
 const gw  = root.add('api-gateway', { name: 'Edge GW', props: { rateLimit: 1000 } })
-const svc = root.add('service', { name: 'Orders' })
+const svc = root.add('service', { name: 'Orders', props: { endpoints: [{ name: 'POST /orders', calls: ['out.insert'] }] } })
 const db  = root.add('relational-db', { name: 'Orders DB' })
 root.connect(gw.port('out'), svc.port('in'), { type: 'http' })
-root.connect(svc.port('db'), db.port('in'), { type: 'db-protocol', method: 'insert' })
+root.connect(svc.port('out'), db.port('in'), { type: 'db-protocol', method: 'insert' })
 
 svc.methods()                      // public and private methods with signatures
 svc.state()                        // typed initial state
@@ -31,7 +31,7 @@ orders.rollup('latency.p99')       // derived value
 const run = await strata.sim.start({ scenario: 'checkout', scope: { selection: [svc.id, db.id] }, seed: 42 })
 await run.stepForward(5, 'hop')
 await run.stepBack(3, 'followedHop')
-run.state(db).orders.length
+Object.keys(run.state(db).tables.orders).length
 run.edit(db, { props: { maxConnections: 200 } })   // run-only change
 const branch = await run.replayFromHere()
 await branch.runToEnd()
@@ -46,7 +46,7 @@ strata.print(root)  // text tree of the system for console or terminal
 strata.help('sim')  // commands with signatures and examples
 ```
 
-Every collection has `toTable()` for `console.table`. Run handles expose every control in §12, and `strata.debug.*` exposes the debugger protocol from §13.
+Every collection has `toTable()` for `console.table`. Run handles expose every control in §12, and `strata.debug.*` exposes the debugger protocol from §13. Each control is a message to the simulation worker, and its reply is a view of the moment it left the run at, so `run.state(node)`, `run.edit(…)` and `strata.sim.compare(a, b)` need no `await` ([ADR 0025](../adr/0025-run-sessions-in-the-worker-protocol.md)). Until scenarios arrive in R1, a run is given its requests instead: `strata.sim.start({ requests: [{ to: svc, path: '/orders', body }], scope, seed })`.
 
 ## Node CLI
 

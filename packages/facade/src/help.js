@@ -89,8 +89,11 @@ const TOPICS = {
   },
   sim: {
     summary:
-      'Simulation (spec §11). So far one request over one edge, as in the walking skeleton; run controls follow (spec §12).',
-    from: [['strata.sim', 'SimApi']],
+      'Simulation (spec §11, §12): start a run, then drive it with every control; each answers with the moment it left the run at.',
+    from: [
+      ['strata.sim', 'SimApi'],
+      ['run', 'RunHandle'],
+    ],
   },
   output: {
     summary: 'Reading the model as text.',

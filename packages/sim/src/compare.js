@@ -27,6 +27,16 @@ function summary(run) {
 }
 
 /**
+ * The metrics a run reported so far, by component and name: how many values, their sum and the
+ * last, sorted by component and name.
+ * @param {import('./run.js').Run} run
+ * @returns {(MetricSummary & { node: string, name: string })[]}
+ */
+export function metricTotals(run) {
+  return [...summary(run)].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, s]) => s)
+}
+
+/**
  * Where two values differ, as paths from `path`.
  * @param {unknown} a @param {unknown} b @param {(string|number)[]} path
  * @returns {{ path: (string|number)[], a: unknown, b: unknown }[]}
