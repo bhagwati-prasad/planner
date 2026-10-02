@@ -115,11 +115,12 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0427 Starter library: identity provider](M04-simulation-core/0427-starter-identity-provider.md) (after 0426)
 - [x] [0428 Starter library: client](M04-simulation-core/0428-starter-client.md) (after 0427)
 - [x] [0412 Scopes, stubs and inbound traffic](M04-simulation-core/0412-scope-stubs.md) (after 0406)
-- [ ] [0413 Snapshots, step units and time travel](M04-simulation-core/0413-snapshots-stepping.md) (after 0404)
-- [ ] [0414 Run lifecycle and controls](M04-simulation-core/0414-run-controls.md) (after 0413)
-- [ ] [0415 Editing a paused run and branch runs](M04-simulation-core/0415-edits-branches.md) (after 0414)
-- [ ] [0416 Breakpoints and inspection](M04-simulation-core/0416-breakpoints-inspection.md) (after 0414)
-- [ ] [0417 Simulation on the facade and the determinism suite](M04-simulation-core/0417-facade-sim.md) (after 0415, 0416, 0412, 0115)
+- [x] [0413 Snapshots, step units and time travel](M04-simulation-core/0413-snapshots-stepping.md) (after 0404)
+- [x] [0414 Run lifecycle and controls](M04-simulation-core/0414-run-controls.md) (after 0413)
+- [x] [0415 Editing a paused run and branch runs](M04-simulation-core/0415-edits-branches.md) (after 0414)
+- [x] [0416 Breakpoints and inspection](M04-simulation-core/0416-breakpoints-inspection.md) (after 0414)
+- [x] [0417 Run sessions on the facade](M04-simulation-core/0417-facade-sim.md) (after 0415, 0416, 0412, 0115)
+- [ ] [0429 strata.debug and the cross-engine determinism suite](M04-simulation-core/0429-facade-debug-determinism.md) (after 0417)
 
 ### M05 Shell
 
@@ -156,7 +157,7 @@ Annotations and threaded comments designed for later collaboration, then the R0 
 - [ ] [0701 Annotations](M07-comments-and-r0-release/0701-annotations.md) (after 0206, 0506)
 - [ ] [0702 Comment threads and anchors](M07-comments-and-r0-release/0702-threads-anchors.md) (after 0115)
 - [ ] [0703 Comments UI and roll-up badges](M07-comments-and-r0-release/0703-comments-ui.md) (after 0702, 0511)
-- [ ] [0704 R0 exit test and release](M07-comments-and-r0-release/0704-r0-exit.md) (after 0701, 0703, 0605, 0512, 0305, 0306, 0309)
+- [ ] [0704 R0 exit test and release](M07-comments-and-r0-release/0704-r0-exit.md) (after 0701, 0703, 0605, 0512, 0305, 0306, 0309, 0429)
 
 ## R1 Load, chaos and tests
 
@@ -187,7 +188,7 @@ The rest of the debugger: trace waterfall, logs, watches and an in-app console.
 
 - [ ] [1001 Trace waterfall](M10-debugger-depth/1001-trace-waterfall.md) (after 0804)
 - [ ] [1002 Logs and watches](M10-debugger-depth/1002-logs-watches.md) (after 0416)
-- [ ] [1003 In-app console](M10-debugger-depth/1003-dock-console.md) (after 0417)
+- [ ] [1003 In-app console](M10-debugger-depth/1003-dock-console.md) (after 0417, 0429)
 
 ### M11 Tests and architecture rules
 

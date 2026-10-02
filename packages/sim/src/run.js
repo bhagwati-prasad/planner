@@ -36,15 +36,18 @@
  */
 import {
   StrataError,
+  canonicalJson,
   contractValue,
   defaultProps,
   fail,
   isDevelopment,
   normalizeManifest,
+  sha256,
+  toHex,
 } from '../../core/src/index.js'
 import { baseLatency, baseOf } from './base.js'
 import { Kernel } from './kernel.js'
-import { createStreams } from './random.js'
+import { hashKey, xoshiro128ss } from './random.js'
 import { parseRoute, pickEdge } from './route.js'
 import { sample } from './sample.js'
 import { copy, initialState, stateView } from './state.js'
@@ -70,6 +73,47 @@ import { copy, initialState, stateView } from './state.js'
  *   system's contract, a System's black-box model
  *
  * @typedef {{ node: string, port: string, method: string } | { unbound: string }} Binding
+ *
+ * @typedef {object} RunInput
+ * @property {number} [seed]
+ * @property {RunNode[]} nodes
+ * @property {RunEdge[]} [edges]
+ * @property {boolean} [record]  keep each message that crosses an edge, for recorded stubs and
+ *   inbound replay (task 0412)
+ * @property {boolean} [inspect]  keep every message that arrives, for hop inspection (spec §13)
+ * @property {number} [snapshotEvery]  events between snapshots, 10,000 by default (ADR 0023)
+ * @property {number} [snapshotBytes]  the memory snapshots may hold, 256 MB by default
+ *
+ * What happens inside an event, for breakpoints (spec §13, task 0416): a public or private call
+ * starting, a message arriving at a component, or leaving one over an edge, or a log.
+ * @typedef {{ type: 'call', kind: 'public'|'private', node: string, method: string, span: Span }
+ *   | { type: 'arrive', node: string, port: string, method: string, message: any }
+ *   | { type: 'depart', node: string, port: string, edge: string, method: string, message: any }
+ *   | { type: 'log', node: string, level: string, args: unknown[] }} Happening
+ *
+ * A message as it arrived at a component, for hop inspection (spec §13).
+ * @typedef {object} Hop
+ * @property {number} event  the event it arrived in
+ * @property {number} atUs
+ * @property {string} traceId
+ * @property {string} node
+ * @property {string} port
+ * @property {string} method
+ * @property {'request'|'event'|'response'} kind
+ * @property {string|null} path
+ * @property {Record<string, string>} headers
+ * @property {unknown} body
+ * @property {number} sizeBytes
+ * @property {number} attempt
+ * @property {string|null} edge
+ *
+ * A run-only edit (spec §12 "Editing a paused run", task 0415): property values in canonical
+ * units; a state field by its path; a component's behaviour code; or components and edges added
+ * and removed.
+ * @typedef {{ kind: 'props', node: string, props: Record<string, unknown> }
+ *   | { kind: 'state', node: string, path: (string|number)[], value: unknown }
+ *   | { kind: 'code', node: string, behaviour: any }
+ *   | { kind: 'structure', add?: { nodes?: RunNode[], edges?: RunEdge[] }, remove?: { nodes?: string[], edges?: string[] } }} Edit
  *
  * @typedef {object} RunEdge
  * @property {string} id
@@ -272,7 +316,7 @@ class Pending {
  * @property {any} node
  * @property {boolean} server  whether it holds one of its node's servers
  *
- * @typedef {RunEdge & { props: EdgeProps, route: import('./route.js').Route, network: { nextU32(): number } }} Edge
+ * @typedef {RunEdge & { props: EdgeProps, route: import('./route.js').Route, network: import('./random.js').Stream }} Edge
  *
  * A request over an edge, sent once per attempt until one is answered or none are left.
  * @typedef {object} Request
@@ -283,7 +327,22 @@ class Pending {
  * @property {number} attempts  made so far
  *
  * @typedef {{ request: Request, span: Span, answered: boolean }} Attempt
+ *
+ * @typedef {{ message: any, method: string|null }} Source  the message a public call answers,
+ *   and its method, or null for a black box answering from its contract
+ *
+ * A snapshot (ADR 0023): the run at a quiet event boundary, where no method is suspended, as
+ * plain data that `seek` restores.
+ * @typedef {object} Snapshot
+ * @property {number} event  events handled before it
+ * @property {number} timeUs  simulated time
+ * @property {boolean} moved  whether the clock had moved past the last event
+ * @property {number} bytes  about how much memory it holds
+ * @property {any} data
  */
+
+/** The owner of a promise restored from a snapshot, whose call has finished. */
+const FINISHED = /** @type {Call} */ (/** @type {unknown} */ ({ done: true, waiting: 0 }))
 
 export class Run {
   kernel = new Kernel()
@@ -304,14 +363,58 @@ export class Run {
    * @type {Record<string, Recording[]> | null}
    */
   recordings = null
+  /**
+   * Snapshots, by event and then time, for stepping back and seeking (task 0413, ADR 0023).
+   * @type {Snapshot[]}
+   */
+  snapshots = []
+  /**
+   * Every message that arrived at a component, when the run inspects (spec §13); null when not.
+   * @type {Hop[] | null}
+   */
+  messages = null
+  /** @type {Set<(happening: Happening) => void>} */
+  #observers = new Set()
   /** Counts what behaviour code does, so the run can tell when microtasks have settled. */
   activity = 0
+  #seed = 1
+  /** @type {{ nodes: RunNode[], edges: RunEdge[] }} */
+  #input = { nodes: [], edges: [] }
+  #every = 10_000
+  #cap = 256_000_000
+  #bytes = 0
+  #lastSnapshot = 0
+  #lastEventUs = 0
+  /** @type {Map<string, Edge>} */
+  #edges = new Map()
+  /** @type {WeakMap<Span, number>} */
+  #spanIndex = new WeakMap()
+  /** @type {Set<number>} the indices of spans still running */
+  #open = new Set()
+  /** @type {WeakMap<object, [string, number]>} where each recording is */
+  #recordingAt = new WeakMap()
+  /** @type {WeakMap<Reply, number>} */
+  #replyIndex = new WeakMap()
+  /**
+   * Every request injected from outside, in order, with how many events had been handled when it
+   * was, so a replay schedules it at the same moment.
+   * Run-only edits join it, at the moment they were made (task 0415).
+   * @type {{ at: number, started: boolean, atUs?: number, message?: any, reply?: Reply, edit?: Edit }[]}
+   */
+  #injections = []
+  #applied = 0
+  #hops = 0
+  #calls = 0
+  /** @type {string|null} */
+  #hopTrace = null
+  /** By event: hops and method calls so far, and the trace of the event's hop (spec §12). */
+  #marks = { hops: [0], calls: [0], traces: /** @type {(string|null)[]} */ ([null]) }
   #woken = false
   #started = false
   #ids = 0
   /** @type {Map<string, any>} */
   #nodes = new Map()
-  /** @type {Map<string, { edges: Edge[], random: { nextU32(): number } }>} `node.port` → the edges leaving it */
+  /** @type {Map<string, { edges: Edge[], random: import('./random.js').Stream }>} `node.port` → the edges leaving it */
   #ports = new Map()
   /** @type {Map<string, string>} `node.port` inside an expanded composite → the composite's port it leaves by */
   #exits = new Map()
@@ -319,47 +422,90 @@ export class Run {
   #live = new Set()
 
   /**
-   * @param {{ seed?: number, nodes: RunNode[], edges?: RunEdge[], record?: boolean }} input
-   *   `record` keeps each message that crosses an edge, for recorded stubs and inbound replay
+   * @param {RunInput} input
    */
-  constructor({ seed = 1, nodes, edges = [], record = false }) {
+  constructor({
+    seed = 1,
+    nodes,
+    edges = [],
+    record = false,
+    snapshotEvery = 10_000,
+    snapshotBytes = 256_000_000,
+    inspect = false,
+  }) {
     if (record) this.recordings = {}
-    const streams = createStreams(seed)
-    const strict = isDevelopment()
-    for (const n of nodes) {
-      const manifest = normalizeManifest(n.manifest)
-      const base = baseOf(manifest)
-      const fields = { ...base?.state, .../** @type {any} */ (manifest).state }
-      this.#nodes.set(n.id, {
-        id: n.id,
-        manifest,
-        behaviour: merged(base, n.behaviour),
-        base,
-        props: { ...defaultProps(manifest.properties ?? {}), ...n.props },
-        fields,
-        strict,
-        state: initialState(fields, n),
-        composite: n.composite ?? null,
-        servers: serversOf(manifest, base),
-        random: streams.stream(n.id),
-        latency: streams.stream(`${n.id}:latency`),
-      })
-    }
-    for (const n of nodes)
-      for (const [port, inner] of Object.entries(n.composite?.exits ?? {}))
-        this.#exits.set(`${inner.node}.${inner.port}`, `${n.id}.${port}`)
-    for (const e of edges) {
-      const key = `${e.from.node}.${e.from.port}`
-      const port = this.#ports.get(key) ?? { edges: [], random: streams.stream(`${key}:route`) }
-      const props = e.props ?? {}
-      port.edges.push({
-        ...e,
-        props,
-        route: parseRoute(e),
-        network: streams.stream(`${e.id}:edge`),
-      })
-      this.#ports.set(key, port)
-    }
+    if (inspect) this.messages = []
+    this.#every = snapshotEvery
+    this.#cap = snapshotBytes
+    this.#seed = seed
+    this.#input = { nodes, edges }
+    this.#build(nodes, edges)
+  }
+
+  /** A fresh random stream for a key, seeded from the run seed. @param {string} key */
+  #stream(key) {
+    return xoshiro128ss((this.#seed ^ hashKey(key)) >>> 0)
+  }
+
+  /** Builds the run's components and edges. @param {RunNode[]} nodes @param {RunEdge[]} edges */
+  #build(nodes, edges) {
+    this.#nodes = new Map()
+    this.#ports = new Map()
+    this.#edges = new Map()
+    this.#exits = new Map()
+    for (const n of nodes) this.#addNode(n)
+    for (const e of edges) this.#addEdge(e)
+  }
+
+  /** @param {RunNode} n */
+  #addNode(n) {
+    if (this.#nodes.has(n.id)) fail('INVALID', `The run already has a component '${n.id}'`)
+    const manifest = normalizeManifest(n.manifest)
+    const base = baseOf(manifest)
+    const fields = { ...base?.state, .../** @type {any} */ (manifest).state }
+    this.#nodes.set(n.id, {
+      id: n.id,
+      manifest,
+      behaviour: merged(base, n.behaviour),
+      base,
+      props: { ...defaultProps(manifest.properties ?? {}), ...n.props },
+      fields,
+      strict: isDevelopment(),
+      state: initialState(fields, n),
+      composite: n.composite ?? null,
+      servers: serversOf(manifest, base),
+      random: this.#stream(n.id),
+      latency: this.#stream(`${n.id}:latency`),
+    })
+    for (const [port, inner] of Object.entries(n.composite?.exits ?? {}))
+      this.#exits.set(`${inner.node}.${inner.port}`, `${n.id}.${port}`)
+  }
+
+  /** @param {RunEdge} e */
+  #addEdge(e) {
+    if (this.#edges.has(e.id)) fail('INVALID', `The run already has an edge '${e.id}'`)
+    const key = `${e.from.node}.${e.from.port}`
+    const port = this.#ports.get(key) ?? { edges: [], random: this.#stream(`${key}:route`) }
+    const props = e.props ?? {}
+    const edge = { ...e, props, route: parseRoute(e), network: this.#stream(`${e.id}:edge`) }
+    port.edges.push(edge)
+    this.#edges.set(e.id, edge)
+    this.#ports.set(key, port)
+  }
+
+  /** @param {string} id */
+  #removeEdge(id) {
+    const edge = this.#edges.get(id) ?? fail('INVALID', `The run has no edge '${id}'`)
+    const port = this.#ports.get(`${edge.from.node}.${edge.from.port}`)
+    if (port) port.edges = port.edges.filter(e => e !== edge)
+    this.#edges.delete(id)
+  }
+
+  /** Removes a component and every edge to or from it. @param {string} id */
+  #removeNode(id) {
+    if (!this.#nodes.delete(id)) fail('INVALID', `The run has no component '${id}'`)
+    for (const edge of [...this.#edges.values()])
+      if (edge.from.node === id || edge.to.node === id) this.#removeEdge(edge.id)
   }
 
   /** Simulated time in µs. */
@@ -381,11 +527,15 @@ export class Run {
   inject({ node, port, method, body, path, headers, sizeBytes = 0, atUs = this.nowUs }) {
     /** @type {Reply} */
     const reply = { status: 'pending', atUs: null }
-    this.kernel.schedule(atUs - this.nowUs, {
-      type: 'deliver',
+    this.#replyIndex.set(reply, this.#injections.length)
+    // A request injected behind the furthest point reached starts a new future from here.
+    this.#forget()
+    this.#injections.push({
+      at: this.kernel.processed,
+      started: this.#started,
+      atUs,
       message: {
         kind: 'request',
-        traceId: this.#id(32),
         parentSpanId: null,
         method,
         path: path ?? null,
@@ -394,20 +544,55 @@ export class Run {
         sizeBytes,
         attempt: 1,
         to: { node, port },
-        reply,
       },
+      reply,
     })
+    this.#applyInputs()
     return reply
+  }
+
+  /** Where the run is: events handled and simulated time. */
+  get position() {
+    return { event: this.kernel.processed, timeUs: this.kernel.nowUs }
+  }
+
+  /** About how much memory the snapshots hold, in bytes. */
+  get snapshotBytes() {
+    return this.#bytes
   }
 
   /**
    * Handles events until none are left, or none are due by `untilUs`, when the clock moves to
-   * it and later events wait for the next call.
-   * @param {{ maxEvents?: number, untilUs?: number }} [limits]
+   * it and later events wait for the next call, or until `untilEvent` events have been handled.
+   * A pause at a quiet moment takes a snapshot (ADR 0023).
+   * @param {{ maxEvents?: number, untilUs?: number, untilEvent?: number }} [limits]
    */
-  async runToEnd({ maxEvents = 10_000_000, untilUs = Infinity } = {}) {
+  async runToEnd({ maxEvents = 10_000_000, untilUs = Infinity, untilEvent = Infinity } = {}) {
+    await this.#run({ maxEvents, untilUs, untilEvent })
+  }
+
+  /**
+   * Handles events as runToEnd does, and also until `until` holds after one, or before one that
+   * `before` holds for, as a breakpoint does (spec §13). It says why it stopped: `before`,
+   * `until`, `event` at `untilEvent`, `time` at `untilUs`, or `end` when no event is left.
+   * @param {{ maxEvents?: number, untilUs?: number, untilEvent?: number, until?: () => boolean, before?: (event: any) => boolean }} [limits]
+   * @returns {Promise<'before'|'until'|'event'|'time'|'end'>}
+   */
+  advance({ until, before, ...limits } = {}) {
+    return this.#run(limits, until, before)
+  }
+
+  /**
+   * Handles events up to a limit, or until `stop` says so after one; moves the clock to `untilUs`
+   * when no event is left before it; and takes a snapshot at the pause when the run is quiet.
+   * @param {{ maxEvents?: number, untilUs?: number, untilEvent?: number }} limits
+   * @param {() => boolean} [stop]
+   * @param {(event: any) => boolean} [before]  stops before an event it holds for
+   * @returns {Promise<'before'|'until'|'event'|'time'|'end'>}
+   */
+  async #run({ maxEvents = 10_000_000, untilUs = Infinity, untilEvent = Infinity }, stop, before) {
     const handlers = {
-      deliver: (/** @type {any} */ e) => this.#deliver(e.message),
+      deliver: (/** @type {any} */ e) => this.#deliver(this.#hop(e.message)),
       timer: (/** @type {any} */ e) => this.#timer(e),
       timeout: (/** @type {any} */ e) => this.#timeout(e.attempt),
       retry: (/** @type {any} */ e) => this.#attempt(e.request, this.nowUs),
@@ -415,17 +600,32 @@ export class Run {
       release: (/** @type {any} */ e) => this.#release(this.#nodes.get(e.node)),
       queueTimeout: (/** @type {any} */ e) => this.#giveUp(e.node, e.waiting),
     }
-    if (!this.#started) {
-      this.#started = true
-      this.#init()
+    await this.#begin()
+    /** @type {'before'|'until'|'event'|'time'|'end'} */
+    let why = 'end'
+    while (this.kernel.processed < untilEvent && this.kernel.nextUs <= untilUs) {
+      if (before?.(this.kernel.peek())) {
+        why = 'before'
+        break
+      }
+      if (!this.kernel.step(handlers)) break
       if (this.#woken) await this.#settle()
-    }
-    while (this.kernel.nextUs <= untilUs && this.kernel.step(handlers)) {
-      if (this.#woken) await this.#settle()
+      this.#mark()
+      this.#autoSnapshot()
+      this.#applyInputs()
       if (this.kernel.processed >= maxEvents)
         fail('INVALID', `The run stopped after ${maxEvents} events`)
+      if (stop?.()) {
+        why = 'until'
+        break
+      }
     }
-    if (Number.isFinite(untilUs)) this.kernel.nowUs = Math.max(this.kernel.nowUs, untilUs)
+    if (why === 'end' && this.kernel.processed >= untilEvent) why = 'event'
+    else if (why === 'end' && this.kernel.nextUs !== Infinity) why = 'time'
+    if ((why === 'end' || why === 'time') && Number.isFinite(untilUs))
+      this.kernel.nowUs = Math.max(this.kernel.nowUs, untilUs)
+    if (this.#quiet()) this.#snapshot()
+    return why
   }
 
   /**
@@ -467,7 +667,9 @@ export class Run {
         body: copy(message.body),
         atUs: this.nowUs,
       }
-      ;(this.recordings[message.edge.id] ??= []).push(message.recording)
+      const list = (this.recordings[message.edge.id] ??= [])
+      this.#recordingAt.set(message.recording, [message.edge.id, list.length])
+      list.push(message.recording)
     }
     let refusal = this.#refusal(node, port, method, message.to.port)
     if (!refusal && node.composite?.mode === 'expanded') {
@@ -483,6 +685,7 @@ export class Run {
         binding?.unbound ?? `'${method}' of ${node.id} is not bound to a component inside`
       )
     }
+    this.#arrived(node.id, message.to.port, method ?? '', message)
     const span = this.#span(node.id, method ?? '', 'public', message.traceId, message.parentSpanId)
     /** @type {Call['respond']} */
     const respond =
@@ -490,28 +693,17 @@ export class Run {
     if (refusal) return this.#refuse(span, respond, refusal)
     const fn = node.behaviour.public?.[method] ?? node.base?.any
     if (typeof fn === 'function') {
-      const msg = {
-        kind: message.kind,
-        traceId: message.traceId,
-        spanId: span.spanId,
-        parentSpanId: message.parentSpanId,
-        method,
-        path: message.path,
-        headers: message.headers,
-        body: message.body,
-        sizeBytes: message.sizeBytes,
-        attempt: message.attempt,
-      }
       const declared = node.manifest.methods.public[method]
       const cost = { latency: declared?.latency ?? baseLatency(node.base, method) }
-      return this.#serve(node, span, respond, this.#latency(node, cost), call =>
-        fn.call(node.behaviour.public, msg, this.#context(node, call, span))
-      )
+      return this.#serve(node, span, respond, this.#latency(node, cost), { message, method })
     }
     // A black box without behaviour of its own answers from its contract: after the service
     // time the contract states, with no body.
     if (node.composite)
-      return this.#serve(node, span, respond, contractUs(node.composite), () => null)
+      return this.#serve(node, span, respond, contractUs(node.composite), {
+        message,
+        method: null,
+      })
     this.#refuse(
       span,
       respond,
@@ -535,16 +727,762 @@ export class Run {
     )
   }
 
-  /** Runs each behaviour's `init` hook once, at the start, as an `init` span (spec §8). */
-  #init() {
-    for (const node of this.#nodes.values()) {
-      const fn = node.behaviour.init
-      if (typeof fn !== 'function') continue
-      const span = this.#span(node.id, 'init', 'init', this.#id(32), null)
-      this.#start(node, span, null, 0, call =>
-        fn.call(node.behaviour, this.#context(node, call, span))
+  /**
+   * Makes a run-only edit now (spec §12 "Editing a paused run", task 0415): property values,
+   * a state field, a component's behaviour code, or the run's structure. The run logs it with
+   * the moment, so a replay makes it again then. An edit behind the furthest point reached
+   * starts a new future from here, as an injection does.
+   * @param {Edit} edit
+   */
+  applyEdit(edit) {
+    this.#forget()
+    this.#injections.push({ at: this.kernel.processed, started: this.#started, edit })
+    this.#applyInputs()
+  }
+
+  /**
+   * A new run at this moment that shares this one's history: its snapshots up to now, and a
+   * copy of its trace and outputs (eng §13). It replays from the latest snapshot to the moment.
+   * @returns {Promise<Run>}
+   */
+  async fork() {
+    const child = new Run({
+      seed: this.#seed,
+      ...this.#input,
+      record: this.recordings !== null,
+      inspect: this.messages !== null,
+      snapshotEvery: this.#every,
+      snapshotBytes: this.#cap,
+    })
+    await child.#adopt(this)
+    return child
+  }
+
+  /** The ids of the run's components. */
+  get components() {
+    return [...this.#nodes.keys()]
+  }
+
+  /** The input a component was given, or undefined for one an edit added. @param {string} id */
+  inputOf(id) {
+    return this.#input.nodes.find(n => n.id === id)
+  }
+
+  /** A copy of a component's property values, as they are now. @param {string} id */
+  propsOf(id) {
+    return copy(this.#nodes.get(id)?.props)
+  }
+
+  /** The run-only edits made so far, with the moment each was made. */
+  get appliedEdits() {
+    return this.#injections
+      .slice(0, this.#applied)
+      .filter(i => i.edit)
+      .map(i => ({ at: i.at, edit: /** @type {Edit} */ (i.edit) }))
+  }
+
+  /** A copy of a component's state. @param {string} id */
+  stateOf(id) {
+    return copy(this.#nodes.get(id)?.state)
+  }
+
+  /**
+   * Whether a component, or one inside it, has work on its way: a call running or waiting for a
+   * server, or an event or message for it.
+   * @param {string} id
+   */
+  hasWork(id) {
+    const ours = (/** @type {string} */ node) => node === id || node.startsWith(`${id}/`)
+    for (const call of this.#live) if (ours(call.node.id)) return true
+    for (const [node, n] of this.#nodes) if (ours(node) && n.servers?.queue.length) return true
+    return this.kernel.save().entries.some(({ event }) => {
+      const e = /** @type {any} */ (event)
+      if (e.type !== 'deliver') return typeof e.node === 'string' && ours(e.node)
+      if (e.message.kind === 'response') return ours(e.message.attempt.request.node)
+      return ours(e.message.to.node)
+    })
+  }
+
+  /**
+   * Takes on a parent run's history up to its moment, then replays to that moment.
+   * @param {Run} parent
+   */
+  async #adopt(parent) {
+    const { processed, nowUs } = parent.kernel
+    this.snapshots = parent.snapshots.filter(
+      s => s.event < processed || (s.event === processed && s.timeUs <= nowUs)
+    )
+    this.#bytes = this.snapshots.reduce((sum, s) => sum + s.bytes, 0)
+    const from = this.snapshots.at(-1) ?? fail('INVALID', 'A run forks once it has started')
+    const d = from.data
+    for (const span of structuredClone(parent.spans.slice(0, d.spans))) {
+      this.#spanIndex.set(span, this.spans.length)
+      this.spans.push(span)
+    }
+    this.metrics.push(...parent.metrics.slice(0, d.outputs[0]))
+    this.logs.push(...parent.logs.slice(0, d.outputs[1]))
+    this.changes.push(...parent.changes.slice(0, d.outputs[2]))
+    this.messages?.push(...(parent.messages ?? []).slice(0, d.outputs[3]))
+    for (const [id, list] of Object.entries(parent.recordings ?? {})) {
+      const kept = structuredClone(list.slice(0, d.recordings?.[id]?.length ?? 0))
+      kept.forEach((r, i) => this.#recordingAt.set(r, [id, i]))
+      if (this.recordings) this.recordings[id] = kept
+    }
+    this.#injections = parent.#injections.slice(0, parent.#applied).map((input, i) => {
+      if (!input.reply) return input
+      const reply = { ...input.reply }
+      this.#replyIndex.set(reply, i)
+      return { ...input, reply }
+    })
+    for (const key of /** @type {const} */ (['hops', 'calls', 'traces']))
+      this.#marks[key] = /** @type {any} */ (parent.#marks[key].slice(0, processed + 1))
+    this.#restore(from)
+    if (parent.#moved()) await this.#run({ untilUs: nowUs })
+    else await this.#run({ untilEvent: processed })
+  }
+
+  /**
+   * Builds the run as its input describes it, with the code and structure edits among the
+   * first `count` inputs made again.
+   * @param {number} count
+   */
+  #rebuild(count) {
+    this.#build(this.#input.nodes, this.#input.edges)
+    for (const { edit } of this.#injections.slice(0, count))
+      if (edit && edit.kind !== 'props' && edit.kind !== 'state') this.#applyEdit(edit, false)
+  }
+
+  /**
+   * Makes an edit to the run. `live` starts the init hooks of components it adds.
+   * @param {Edit} edit @param {boolean} live
+   */
+  #applyEdit(edit, live) {
+    /** @param {string} id */
+    const node = id => this.#nodes.get(id) ?? fail('INVALID', `The run has no component '${id}'`)
+    switch (edit.kind) {
+      case 'props': {
+        const n = node(edit.node)
+        n.props = { ...n.props, ...copy(edit.props) }
+        return
+      }
+      case 'state': {
+        let at = node(edit.node).state
+        const path = [...edit.path]
+        const last = /** @type {string|number} */ (path.pop())
+        for (const key of path) at = at[key] ??= {}
+        at[last] = copy(edit.value)
+        return
+      }
+      case 'code': {
+        const n = node(edit.node)
+        n.behaviour = merged(n.base, edit.behaviour)
+        return
+      }
+      case 'structure': {
+        for (const id of edit.remove?.edges ?? []) this.#removeEdge(id)
+        for (const id of edit.remove?.nodes ?? []) this.#removeNode(id)
+        for (const n of edit.add?.nodes ?? []) this.#addNode(n)
+        for (const e of edit.add?.edges ?? []) this.#addEdge(e)
+        if (live && this.#started) for (const n of edit.add?.nodes ?? []) this.#initNode(node(n.id))
+        return
+      }
+      default:
+        fail(
+          'INVALID',
+          `Run-only edits are props, state, code and structure, not '${/** @type {any} */ (edit).kind}'`
+        )
+    }
+  }
+
+  /**
+   * Seeks to a moment: the end of an event, or a simulated time, as a run from time zero would
+   * reach it. Going back restores the latest snapshot before the moment and replays forward
+   * (ADR 0023).
+   * @param {{ event?: number, timeUs?: number }} target
+   */
+  async seek({ event, timeUs }) {
+    await this.#begin()
+    if (event !== undefined) {
+      const at = this.kernel.processed
+      if (event < at || (event === at && this.#moved()))
+        this.#restore(this.#latest(s => s.event < event || (s.event === event && !s.moved)))
+      if (event > this.kernel.processed) await this.#run({ untilEvent: event })
+      return
+    }
+    if (timeUs === undefined) return fail('INVALID', 'seek takes an event or a time in µs')
+    if (timeUs < this.kernel.nowUs) this.#restore(this.#latest(s => s.timeUs <= timeUs))
+    await this.#run({ untilUs: timeUs })
+  }
+
+  /**
+   * Steps forward n units, or back for a negative n (spec §12 "Step units"): events; hops, a
+   * message arriving at any component; followed hops, those of one trace; method calls, a public
+   * or private call starting or finishing; or slices of simulated time. A step in hops, followed
+   * hops or calls ends right after the event that makes it, so stepping forward n then back n
+   * comes back to the same moment.
+   * @param {number} n
+   * @param {'event'|'hop'|'followed'|'call'|'time'} [unit]
+   * @param {{ trace?: string, sliceMs?: number }} [options]  the trace a followed hop belongs to,
+   *   and the slice of time a time step takes, 10 ms by default
+   */
+  async step(n, unit = 'event', { trace, sliceMs = 10 } = {}) {
+    await this.#begin()
+    if (n === 0) return
+    const { processed, nowUs } = this.kernel
+    if (unit === 'event') return this.seek({ event: Math.max(0, processed + n) })
+    if (unit === 'time')
+      return this.seek({ timeUs: Math.max(0, nowUs + Math.round(n * sliceMs * 1000)) })
+    const marks = this.#marks
+    const counts = unit === 'hop' ? marks.hops : unit === 'call' ? marks.calls : null
+    if (!counts && unit !== 'followed')
+      fail('INVALID', `Step units are event, hop, followed, call and time, not '${unit}'`)
+    /** @param {number} k */
+    const isUnit = k => k > 0 && (counts ? counts[k] > counts[k - 1] : marks.traces[k] === trace)
+    if (n > 0) {
+      let passed = 0
+      return this.#run(
+        {},
+        () =>
+          (isUnit(this.kernel.processed) && ++passed >= n) ||
+          (!counts && !this.#traceAlive(/** @type {string} */ (trace)))
       )
     }
+    let need = -n + (isUnit(processed) && !this.#moved() ? 1 : 0)
+    let k = processed
+    for (; k > 0; k--) if (isUnit(k) && --need === 0) break
+    return this.seek({ event: need === 0 ? k : 0 })
+  }
+
+  /**
+   * A hash of everything a moment of the run holds: its position, every component's state,
+   * servers and random streams, the pending events and the trace so far.
+   */
+  stateHash() {
+    const k = this.kernel.save()
+    return toHex(
+      sha256(
+        canonicalJson({
+          position: [k.processed, k.nowUs, this.#ids],
+          nodes: [...this.#nodes].map(([id, n]) => [
+            id,
+            n.state,
+            n.random.save(),
+            n.latency.save(),
+            n.servers ? [n.servers.busy, n.servers.queue.length] : null,
+          ]),
+          ports: [...this.#ports].map(([key, port]) => [key, port.random.save()]),
+          edges: [...this.#edges].map(([id, edge]) => [id, edge.network.save()]),
+          queue: k.entries.map(e => [e.timeUs, e.priority, e.seq, e.event.type]),
+          spans: this.spans,
+          outputs: [
+            this.metrics.length,
+            this.logs.length,
+            this.changes.length,
+            this.messages?.length ?? 0,
+          ],
+        })
+      )
+    )
+  }
+
+  /**
+   * Starts the run: a snapshot before anything happens, the `init` hooks, and the snapshot at
+   * time zero that replaces it when no init is waiting part-way.
+   */
+  async #begin() {
+    if (this.#started) return
+    if (!this.snapshots.length) this.#snapshot()
+    this.#started = true
+    this.#init()
+    if (this.#woken) await this.#settle()
+    this.#marks.calls[0] = this.#calls
+    if (this.#quiet()) this.#snapshot(true)
+    this.#applyInputs()
+  }
+
+  /** Whether no method is suspended part-way, so the run can be captured as data (ADR 0023). */
+  #quiet() {
+    return this.#live.size === 0
+  }
+
+  /** Whether the clock has moved past the last event, to a time a run was asked to reach. */
+  #moved() {
+    return this.kernel.nowUs !== this.#lastEventUs
+  }
+
+  /** Counts a message arriving, and the trace it belongs to. @param {any} message */
+  #hop(message) {
+    this.#hops++
+    this.#hopTrace =
+      message.kind === 'response' ? message.attempt.request.message.traceId : message.traceId
+    if (message.kind === 'response') {
+      const { request, span } = message.attempt
+      this.#arrived(request.node, request.edge.from.port, request.message.method, {
+        kind: 'response',
+        traceId: request.message.traceId,
+        path: null,
+        headers: {},
+        body: message.ok ? message.value : errorBody(request.node, message.value),
+        sizeBytes: request.edge.props.payloadSize ?? 0,
+        attempt: span.attempt ?? 1,
+        edge: request.edge,
+      })
+    }
+    return message
+  }
+
+  /**
+   * A message arriving at a component: tells the observers, and keeps it when the run inspects.
+   * @param {string} node @param {string} port @param {string} method @param {any} message
+   */
+  #arrived(node, port, method, message) {
+    if (this.#observers.size) this.#tell({ type: 'arrive', node, port, method, message })
+    this.messages?.push({
+      event: this.kernel.processed,
+      atUs: this.nowUs,
+      traceId: message.traceId,
+      node,
+      port,
+      method,
+      kind: message.kind,
+      path: message.path ?? null,
+      headers: copy(message.headers ?? {}),
+      body: copy(message.body),
+      sizeBytes: message.sizeBytes ?? 0,
+      attempt: message.attempt ?? 1,
+      edge: message.edge?.id ?? null,
+    })
+  }
+
+  /** @param {Happening} happening */
+  #tell(happening) {
+    for (const listener of this.#observers) listener(happening)
+  }
+
+  /**
+   * Calls `listener` with what happens inside each event (spec §13): calls starting, messages
+   * arriving and leaving, and logs. It returns a function that stops it.
+   * @param {(happening: Happening) => void} listener
+   */
+  observe(listener) {
+    this.#observers.add(listener)
+    return () => void this.#observers.delete(listener)
+  }
+
+  /** Records, for the event just handled, the step units so far. */
+  #mark() {
+    const k = this.kernel.processed
+    this.#lastEventUs = this.kernel.nowUs
+    this.#marks.hops[k] = this.#hops
+    this.#marks.calls[k] = this.#calls
+    this.#marks.traces[k] = this.#hopTrace
+    this.#hopTrace = null
+  }
+
+  /** Takes a snapshot when one is due and the run is quiet. */
+  #autoSnapshot() {
+    if (this.kernel.processed - this.#lastSnapshot >= this.#every && this.#quiet()) this.#snapshot()
+  }
+
+  /**
+   * Takes a snapshot here, unless one is here already, which `replace` replaces; then thins old
+   * snapshots to the memory cap.
+   * @param {boolean} [replace]
+   */
+  #snapshot(replace = false) {
+    const { processed: event, nowUs: timeUs } = this.kernel
+    const here = this.snapshots.findIndex(s => s.event === event && s.timeUs === timeUs)
+    this.#lastSnapshot = event
+    if (here >= 0 && !replace) return
+    const data = structuredClone(this.#encode())
+    /** @type {Snapshot} */
+    const snapshot = {
+      event,
+      timeUs,
+      moved: this.#moved(),
+      bytes: JSON.stringify(data).length,
+      data,
+    }
+    if (here >= 0) {
+      this.#bytes -= this.snapshots[here].bytes
+      this.snapshots[here] = snapshot
+    } else {
+      const after = this.snapshots.findIndex(
+        s => s.event > event || (s.event === event && s.timeUs > timeUs)
+      )
+      this.snapshots.splice(after < 0 ? this.snapshots.length : after, 0, snapshot)
+    }
+    this.#bytes += snapshot.bytes
+    // Thin the old ones: drop the snapshot whose neighbours are closest, the oldest first, never
+    // one at time zero or the latest. Seeks stay exact; distant ones replay further.
+    while (this.#bytes > this.#cap) {
+      let drop = -1
+      let gap = Infinity
+      for (let i = 1; i < this.snapshots.length - 1; i++) {
+        if (this.snapshots[i].event === 0) continue
+        const g = this.snapshots[i + 1].event - this.snapshots[i - 1].event
+        if (g < gap) [drop, gap] = [i, g]
+      }
+      if (drop < 0) break
+      this.#bytes -= this.snapshots[drop].bytes
+      this.snapshots.splice(drop, 1)
+    }
+  }
+
+  /** The latest snapshot that `fits`. @param {(s: Snapshot) => boolean} fits */
+  #latest(fits) {
+    for (let i = this.snapshots.length - 1; i >= 0; i--)
+      if (fits(this.snapshots[i])) return this.snapshots[i]
+    return fail('INVALID', 'No snapshot is early enough')
+  }
+
+  /** Schedules the injected requests due by now, generating their trace ids as they go. */
+  #applyInputs() {
+    while (this.#applied < this.#injections.length) {
+      const next = this.#injections[this.#applied]
+      if (next.started && (!this.#started || next.at > this.kernel.processed)) return
+      this.#applied++
+      if (next.edit) this.#applyEdit(next.edit, true)
+      else
+        this.kernel.schedule(/** @type {number} */ (next.atUs) - this.nowUs, {
+          type: 'deliver',
+          message: { ...next.message, traceId: this.#id(32), reply: next.reply },
+        })
+    }
+  }
+
+  /**
+   * Drops the future beyond this moment, which a request injected now replaces: later snapshots,
+   * step marks and injections not yet scheduled.
+   */
+  #forget() {
+    const { processed, nowUs } = this.kernel
+    this.snapshots = this.snapshots.filter(
+      s => s.event < processed || (s.event === processed && s.timeUs <= nowUs)
+    )
+    this.#bytes = this.snapshots.reduce((sum, s) => sum + s.bytes, 0)
+    for (const list of Object.values(this.#marks))
+      list.length = Math.min(list.length, processed + 1)
+    this.#injections.length = this.#applied
+  }
+
+  /** Whether any pending event or running call belongs to a trace. @param {string} trace */
+  #traceAlive(trace) {
+    for (const call of this.#live) if (call.span.traceId === trace) return true
+    return this.kernel.save().entries.some(e => this.#traceOf(e.event) === trace)
+  }
+
+  /** The trace an event belongs to. @param {any} e @returns {string|null} */
+  #traceOf(e) {
+    switch (e.type) {
+      case 'deliver':
+        return e.message.kind === 'response'
+          ? e.message.attempt.request.message.traceId
+          : e.message.traceId
+      case 'timer':
+        return e.traceId
+      case 'timeout':
+        return e.attempt.request.message.traceId
+      case 'retry':
+        return e.request.message.traceId
+      case 'spent':
+        return e.pending.owner.span?.traceId ?? null
+      default:
+        return null
+    }
+  }
+
+  /**
+   * The run as plain data, at a quiet moment: nothing in it refers to a suspended method, so a
+   * structural copy captures it (ADR 0023). References between its parts become indices and
+   * ids: spans by index, edges by id, injected replies by index.
+   */
+  #encode() {
+    /** @type {Map<object, any>} */
+    const memo = new Map()
+    const k = this.kernel.save()
+    const { spans, recordings } = this
+    return {
+      started: this.#started,
+      ids: this.#ids,
+      hops: this.#hops,
+      calls: this.#calls,
+      lastEventUs: this.#lastEventUs,
+      applied: this.#applied,
+      replies: this.#injections.map(({ reply }) => reply && { ...reply }),
+      spans: spans.length,
+      open: [...this.#open].map(i => {
+        const { endUs, status, code, queuedUs } = spans[i]
+        return [i, { endUs, status, code, queuedUs }]
+      }),
+      outputs: [
+        this.metrics.length,
+        this.logs.length,
+        this.changes.length,
+        this.messages?.length ?? 0,
+      ],
+      recordings:
+        recordings &&
+        Object.fromEntries(
+          Object.entries(recordings).map(([id, list]) => [
+            id,
+            { length: list.length, open: list.flatMap((r, i) => (r.response ? [] : [i])) },
+          ])
+        ),
+      nodes: [...this.#nodes].map(([id, n]) => [
+        id,
+        {
+          // A copy, as state may hold views of its own parts, which no structural copy takes.
+          state: copy(n.state),
+          props: copy(n.props),
+          random: n.random.save(),
+          latency: n.latency.save(),
+          servers: n.servers && {
+            busy: n.servers.busy,
+            queue: n.servers.queue.map((/** @type {any} */ w) => this.#encodeWork(w, memo)),
+          },
+        },
+      ]),
+      ports: [...this.#ports].map(([key, port]) => [key, port.random.save()]),
+      edges: [...this.#edges].map(([id, edge]) => [id, edge.network.save()]),
+      nowUs: k.nowUs,
+      processed: k.processed,
+      seq: k.seq,
+      queue: k.entries.map(e => ({ ...e, event: this.#encodeEvent(e.event, memo) })),
+    }
+  }
+
+  /** @param {any} e @param {Map<object, any>} memo */
+  #encodeEvent(e, memo) {
+    switch (e.type) {
+      case 'deliver':
+        return { type: e.type, message: this.#encodeMessage(e.message, memo) }
+      case 'timeout':
+        return { type: e.type, attempt: this.#encodeAttempt(e.attempt, memo) }
+      case 'retry':
+        return { type: e.type, request: this.#encodeRequest(e.request, memo) }
+      case 'spent':
+        // Its call has finished, so settling it does nothing but count.
+        return { type: e.type }
+      case 'queueTimeout':
+        return { type: e.type, node: e.node, waiting: this.#encodeWork(e.waiting, memo) }
+      default:
+        return e
+    }
+  }
+
+  /** @param {any} m @param {Map<object, any>} memo */
+  #encodeMessage(m, memo) {
+    if (m.kind === 'response') {
+      const { code, message, details } = m.ok ? {} : m.value
+      return {
+        kind: m.kind,
+        attempt: this.#encodeAttempt(m.attempt, memo),
+        ok: m.ok,
+        value: m.ok ? m.value : { code, message, details },
+      }
+    }
+    return {
+      ...m,
+      edge: m.edge?.id,
+      current: m.current && this.#encodeAttempt(m.current, memo),
+      reply: m.reply ? this.#replyIndex.get(m.reply) : undefined,
+      recording: m.recording ? this.#recordingAt.get(m.recording) : undefined,
+    }
+  }
+
+  /** @param {Attempt} a @param {Map<object, any>} memo */
+  #encodeAttempt(a, memo) {
+    if (memo.has(a)) return memo.get(a)
+    const out = { request: null, span: this.#spanIndex.get(a.span), answered: a.answered }
+    memo.set(a, out)
+    out.request = this.#encodeRequest(a.request, memo)
+    return out
+  }
+
+  /** @param {Request} r @param {Map<object, any>} memo */
+  #encodeRequest(r, memo) {
+    if (memo.has(r)) return memo.get(r)
+    const out = { node: r.node, edge: r.edge.id, message: null, attempts: r.attempts }
+    memo.set(r, out)
+    out.message = this.#encodeMessage(r.message, memo)
+    return out
+  }
+
+  /** @param {any} w @param {Map<object, any>} memo */
+  #encodeWork(w, memo) {
+    if (memo.has(w)) return memo.get(w)
+    const out = {
+      span: this.#spanIndex.get(w.span),
+      ownUs: w.ownUs,
+      at: w.at,
+      source: { message: this.#encodeMessage(w.source.message, memo), method: w.source.method },
+    }
+    memo.set(w, out)
+    return out
+  }
+
+  /**
+   * Puts the run back as a snapshot holds it: the clock, the queue, every component's state,
+   * servers and random streams, and the trace and outputs as they were then.
+   * @param {Snapshot} snapshot
+   */
+  #restore(snapshot) {
+    const d = structuredClone(snapshot.data)
+    /** @type {Map<object, any>} */
+    const memo = new Map()
+    this.#live.clear()
+    this.#woken = false
+    this.#started = d.started
+    this.#ids = d.ids
+    this.#hops = d.hops
+    this.#calls = d.calls
+    this.#hopTrace = null
+    this.#lastEventUs = d.lastEventUs
+    this.#lastSnapshot = snapshot.event
+    this.spans.length = d.spans
+    this.#open = new Set(d.open.map((/** @type {[number, any]} */ [i]) => i))
+    for (const [i, fields] of d.open) {
+      const span = /** @type {any} */ (this.spans[i])
+      for (const key of ['endUs', 'status', 'code', 'queuedUs'])
+        if (fields[key] === undefined) delete span[key]
+        else span[key] = fields[key]
+    }
+    ;[this.metrics.length, this.logs.length, this.changes.length] = d.outputs
+    if (this.messages) this.messages.length = d.outputs[3]
+    for (const [id, list] of Object.entries(this.recordings ?? {})) {
+      const kept = d.recordings?.[id]
+      list.length = kept?.length ?? 0
+      for (const i of kept?.open ?? []) delete list[i].response
+    }
+    this.#injections.forEach(({ reply }, i) => {
+      if (!reply) return
+      for (const key of Object.keys(reply)) delete (/** @type {any} */ (reply)[key])
+      Object.assign(reply, d.replies[i] ?? { status: 'pending', atUs: null })
+    })
+    this.#applied = d.applied
+    // Code and structure edits change the run's shape: build it as it was at the snapshot.
+    if (this.#injections.some(i => i.edit && i.edit.kind !== 'props' && i.edit.kind !== 'state'))
+      this.#rebuild(d.applied)
+    for (const [id, n] of d.nodes) {
+      const node = this.#nodes.get(id)
+      node.state = n.state
+      node.props = n.props
+      node.random.load(n.random)
+      node.latency.load(n.latency)
+      if (node.servers) {
+        node.servers.busy = n.servers.busy
+        node.servers.queue = n.servers.queue.map((/** @type {any} */ w) =>
+          this.#decodeWork(w, memo)
+        )
+      }
+    }
+    for (const [key, saved] of d.ports) this.#ports.get(key)?.random.load(saved)
+    for (const [id, saved] of d.edges) this.#edges.get(id)?.network.load(saved)
+    this.kernel.load({
+      nowUs: d.nowUs,
+      processed: d.processed,
+      seq: d.seq,
+      entries: d.queue.map((/** @type {any} */ e) => ({
+        ...e,
+        event: this.#decodeEvent(e.event, memo),
+      })),
+    })
+    this.#applyInputs()
+  }
+
+  /** @param {any} e @param {Map<object, any>} memo */
+  #decodeEvent(e, memo) {
+    switch (e.type) {
+      case 'deliver':
+        return { type: e.type, message: this.#decodeMessage(e.message, memo) }
+      case 'timeout':
+        return { type: e.type, attempt: this.#decodeAttempt(e.attempt, memo) }
+      case 'retry':
+        return { type: e.type, request: this.#decodeRequest(e.request, memo) }
+      case 'spent':
+        return { type: e.type, pending: new Pending(FINISHED, this) }
+      case 'queueTimeout':
+        return { type: e.type, node: e.node, waiting: this.#decodeWork(e.waiting, memo) }
+      default:
+        return e
+    }
+  }
+
+  /** @param {any} m @param {Map<object, any>} memo */
+  #decodeMessage(m, memo) {
+    if (m.kind === 'response')
+      return {
+        kind: m.kind,
+        attempt: this.#decodeAttempt(m.attempt, memo),
+        ok: m.ok,
+        value: m.ok ? m.value : new CallError(m.value),
+      }
+    return {
+      ...m,
+      edge: m.edge === undefined ? undefined : this.#edges.get(m.edge),
+      current: m.current && this.#decodeAttempt(m.current, memo),
+      reply: m.reply === undefined ? undefined : this.#injections[m.reply].reply,
+      recording: m.recording && this.recordings?.[m.recording[0]][m.recording[1]],
+    }
+  }
+
+  /** @param {any} a @param {Map<object, any>} memo */
+  #decodeAttempt(a, memo) {
+    if (memo.has(a)) return memo.get(a)
+    const out = { request: null, span: this.spans[a.span], answered: a.answered }
+    memo.set(a, out)
+    out.request = this.#decodeRequest(a.request, memo)
+    return out
+  }
+
+  /** @param {any} r @param {Map<object, any>} memo */
+  #decodeRequest(r, memo) {
+    if (memo.has(r)) return memo.get(r)
+    const out = {
+      node: r.node,
+      edge: this.#edges.get(r.edge),
+      message: null,
+      pending: new Pending(FINISHED, this),
+      attempts: r.attempts,
+    }
+    memo.set(r, out)
+    out.message = this.#decodeMessage(r.message, memo)
+    return out
+  }
+
+  /** @param {any} w @param {Map<object, any>} memo */
+  #decodeWork(w, memo) {
+    if (memo.has(w)) return memo.get(w)
+    const message = this.#decodeMessage(w.source.message, memo)
+    const out = {
+      span: this.spans[w.span],
+      ownUs: w.ownUs,
+      at: w.at,
+      source: { message, method: w.source.method },
+      respond:
+        message.kind === 'event'
+          ? null
+          : (/** @type {boolean} */ ok, /** @type {unknown} */ value, /** @type {number} */ atUs) =>
+              this.#respond(message, ok, value, atUs),
+    }
+    memo.set(w, out)
+    return out
+  }
+
+  /** Runs each behaviour's `init` hook once, at the start, as an `init` span (spec §8). */
+  #init() {
+    for (const node of this.#nodes.values()) this.#initNode(node)
+  }
+
+  /** Runs a component's `init` hook, if it has one. @param {any} node */
+  #initNode(node) {
+    const fn = node.behaviour.init
+    if (typeof fn !== 'function') return
+    const span = this.#span(node.id, 'init', 'init', this.#id(32), null)
+    this.#start(node, span, null, 0, call =>
+      fn.call(node.behaviour, this.#context(node, call, span))
+    )
   }
 
   /** @param {{ node: string, name: string, data: unknown, traceId: string, parentSpanId: string }} e */
@@ -622,13 +1560,13 @@ export class Run {
    * Runs a public call on a free server of its node, queues it when all are busy, or refuses it
    * when the backlog is full (ADR 0020). A node without servers runs every call at once.
    * @param {any} node @param {Span} span @param {Call['respond']} respond @param {number} ownUs
-   * @param {(call: Call) => unknown} body
+   * @param {Source} source
    */
-  #serve(node, span, respond, ownUs, body) {
+  #serve(node, span, respond, ownUs, source) {
     const servers = node.servers
     if (!servers || this.#setting(node, 'count') === Infinity)
-      return this.#start(node, span, respond, ownUs, body)
-    const work = { span, respond, ownUs, body, at: this.nowUs }
+      return this.#start(node, span, respond, ownUs, this.#body(node, span, source))
+    const work = { span, respond, ownUs, source, at: this.nowUs }
     if (!servers.queue.length && servers.busy < this.#setting(node, 'count'))
       return this.#admit(node, work)
     if (servers.queue.length >= this.#setting(node, 'backlog'))
@@ -677,10 +1615,36 @@ export class Run {
     servers.busy++
     this.#busy(node)
     if (this.nowUs > work.at) work.span.queuedUs = this.nowUs - work.at
+    const body = this.#body(node, work.span, work.source)
     this.#start(node, work.span, work.respond, work.ownUs, call => {
       call.server = true
-      return work.body(call)
+      return body(call)
     })
+  }
+
+  /**
+   * What a call runs: the public method's behaviour with its message, or, for a black box
+   * without behaviour (`method` null), nothing. It is rebuilt from data, so a snapshot can hold
+   * calls waiting for a server.
+   * @param {any} node @param {Span} span @param {Source} source
+   * @returns {(call: Call) => unknown}
+   */
+  #body(node, span, { message, method }) {
+    const fn = method === null ? null : (node.behaviour.public?.[method] ?? node.base?.any)
+    if (typeof fn !== 'function') return () => null
+    const msg = {
+      kind: message.kind,
+      traceId: message.traceId,
+      spanId: span.spanId,
+      parentSpanId: message.parentSpanId,
+      method,
+      path: message.path,
+      headers: message.headers,
+      body: message.body,
+      sizeBytes: message.sizeBytes,
+      attempt: message.attempt,
+    }
+    return call => fn.call(node.behaviour.public, msg, this.#context(node, call, span))
   }
 
   /** Frees a server, and starts the calls waiting that now fit. @param {any} node */
@@ -746,6 +1710,8 @@ export class Run {
     span.endUs = atUs
     span.status = status
     if (code) span.code = code
+    this.#open.delete(/** @type {number} */ (this.#spanIndex.get(span)))
+    if (span.kind === 'public' || span.kind === 'private') this.#calls++
   }
 
   /**
@@ -885,6 +1851,7 @@ export class Run {
       log: (/** @type {string} */ level, /** @type {unknown[]} */ ...args) => {
         touch()
         run.logs.push({ atUs: run.nowUs, node: node.id, level, args: copy(args) })
+        if (run.#observers.size) run.#tell({ type: 'log', node: node.id, level, args: copy(args) })
       },
     }
     return ctx
@@ -953,6 +1920,15 @@ export class Run {
       to: edge.to,
       edge,
     })
+    if (this.#observers.size)
+      this.#tell({
+        type: 'depart',
+        node: node.id,
+        port: portName,
+        edge: edge.id,
+        method: message.method,
+        message,
+      })
     const departs = Math.max(call.busyUntil, this.nowUs)
     if (!wait) {
       this.#cross(edge, departs, message.sizeBytes, {
@@ -1118,7 +2094,13 @@ export class Run {
       endUs: null,
       status: 'running',
     }
+    this.#spanIndex.set(span, this.spans.length)
+    this.#open.add(this.spans.length)
     this.spans.push(span)
+    if (kind === 'public' || kind === 'private') {
+      this.#calls++
+      if (this.#observers.size) this.#tell({ type: 'call', kind, node, method, span })
+    }
     return span
   }
 
@@ -1131,7 +2113,7 @@ export class Run {
 /**
  * A run of components with the real ctx. With `record`, it keeps each message that crosses an
  * edge in `run.recordings`, for recorded stubs and inbound replay (task 0412).
- * @param {{ seed?: number, nodes: RunNode[], edges?: RunEdge[], record?: boolean }} input
+ * @param {RunInput} input
  * @example const run = createRun({ seed: 42, nodes, edges }); run.inject({ node: 'api', port: 'in', method: 'get' }); await run.runToEnd()
  */
 export function createRun(input) {

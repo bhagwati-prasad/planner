@@ -14,7 +14,7 @@ The kernel is the most performance-sensitive and correctness-sensitive code in S
 
 ## Snapshots, stepping and branches
 
-- Snapshots capture all component state, pending events and PRNG positions every 10,000 events and at every pause. They are structural copies, never live references.
+- Snapshots capture all component state, pending events, servers and their waiting calls, and PRNG positions. They are taken at time zero and at the first quiet event boundary after every 10,000 events: one where no method is suspended at an `await`, because a suspended method is a continuation no copy can capture (ADR 0023). A pause records its event, and is a snapshot too when the run is quiet then. They are structural copies, never live references.
 - Stepping back and scrubbing restore the nearest earlier snapshot and replay forward deterministically. Stepping forward n then back n must restore an identical state hash; a property test enforces this.
 - Snapshot memory is capped per run (256 MB by default). Older snapshots are thinned, which makes distant seeks slower but never inexact.
 - A branch run stores its parent id, branch point and edit list. It shares its parent's snapshots up to the branch point instead of copying them.

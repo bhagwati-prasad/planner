@@ -85,6 +85,43 @@ export class EventQueue {
     this.#popped = top
     return top
   }
+
+  /** The earliest event, left in the queue, or undefined when there is none. */
+  peek() {
+    return this.#heap[0]?.event
+  }
+
+  /**
+   * The queued events in order, with the insertion counter, for a snapshot (task 0413). The
+   * entries are copies; their events are the queue's own.
+   * @returns {{ entries: QueuedEvent<T>[], seq: number }}
+   */
+  save() {
+    const entries = this.#heap.map(({ timeUs, priority, seq, event }) => ({
+      timeUs,
+      priority,
+      seq,
+      event,
+    }))
+    return { entries: entries.sort((a, b) => (before(a, b) ? -1 : 1)), seq: this.#seq }
+  }
+
+  /**
+   * Replaces the queue with saved entries, in order, and the insertion counter.
+   * @param {{ entries: QueuedEvent<T>[], seq: number }} saved
+   */
+  load({ entries, seq }) {
+    // A sorted array is a valid heap.
+    this.#heap = entries.map(({ timeUs, priority, seq: s, event }) => ({
+      timeUs,
+      priority,
+      seq: s,
+      event,
+    }))
+    this.#heap.sort((a, b) => (before(a, b) ? -1 : 1))
+    this.#popped = undefined
+    this.#seq = seq
+  }
 }
 
 /** @param {QueuedEvent<any>} a @param {QueuedEvent<any>} b */

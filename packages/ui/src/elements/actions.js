@@ -129,7 +129,7 @@ export function registerDefaultActions(shell) {
   // Simulate (spec §11): the walking skeleton's single request; run controls follow (spec §12)
   const runOnce = async () => {
     try {
-      const run = await s.sim.start({ system: current() })
+      const run = await s.sim.once({ system: current() })
       await canvas()?.animateRun(run)
       if (run.response) shell.notify(`Response in ${run.response.atUs / 1000} ms`, 'success')
       else shell.notify('The request got no response', 'error')

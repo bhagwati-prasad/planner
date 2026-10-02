@@ -19,7 +19,7 @@ The debugger works inside any run. It adds breakpoints, inspection and watches o
 ## How it works
 
 - The kernel checks breakpoints before dispatching each event and yields control when one matches.
-- Snapshots of all component state are taken every 10,000 events (configurable) and at every pause, which bounds the cost of stepping back and scrubbing.
+- Snapshots of all component state are taken at the first moment after every 10,000 events (configurable) when no method is waiting part-way through, which bounds the cost of stepping back and scrubbing (ADR 0023). A pause marks its moment, and is a snapshot too when no method is waiting then.
 - For line-level debugging inside component code, a `debugger` statement in a method pauses in the browser's own DevTools worker debugger.
 - Protocol commands include `play`, `pause`, `stop`, `restart`, `runToEnd`, `step`, `stepBack`, `seek`, `setBreakpoint`, `clearBreakpoint`, `inspect`, `evaluate`, `edit` and `branch`. The console exposes them on run handles and as `strata.debug.*` (§18).
 

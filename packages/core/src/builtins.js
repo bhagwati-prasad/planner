@@ -67,7 +67,8 @@ const base = (key, name, description, ports) => ({
 
 /**
  * What every connection carries (spec §8 "Connection types"). Transmission delay is payload
- * size divided by bandwidth; the simulation (R1) adds it to the network latency.
+ * size divided by bandwidth, in bits per second as eng §8 stores it; the simulation adds it to
+ * the network latency (task 0405).
  */
 const connection = {
   properties: {
@@ -85,7 +86,14 @@ const connection = {
       group: 'Network',
       description: 'Network latency, one way',
     },
-    bandwidth: { type: 'number', unit: 'Mbps', default: 1000, min: 0, group: 'Network' },
+    bandwidth: {
+      type: 'number',
+      unit: 'bps',
+      default: 1_000_000_000,
+      min: 0,
+      group: 'Network',
+      description: 'Bits per second (eng §8): 1 Gbps',
+    },
     packetLoss: { type: 'percent', unit: '%', default: 0, min: 0, max: 100, group: 'Network' },
     payloadSize: { type: 'bytes', default: '4KB', group: 'Network' },
     tlsOverhead: {

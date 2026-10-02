@@ -9,6 +9,8 @@ export { EventQueue } from './queue.js'
 export { createStreams, xoshiro128ss, hashKey } from './random.js'
 export { log, exp } from './math.js'
 export { createRun, Run } from './run.js'
+export { createControl, RunControl, branchHash, rootHash } from './control.js'
+export { compareRuns } from './compare.js'
 export { planRun } from './plan.js'
 export { requestPath, replayInbound } from './scope.js'
 export { runComponent } from './component.js'
@@ -16,5 +18,10 @@ export { createTestContext } from './testing.js'
 export { sample, probit } from './sample.js'
 export { runHash } from './hash.js'
 export { simulate } from './skeleton.js'
-export { PROTOCOL_VERSION, handleMessage, inProcessSimHost } from './protocol.js'
+export {
+  PROTOCOL_VERSION,
+  createInProcessSimHost,
+  handleMessage,
+  inProcessSimHost,
+} from './protocol.js'
 export { createWorkerSession } from './worker/session.js'

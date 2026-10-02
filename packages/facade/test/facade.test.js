@@ -79,7 +79,8 @@ describe('facade handles', () => {
     const { strata } = createTestStrata()
     await strata.projects.create('checkout')
 
-    // Spec §18, as written, up to strata.sim.start.
+    // Spec §18 up to strata.sim.start, with the stand-ins' db port (sim.test.js runs it in full,
+    // with the starter library).
     const p = await strata.projects.open('checkout')
     const root = p.root
 

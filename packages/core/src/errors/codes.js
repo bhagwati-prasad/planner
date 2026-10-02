@@ -110,6 +110,9 @@ const DESCRIPTIONS = {
   E_SIM_EXPRESSION_INVALID: 'An expression is malformed or uses a name it cannot',
   E_SIM_TIMEOUT: 'A request got no response within its edge timeout, after every retry',
   E_STUB_NO_RECORDING: 'A recorded stub has no recorded response left for the call',
+  E_RUN_STATE: 'The run is not in a state that allows this control',
+  E_RUN_EDIT: 'The run-only edits do not allow this way to continue',
+  E_RUN_NOT_FOUND: 'The worker holds no run with this id; it was closed, or its worker restarted',
 
   E_PROTOCOL_VERSION: 'A worker message uses a protocol version this build does not speak',
   E_PROTOCOL_UNKNOWN_TYPE: 'A worker message has a type the worker does not handle',

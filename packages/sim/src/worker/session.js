@@ -11,12 +11,17 @@
  *   → run { … }                   runs the kernel (protocol.js)
  *   ← heartbeat { node, method }  as a method starts, so the host can name one that never
  *                                 returns (spec §8 "Watchdog")
+ *   → run.start, run.control, run.read, run.close
+ *                                 the runs it keeps between messages (sessions.js, ADR 0025),
+ *                                 with the components it loaded as their behaviours
  *
  * Replies carry the request's `id` and move the buffers of their typed arrays as Transferables;
  * failures are `error` replies with a code.
  */
+import { fail } from '../../../core/src/index.js'
 import { PROTOCOL_VERSION, handleMessage, transferables } from '../protocol.js'
 import { createStreams } from '../random.js'
+import { createRunSessions } from '../sessions.js'
 
 /**
  * @typedef {import('../protocol.js').ProtocolMessage} ProtocolMessage
@@ -36,8 +41,11 @@ import { createStreams } from '../random.js'
  * @param {object} options
  * @param {(message: ProtocolMessage, transfer?: any[]) => void} options.post  posts to the host
  * @param {Sandbox} options.sandbox
+ * @param {import('../control.js').Scheduler} [options.scheduler]  plays runs; without one, runs
+ *   fail to start
+ * @param {() => number} [options.wallMs]  wall time, for heartbeats and views while playing
  */
-export function createWorkerSession({ post, sandbox }) {
+export function createWorkerSession({ post, sandbox, scheduler, wallMs = () => 0 }) {
   /** @type {Map<string, { entry: string, runtime: ModuleRuntime }>} */
   const components = new Map()
   let sealed = false
@@ -90,6 +98,20 @@ export function createWorkerSession({ post, sandbox }) {
     reply(id, 'call.result', { output })
   }
 
+  /** @type {ReturnType<typeof createRunSessions>|null} */
+  let sessions = null
+  /** The run sessions, with the loaded components as behaviours, made on the first run message. */
+  const runs = () =>
+    (sessions ??= createRunSessions({
+      behaviourOf: manifest => {
+        const loaded = components.get(`${manifest.id}@${manifest.version}`)
+        return loaded?.runtime.load(loaded.entry).default
+      },
+      scheduler: scheduler ?? fail('INVALID', 'This worker was started without a scheduler'),
+      wallMs,
+      post: message => post(message, transferables(message.payload)),
+    }))
+
   return {
     /**
      * Answers one message. Never throws: failures become `error` replies.
@@ -101,6 +123,10 @@ export function createWorkerSession({ post, sandbox }) {
         if (message.type === 'load') return load(message)
         if (message.type === 'call') return await call(message)
         seal()
+        if (message.type?.startsWith('run.')) {
+          for (const out of await runs().handle(message)) post(out, transferables(out.payload))
+          return
+        }
         post(handleMessage(message))
       } catch (err) {
         const e = /** @type {any} */ (err)

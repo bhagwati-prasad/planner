@@ -87,6 +87,12 @@ describe('canonical property values', () => {
     assert.equal(c.effectiveProps(id).uptime, 0.99)
   })
 
+  it('a connection carries its bandwidth in bits per second, as the kernel reads it (eng §8)', () => {
+    const http = registry().resolve('acme.http')
+    assert.equal(http.properties.bandwidth.default, 1_000_000_000, '1 Gbps')
+    assert.equal(http.properties.bandwidth.unit, 'bps')
+  })
+
   it('a schema-version-1 snapshot fixture migrates to version 2, and its op log replays to the same state hash', () => {
     const v1 = fixture('schema-v1/payments')
     assert.equal(v1.schemaVersion, 1)

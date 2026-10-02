@@ -40,6 +40,24 @@ function strip(scope, name) {
 }
 
 /**
+ * The worker's own adapters (eng §6): a scheduler on its timers, which plays runs, and its wall
+ * clock, for heartbeats and views while playing (ADR 0025). They are taken before `bootstrap`
+ * makes `performance.now` simulated time, and only the run sessions hold them, never a behaviour.
+ * @param {any} scope  the worker's global object
+ * @returns {{ scheduler: import('../control.js').Scheduler, wallMs: () => number }}
+ */
+export function workerAdapters(scope) {
+  const now = scope.performance.now.bind(scope.performance)
+  return {
+    scheduler: {
+      setTimeout: (fn, ms) => scope.setTimeout(fn, ms),
+      clearTimeout: timer => scope.clearTimeout(timer),
+    },
+    wallMs: () => now(),
+  }
+}
+
+/**
  * @param {any} scope  the worker's global object
  * @returns {import('./session.js').Sandbox}
  */

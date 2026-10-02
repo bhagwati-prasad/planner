@@ -4,10 +4,10 @@ Budgets are measured on the reference machine: a 2023 mid-range laptop with 8 co
 
 | Measure | Budget |
 | --- | --- |
-| Core, facade and non-UI packages (minified) | 255 KB |
+| Core, facade and non-UI packages (minified) | 265 KB |
 | strata-graph (minified) | 115 KB |
-| strata-ui (minified) | 230 KB |
-| Simulation worker bundle (minified) | 120 KB |
+| strata-ui (minified) | 220 KB |
+| Simulation worker bundle (minified) | 160 KB |
 | Bundled fonts (woff2, Latin subset) | 120 KB |
 | Console help metadata (minified) | 25 KB |
 | Offline startup to interactive | 2 s |
@@ -20,7 +20,7 @@ Budgets are measured on the reference machine: a 2023 mid-range laptop with 8 co
 | IndexedDB flush after a command | 500 ms |
 | Idle heap, 2,000-node project | 300 MB |
 
-D3 is excluded from the JS budgets and Three.js is lazy-loaded, matching spec §21. The console help metadata (`packages/facade/src/help-data.js`, generated from the facade's JSDoc) is text, not code, so it has its own line and does not count toward the core budget ([ADR 0013](../../adr/0013-console-help-metadata-has-its-own-budget.md)). Core has 255 KB, strata-graph 115 KB and strata-ui 230 KB, so the three still sum to the 600 KB of spec §21 ([ADR 0014](../../adr/0014-strata-graph-budget-of-110-kb.md), [ADR 0016](../../adr/0016-strata-graph-budget-of-115-kb.md), [ADR 0017](../../adr/0017-core-budget-of-255-kb.md)). strata-sim ships only in the simulation worker bundle and counts in that line, not in the core line ([ADR 0018](../../adr/0018-simulation-code-ships-only-in-the-worker.md)).
+D3 is excluded from the JS budgets and Three.js is lazy-loaded, matching spec §21. The console help metadata (`packages/facade/src/help-data.js`, generated from the facade's JSDoc) is text, not code, so it has its own line and does not count toward the core budget ([ADR 0013](../../adr/0013-console-help-metadata-has-its-own-budget.md)). Core has 265 KB, strata-graph 115 KB and strata-ui 220 KB, so the three still sum to the 600 KB of spec §21 ([ADR 0014](../../adr/0014-strata-graph-budget-of-110-kb.md), [ADR 0016](../../adr/0016-strata-graph-budget-of-115-kb.md), [ADR 0017](../../adr/0017-core-budget-of-255-kb.md), [ADR 0026](../../adr/0026-budgets-for-run-sessions.md)). strata-sim and strata-debug ship only in the simulation worker bundle and count in that line, not in the core line ([ADR 0018](../../adr/0018-simulation-code-ships-only-in-the-worker.md), [ADR 0024](../../adr/0024-strata-debug-ships-in-the-worker.md)). The worker carries whole runs, with the core modules they need, within 160 KB ([ADR 0026](../../adr/0026-budgets-for-run-sessions.md)).
 
 ---
 Part of the [Strata Engineering Guidelines](README.md).
