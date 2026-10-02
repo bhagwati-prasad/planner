@@ -1,4 +1,4 @@
-# 0417 Simulation on the facade and the determinism suite
+# 0417 Run sessions on the facade
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
@@ -7,18 +7,21 @@
 ## Read first
 
 - [Spec §18 Headless operation](../../docs/spec/18-headless-operation.md): Console API
-- [Engineering §18 Testing](../../docs/guidelines/engineering/18-testing.md)
+- [Spec §12 Simulation controls and run lifecycle](../../docs/spec/12-simulation-controls-and-run-lifecycle.md)
+- [Engineering §13 Simulation engine](../../docs/guidelines/engineering/13-simulation-engine.md): Worker protocol
+- [ADR 0025 Run sessions in the worker protocol](../../docs/adr/0025-run-sessions-in-the-worker-protocol.md)
 
 ## Goal
 
-`strata.sim.start`, run handles with every control, `strata.debug.*`, and the cross-engine determinism suite.
+`strata.sim.start` and run handles with every control of spec §12, over ADR 0025's run sessions in the worker protocol, and `strata.sim.compare`. `strata.debug.*` and the cross-engine determinism suite are [0429](0429-facade-debug-determinism.md).
 
 ## Tests to write first
 
-Write these tests first, in `packages/facade/test/sim.test.js`, `tests/e2e/determinism.spec.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
+Write these tests first, in `packages/facade/test/sim.test.js` and `packages/sim/test/session.test.js`. Run them and confirm each one fails for the reason it describes, not because of a syntax error or a missing file. Only then write the implementation.
 
-- [ ] The full spec §18 console example runs in Node
-- [ ] The recursive fixture's checkout run has the same hash in Node, Chromium, Firefox and WebKit
+- [ ] The spec §18 console example runs in Node in its R0 form, in a `worker_threads` worker: every line as written, with the starter library's names; the scenario line gives the run its requests instead; and the lines for later releases (`strata.test`, `strata.docs`, `strata.comments`, a scenario) fail with `UNSUPPORTED`, naming their release
+- [ ] A run handle has every control of spec §12, and each answers with the view of the moment it left the run at
+- [ ] The worker keeps runs by id: `run.start`, `run.control`, `run.read` and `run.close` (ADR 0025), with a heartbeat inside a long action and views while playing
 - [ ] `strata.help('sim')` lists every control with its signature
 
 ## Done when

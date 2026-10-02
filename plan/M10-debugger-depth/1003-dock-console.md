@@ -2,7 +2,7 @@
 
 | Milestone | Release | Status | Depends on |
 | --- | --- | --- | --- |
-| [M10 Debugger depth](../ROADMAP.md#m10-debugger-depth) | R1 | todo | [0417](../M04-simulation-core/0417-facade-sim.md) |
+| [M10 Debugger depth](../ROADMAP.md#m10-debugger-depth) | R1 | todo | [0417](../M04-simulation-core/0417-facade-sim.md), [0429](../M04-simulation-core/0429-facade-debug-determinism.md) |
 
 ## Read first
 
