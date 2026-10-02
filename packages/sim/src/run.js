@@ -47,7 +47,7 @@ import {
 } from '../../core/src/index.js'
 import { baseLatency, baseOf } from './base.js'
 import { Kernel } from './kernel.js'
-import { createStreams } from './random.js'
+import { hashKey, xoshiro128ss } from './random.js'
 import { parseRoute, pickEdge } from './route.js'
 import { sample } from './sample.js'
 import { copy, initialState, stateView } from './state.js'
@@ -82,6 +82,14 @@ import { copy, initialState, stateView } from './state.js'
  *   inbound replay (task 0412)
  * @property {number} [snapshotEvery]  events between snapshots, 10,000 by default (ADR 0023)
  * @property {number} [snapshotBytes]  the memory snapshots may hold, 256 MB by default
+ *
+ * A run-only edit (spec §12 "Editing a paused run", task 0415): property values in canonical
+ * units; a state field by its path; a component's behaviour code; or components and edges added
+ * and removed.
+ * @typedef {{ kind: 'props', node: string, props: Record<string, unknown> }
+ *   | { kind: 'state', node: string, path: (string|number)[], value: unknown }
+ *   | { kind: 'code', node: string, behaviour: any }
+ *   | { kind: 'structure', add?: { nodes?: RunNode[], edges?: RunEdge[] }, remove?: { nodes?: string[], edges?: string[] } }} Edit
  *
  * @typedef {object} RunEdge
  * @property {string} id
@@ -338,6 +346,9 @@ export class Run {
   snapshots = []
   /** Counts what behaviour code does, so the run can tell when microtasks have settled. */
   activity = 0
+  #seed = 1
+  /** @type {{ nodes: RunNode[], edges: RunEdge[] }} */
+  #input = { nodes: [], edges: [] }
   #every = 10_000
   #cap = 256_000_000
   #bytes = 0
@@ -356,7 +367,8 @@ export class Run {
   /**
    * Every request injected from outside, in order, with how many events had been handled when it
    * was, so a replay schedules it at the same moment.
-   * @type {{ at: number, started: boolean, atUs: number, message: any, reply: Reply }[]}
+   * Run-only edits join it, at the moment they were made (task 0415).
+   * @type {{ at: number, started: boolean, atUs?: number, message?: any, reply?: Reply, edit?: Edit }[]}
    */
   #injections = []
   #applied = 0
@@ -392,39 +404,75 @@ export class Run {
     if (record) this.recordings = {}
     this.#every = snapshotEvery
     this.#cap = snapshotBytes
-    const streams = createStreams(seed)
-    const strict = isDevelopment()
-    for (const n of nodes) {
-      const manifest = normalizeManifest(n.manifest)
-      const base = baseOf(manifest)
-      const fields = { ...base?.state, .../** @type {any} */ (manifest).state }
-      this.#nodes.set(n.id, {
-        id: n.id,
-        manifest,
-        behaviour: merged(base, n.behaviour),
-        base,
-        props: { ...defaultProps(manifest.properties ?? {}), ...n.props },
-        fields,
-        strict,
-        state: initialState(fields, n),
-        composite: n.composite ?? null,
-        servers: serversOf(manifest, base),
-        random: streams.stream(n.id),
-        latency: streams.stream(`${n.id}:latency`),
-      })
-    }
-    for (const n of nodes)
-      for (const [port, inner] of Object.entries(n.composite?.exits ?? {}))
-        this.#exits.set(`${inner.node}.${inner.port}`, `${n.id}.${port}`)
-    for (const e of edges) {
-      const key = `${e.from.node}.${e.from.port}`
-      const port = this.#ports.get(key) ?? { edges: [], random: streams.stream(`${key}:route`) }
-      const props = e.props ?? {}
-      const edge = { ...e, props, route: parseRoute(e), network: streams.stream(`${e.id}:edge`) }
-      port.edges.push(edge)
-      this.#edges.set(e.id, edge)
-      this.#ports.set(key, port)
-    }
+    this.#seed = seed
+    this.#input = { nodes, edges }
+    this.#build(nodes, edges)
+  }
+
+  /** A fresh random stream for a key, seeded from the run seed. @param {string} key */
+  #stream(key) {
+    return xoshiro128ss((this.#seed ^ hashKey(key)) >>> 0)
+  }
+
+  /** Builds the run's components and edges. @param {RunNode[]} nodes @param {RunEdge[]} edges */
+  #build(nodes, edges) {
+    this.#nodes = new Map()
+    this.#ports = new Map()
+    this.#edges = new Map()
+    this.#exits = new Map()
+    for (const n of nodes) this.#addNode(n)
+    for (const e of edges) this.#addEdge(e)
+  }
+
+  /** @param {RunNode} n */
+  #addNode(n) {
+    if (this.#nodes.has(n.id)) fail('INVALID', `The run already has a component '${n.id}'`)
+    const manifest = normalizeManifest(n.manifest)
+    const base = baseOf(manifest)
+    const fields = { ...base?.state, .../** @type {any} */ (manifest).state }
+    this.#nodes.set(n.id, {
+      id: n.id,
+      manifest,
+      behaviour: merged(base, n.behaviour),
+      base,
+      props: { ...defaultProps(manifest.properties ?? {}), ...n.props },
+      fields,
+      strict: isDevelopment(),
+      state: initialState(fields, n),
+      composite: n.composite ?? null,
+      servers: serversOf(manifest, base),
+      random: this.#stream(n.id),
+      latency: this.#stream(`${n.id}:latency`),
+    })
+    for (const [port, inner] of Object.entries(n.composite?.exits ?? {}))
+      this.#exits.set(`${inner.node}.${inner.port}`, `${n.id}.${port}`)
+  }
+
+  /** @param {RunEdge} e */
+  #addEdge(e) {
+    if (this.#edges.has(e.id)) fail('INVALID', `The run already has an edge '${e.id}'`)
+    const key = `${e.from.node}.${e.from.port}`
+    const port = this.#ports.get(key) ?? { edges: [], random: this.#stream(`${key}:route`) }
+    const props = e.props ?? {}
+    const edge = { ...e, props, route: parseRoute(e), network: this.#stream(`${e.id}:edge`) }
+    port.edges.push(edge)
+    this.#edges.set(e.id, edge)
+    this.#ports.set(key, port)
+  }
+
+  /** @param {string} id */
+  #removeEdge(id) {
+    const edge = this.#edges.get(id) ?? fail('INVALID', `The run has no edge '${id}'`)
+    const port = this.#ports.get(`${edge.from.node}.${edge.from.port}`)
+    if (port) port.edges = port.edges.filter(e => e !== edge)
+    this.#edges.delete(id)
+  }
+
+  /** Removes a component and every edge to or from it. @param {string} id */
+  #removeNode(id) {
+    if (!this.#nodes.delete(id)) fail('INVALID', `The run has no component '${id}'`)
+    for (const edge of [...this.#edges.values()])
+      if (edge.from.node === id || edge.to.node === id) this.#removeEdge(edge.id)
   }
 
   /** Simulated time in µs. */
@@ -466,7 +514,7 @@ export class Run {
       },
       reply,
     })
-    this.#applyInjections()
+    this.#applyInputs()
     return reply
   }
 
@@ -531,7 +579,7 @@ export class Run {
       if (this.#woken) await this.#settle()
       this.#mark()
       this.#autoSnapshot()
-      this.#applyInjections()
+      this.#applyInputs()
       if (this.kernel.processed >= maxEvents)
         fail('INVALID', `The run stopped after ${maxEvents} events`)
       if (stop?.()) {
@@ -646,6 +694,153 @@ export class Run {
   }
 
   /**
+   * Makes a run-only edit now (spec §12 "Editing a paused run", task 0415): property values,
+   * a state field, a component's behaviour code, or the run's structure. The run logs it with
+   * the moment, so a replay makes it again then. An edit behind the furthest point reached
+   * starts a new future from here, as an injection does.
+   * @param {Edit} edit
+   */
+  applyEdit(edit) {
+    this.#forget()
+    this.#injections.push({ at: this.kernel.processed, started: this.#started, edit })
+    this.#applyInputs()
+  }
+
+  /**
+   * A new run at this moment that shares this one's history: its snapshots up to now, and a
+   * copy of its trace and outputs (eng §13). It replays from the latest snapshot to the moment.
+   * @returns {Promise<Run>}
+   */
+  async fork() {
+    const child = new Run({
+      seed: this.#seed,
+      ...this.#input,
+      record: this.recordings !== null,
+      snapshotEvery: this.#every,
+      snapshotBytes: this.#cap,
+    })
+    await child.#adopt(this)
+    return child
+  }
+
+  /** The ids of the run's components. */
+  get components() {
+    return [...this.#nodes.keys()]
+  }
+
+  /** A copy of a component's state. @param {string} id */
+  stateOf(id) {
+    return copy(this.#nodes.get(id)?.state)
+  }
+
+  /**
+   * Whether a component, or one inside it, has work on its way: a call running or waiting for a
+   * server, or an event or message for it.
+   * @param {string} id
+   */
+  hasWork(id) {
+    const ours = (/** @type {string} */ node) => node === id || node.startsWith(`${id}/`)
+    for (const call of this.#live) if (ours(call.node.id)) return true
+    for (const [node, n] of this.#nodes) if (ours(node) && n.servers?.queue.length) return true
+    return this.kernel.save().entries.some(({ event }) => {
+      const e = /** @type {any} */ (event)
+      if (e.type !== 'deliver') return typeof e.node === 'string' && ours(e.node)
+      if (e.message.kind === 'response') return ours(e.message.attempt.request.node)
+      return ours(e.message.to.node)
+    })
+  }
+
+  /**
+   * Takes on a parent run's history up to its moment, then replays to that moment.
+   * @param {Run} parent
+   */
+  async #adopt(parent) {
+    const { processed, nowUs } = parent.kernel
+    this.snapshots = parent.snapshots.filter(
+      s => s.event < processed || (s.event === processed && s.timeUs <= nowUs)
+    )
+    this.#bytes = this.snapshots.reduce((sum, s) => sum + s.bytes, 0)
+    const from = this.snapshots.at(-1) ?? fail('INVALID', 'A run forks once it has started')
+    const d = from.data
+    for (const span of structuredClone(parent.spans.slice(0, d.spans))) {
+      this.#spanIndex.set(span, this.spans.length)
+      this.spans.push(span)
+    }
+    this.metrics.push(...parent.metrics.slice(0, d.outputs[0]))
+    this.logs.push(...parent.logs.slice(0, d.outputs[1]))
+    this.changes.push(...parent.changes.slice(0, d.outputs[2]))
+    for (const [id, list] of Object.entries(parent.recordings ?? {})) {
+      const kept = structuredClone(list.slice(0, d.recordings?.[id]?.length ?? 0))
+      kept.forEach((r, i) => this.#recordingAt.set(r, [id, i]))
+      if (this.recordings) this.recordings[id] = kept
+    }
+    this.#injections = parent.#injections.slice(0, parent.#applied).map((input, i) => {
+      if (!input.reply) return input
+      const reply = { ...input.reply }
+      this.#replyIndex.set(reply, i)
+      return { ...input, reply }
+    })
+    for (const key of /** @type {const} */ (['hops', 'calls', 'traces']))
+      this.#marks[key] = /** @type {any} */ (parent.#marks[key].slice(0, processed + 1))
+    this.#restore(from)
+    if (parent.#moved()) await this.#run({ untilUs: nowUs })
+    else await this.#run({ untilEvent: processed })
+  }
+
+  /**
+   * Builds the run as its input describes it, with the code and structure edits among the
+   * first `count` inputs made again.
+   * @param {number} count
+   */
+  #rebuild(count) {
+    this.#build(this.#input.nodes, this.#input.edges)
+    for (const { edit } of this.#injections.slice(0, count))
+      if (edit && edit.kind !== 'props' && edit.kind !== 'state') this.#applyEdit(edit, false)
+  }
+
+  /**
+   * Makes an edit to the run. `live` starts the init hooks of components it adds.
+   * @param {Edit} edit @param {boolean} live
+   */
+  #applyEdit(edit, live) {
+    /** @param {string} id */
+    const node = id => this.#nodes.get(id) ?? fail('INVALID', `The run has no component '${id}'`)
+    switch (edit.kind) {
+      case 'props': {
+        const n = node(edit.node)
+        n.props = { ...n.props, ...copy(edit.props) }
+        return
+      }
+      case 'state': {
+        let at = node(edit.node).state
+        const path = [...edit.path]
+        const last = /** @type {string|number} */ (path.pop())
+        for (const key of path) at = at[key] ??= {}
+        at[last] = copy(edit.value)
+        return
+      }
+      case 'code': {
+        const n = node(edit.node)
+        n.behaviour = merged(n.base, edit.behaviour)
+        return
+      }
+      case 'structure': {
+        for (const id of edit.remove?.edges ?? []) this.#removeEdge(id)
+        for (const id of edit.remove?.nodes ?? []) this.#removeNode(id)
+        for (const n of edit.add?.nodes ?? []) this.#addNode(n)
+        for (const e of edit.add?.edges ?? []) this.#addEdge(e)
+        if (live && this.#started) for (const n of edit.add?.nodes ?? []) this.#initNode(node(n.id))
+        return
+      }
+      default:
+        fail(
+          'INVALID',
+          `Run-only edits are props, state, code and structure, not '${/** @type {any} */ (edit).kind}'`
+        )
+    }
+  }
+
+  /**
    * Seeks to a moment: the end of an event, or a simulated time, as a run from time zero would
    * reach it. Going back restores the latest snapshot before the moment and replays forward
    * (ADR 0023).
@@ -743,7 +938,7 @@ export class Run {
     if (this.#woken) await this.#settle()
     this.#marks.calls[0] = this.#calls
     if (this.#quiet()) this.#snapshot(true)
-    this.#applyInjections()
+    this.#applyInputs()
   }
 
   /** Whether no method is suspended part-way, so the run can be captured as data (ADR 0023). */
@@ -832,15 +1027,17 @@ export class Run {
   }
 
   /** Schedules the injected requests due by now, generating their trace ids as they go. */
-  #applyInjections() {
+  #applyInputs() {
     while (this.#applied < this.#injections.length) {
       const next = this.#injections[this.#applied]
       if (next.started && (!this.#started || next.at > this.kernel.processed)) return
       this.#applied++
-      this.kernel.schedule(next.atUs - this.nowUs, {
-        type: 'deliver',
-        message: { ...next.message, traceId: this.#id(32), reply: next.reply },
-      })
+      if (next.edit) this.#applyEdit(next.edit, true)
+      else
+        this.kernel.schedule(/** @type {number} */ (next.atUs) - this.nowUs, {
+          type: 'deliver',
+          message: { ...next.message, traceId: this.#id(32), reply: next.reply },
+        })
     }
   }
 
@@ -902,7 +1099,7 @@ export class Run {
       calls: this.#calls,
       lastEventUs: this.#lastEventUs,
       applied: this.#applied,
-      replies: this.#injections.map(({ reply }) => ({ ...reply })),
+      replies: this.#injections.map(({ reply }) => reply && { ...reply }),
       spans: spans.length,
       open: [...this.#open].map(i => {
         const { endUs, status, code, queuedUs } = spans[i]
@@ -922,6 +1119,7 @@ export class Run {
         {
           // A copy, as state may hold views of its own parts, which no structural copy takes.
           state: copy(n.state),
+          props: copy(n.props),
           random: n.random.save(),
           latency: n.latency.save(),
           servers: n.servers && {
@@ -1042,13 +1240,18 @@ export class Run {
       for (const i of kept?.open ?? []) delete list[i].response
     }
     this.#injections.forEach(({ reply }, i) => {
+      if (!reply) return
       for (const key of Object.keys(reply)) delete (/** @type {any} */ (reply)[key])
       Object.assign(reply, d.replies[i] ?? { status: 'pending', atUs: null })
     })
     this.#applied = d.applied
+    // Code and structure edits change the run's shape: build it as it was at the snapshot.
+    if (this.#injections.some(i => i.edit && i.edit.kind !== 'props' && i.edit.kind !== 'state'))
+      this.#rebuild(d.applied)
     for (const [id, n] of d.nodes) {
       const node = this.#nodes.get(id)
       node.state = n.state
+      node.props = n.props
       node.random.load(n.random)
       node.latency.load(n.latency)
       if (node.servers) {
@@ -1069,7 +1272,7 @@ export class Run {
         event: this.#decodeEvent(e.event, memo),
       })),
     })
-    this.#applyInjections()
+    this.#applyInputs()
   }
 
   /** @param {any} e @param {Map<object, any>} memo */
@@ -1153,14 +1356,17 @@ export class Run {
 
   /** Runs each behaviour's `init` hook once, at the start, as an `init` span (spec §8). */
   #init() {
-    for (const node of this.#nodes.values()) {
-      const fn = node.behaviour.init
-      if (typeof fn !== 'function') continue
-      const span = this.#span(node.id, 'init', 'init', this.#id(32), null)
-      this.#start(node, span, null, 0, call =>
-        fn.call(node.behaviour, this.#context(node, call, span))
-      )
-    }
+    for (const node of this.#nodes.values()) this.#initNode(node)
+  }
+
+  /** Runs a component's `init` hook, if it has one. @param {any} node */
+  #initNode(node) {
+    const fn = node.behaviour.init
+    if (typeof fn !== 'function') return
+    const span = this.#span(node.id, 'init', 'init', this.#id(32), null)
+    this.#start(node, span, null, 0, call =>
+      fn.call(node.behaviour, this.#context(node, call, span))
+    )
   }
 
   /** @param {{ node: string, name: string, data: unknown, traceId: string, parentSpanId: string }} e */
