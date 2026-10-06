@@ -46,13 +46,40 @@ Every pairing meets WCAG 2.2 AA: 4.5:1 for text, and 3:1 for icons, focus rings 
 | `--st-color-border-strong` | `#4F5866` | `#8A94A3` | Hover, emphasis |
 | `--st-color-text-primary` | `#1B1F25` | `#E6E9EE` | Body text, titles |
 | `--st-color-text-secondary` | `#4F5866` | `#AEB6C2` | Labels, subtitles |
-| `--st-color-text-tertiary` | `#626C7C` | `#8A94A3` | Hints, units, timestamps |
+| `--st-color-text-tertiary` | `#626C7C` | `#8D97A6` | Hints, units, timestamps |
 | `--st-color-accent` | `#3346D3` | `#95A1F4` | Selection, focus, primary buttons |
 | `--st-color-accent-hover` | `#2837A8` | `#BCC4F9` | Hovered primary controls |
 | `--st-color-accent-subtle` | `#EEF0FE` | `#1E2556` | Selected rows, marquee fill |
 | `--st-color-text-on-accent` | `#FFFFFF` | `#13161A` | Text on accent fills |
 | `--st-color-focus` | `#3346D3` | `#95A1F4` | Focus rings |
 | `--st-color-guide` | `#7A45C2` | `#B38BEB` | Smart guides and spacing labels |
+
+The dark tertiary text is `#8D97A6`, one step lighter than Basalt 400, so it reaches 4.5:1 on the subtle background too (task 0501).
+
+### Contrast theme
+
+`data-theme="contrast"` follows the system colour scheme, light or dark, with higher targets: 7:1 for text, and 3:1 for every border, dividers included, against every background. Tokens it does not list keep their light or dark values.
+
+| Token | Contrast light | Contrast dark |
+| --- | --- | --- |
+| `--st-color-bg-canvas` | `#FFFFFF` | `#0B0D10` |
+| `--st-color-bg-surface` | `#FFFFFF` | `#13161A` |
+| `--st-color-bg-raised` | `#FFFFFF` | `#1B1F25` |
+| `--st-color-bg-subtle` | `#F0F2F5` | `#22272E` |
+| `--st-color-border-subtle` | `#626C7C` | `#8A94A3` |
+| `--st-color-border-default` | `#4F5866` | `#AEB6C2` |
+| `--st-color-border-control` | `#3B424D` | `#CFD4DC` |
+| `--st-color-border-strong` | `#13161A` | `#FFFFFF` |
+| `--st-color-text-primary` | `#13161A` | `#FFFFFF` |
+| `--st-color-text-secondary` | `#2A3038` | `#E4E7EC` |
+| `--st-color-text-tertiary` | `#3B424D` | `#CFD4DC` |
+| `--st-color-accent` | `#1F2B80` | `#BCC4F9` |
+| `--st-color-accent-hover` | `#1E2556` | `#DDE1FC` |
+| `--st-color-accent-subtle` | `#EEF0FE` | `#1F2B80` |
+| `--st-color-text-on-accent` | `#FFFFFF` | `#0B0D10` |
+| `--st-color-focus` | `#1F2B80` | `#BCC4F9` |
+| `--st-color-guide` | `#5A2E99` | `#D2B6F5` |
+| Success, warning, danger and info text | `#0F5A3A`, `#663F05`, `#8A1627`, `#074C6B` | `#8FE0B6`, `#F2CD85`, `#F7AAB2`, `#A3D9F2` |
 
 ## Status colours
 
@@ -104,7 +131,7 @@ Stratum bands mark nesting depth. They appear only as thin bands, layered node e
 | `--st-type-display` | 36 / 44 px | 500 | Onboarding only, -0.015 em tracking |
 
 - Font stacks: `--st-font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` and `--st-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace`.
-- Bundled weights: Sans 400, 500 and 600; Mono 400 and 500.
+- Bundled weights: Sans 400, 500 and 600; Mono 400 and 500 (`vendor/plex`, about 101 KB of the 120 KB font budget).
 - Numbers that line up (tables, inspector, metrics, timelines) use `font-variant-numeric: tabular-nums`. Numbers in prose stay proportional.
 - Labels are sentence case. Tracked-out all-caps labels are not used anywhere.
 - Mono is for code, expressions, ids, keys such as `PAY-42`, and paths. It is not used for metric values or data labels.

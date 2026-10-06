@@ -1,7 +1,8 @@
 # 15. Theming and implementation
 
-- Tokens are defined once in `packages/ui/tokens/tokens.json`. The build generates `tokens.css` for CSS and `tokens.js` for canvas and Three.js code, which cannot read CSS variables directly.
-- Themes are selected with `data-theme` on the root element: `light`, `dark` or `contrast`. When no theme is chosen, the system preference applies.
+- Tokens are defined once in `packages/ui/tokens/tokens.json`. `npm run generate:tokens` (`tools/tokens/generate.js`) writes `packages/ui/tokens/tokens.css` for CSS and `packages/ui/src/tokens.js` for canvas and Three.js code, which cannot read CSS variables directly; a test fails when either is out of date. `tokens.js` also carries the CSS, which the shell adopts as a constructed stylesheet, since the CSP allows no inline styles.
+- Themes are selected with `data-theme` on the root element: `light`, `dark` or `contrast`. When no theme is chosen, the system preference applies. The contrast theme follows the system preference too, in its light or dark form.
+- The offline app's `strata.css` declares the bundled IBM Plex faces, which the build copies to `dist/fonts/`.
 - Canvas and 3D renderers re-read `tokens.js` values when the theme changes.
 - Components expose `part` attributes, so a replacement theme can restyle internals without forking components.
 

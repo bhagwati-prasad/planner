@@ -75,10 +75,12 @@ describe('vendored licences', () => {
     assert.match(readme, /^\| Three\.js \| 0\.186\.1 \|.*\| MIT \(`three\/LICENSE`\) \|/m)
   })
 
-  it('vendor/plex pins the three fonts and the OFL licence', () => {
+  it('vendor/plex pins the five fonts of design system §3 and the OFL licence', () => {
     const { plex } = manifest().libraries
     assert.deepEqual(Object.keys(plex?.files ?? {}).sort(), [
+      'plex/IBMPlexMono-Medium-Latin1.woff2',
       'plex/IBMPlexMono-Regular-Latin1.woff2',
+      'plex/IBMPlexSans-Medium-Latin1.woff2',
       'plex/IBMPlexSans-Regular-Latin1.woff2',
       'plex/IBMPlexSans-SemiBold-Latin1.woff2',
       'plex/LICENSE.txt',

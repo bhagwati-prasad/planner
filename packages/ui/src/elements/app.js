@@ -15,6 +15,7 @@
 import { Shell } from './shell.js'
 import { registerDefaultActions, shortcutOf, displayShortcut } from './actions.js'
 import { h, fill, define, adoptStyles } from './base.js'
+import { TOKENS_CSS as GENERATED_TOKENS_CSS } from '../tokens.js'
 
 export const DEFAULT_CONFIG = Object.freeze({
   regions: {
@@ -33,45 +34,31 @@ export const DEFAULT_CONFIG = Object.freeze({
   },
 })
 
-/** Design tokens (spec §16): every colour, size and font is a CSS custom property. */
-export const TOKENS_CSS = `
+/**
+ * Design tokens (spec §16, design system §3, §15): the generated tokens, with the names the shell's
+ * elements used before them mapped onto the semantic tokens, so every theme reaches them.
+ */
+export const TOKENS_CSS = `${GENERATED_TOKENS_CSS}
 :root {
-  --st-font: 13px/1.4 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --st-mono: 12px/1.4 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --st-radius: 6px;
-  --st-bg: #fafaf9;
-  --st-panel: #f5f5f4;
-  --st-field: #ffffff;
-  --st-line: #d6d3d1;
-  --st-text: #1c1917;
-  --st-muted: #78716c;
-  --st-accent: #2563eb;
-  --st-accent-soft: rgba(37, 99, 235, 0.12);
-  --st-on-accent: #ffffff;
-  --st-danger: #b91c1c;
-  --st-warn: #a16207;
-  --st-warn-soft: #fef3c7;
-  --st-success: #15803d;
-  --st-shadow: 0 1px 4px rgba(0,0,0,0.12);
-  --st-shadow-lg: 0 10px 30px rgba(0,0,0,0.2);
-  --st-scrim: rgba(0, 0, 0, 0.25);
-  color-scheme: light;
-}
-:root[data-theme="dark"] {
-  --st-bg: #1c1917;
-  --st-panel: #231f1d;
-  --st-field: #292524;
-  --st-line: #44403c;
-  --st-text: #f5f5f4;
-  --st-muted: #a8a29e;
-  --st-accent: #60a5fa;
-  --st-accent-soft: rgba(96, 165, 250, 0.16);
-  --st-on-accent: #0c0a09;
-  --st-danger: #f87171;
-  --st-warn: #fbbf24;
-  --st-warn-soft: #422006;
-  --st-success: #4ade80;
-  color-scheme: dark;
+  --st-font: var(--st-type-body);
+  --st-mono: 400 12px/16px var(--st-font-mono);
+  --st-radius: var(--st-radius-md);
+  --st-bg: var(--st-color-bg-canvas);
+  --st-panel: var(--st-color-bg-surface);
+  --st-field: var(--st-color-bg-raised);
+  --st-line: var(--st-color-border-default);
+  --st-text: var(--st-color-text-primary);
+  --st-muted: var(--st-color-text-secondary);
+  --st-accent: var(--st-color-accent);
+  --st-accent-soft: var(--st-color-accent-subtle);
+  --st-on-accent: var(--st-color-text-on-accent);
+  --st-danger: var(--st-color-danger-text);
+  --st-warn: var(--st-color-warning-text);
+  --st-warn-soft: var(--st-color-warning-bg);
+  --st-success: var(--st-color-success-text);
+  --st-shadow: var(--st-elevation-1);
+  --st-shadow-lg: var(--st-elevation-2);
+  --st-scrim: var(--st-color-scrim);
 }
 `
 

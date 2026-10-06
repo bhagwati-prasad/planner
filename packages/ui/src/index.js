@@ -12,3 +12,5 @@ export {
   SHAPE_BY_BASE,
   SIDE_BY_DIRECTION,
 } from './adapter.js'
+// The design tokens by theme, for canvas and 3D code (design system §15).
+export { THEMES, BASE, TYPE, REDUCED_MOTION, FONTS } from './tokens.js'

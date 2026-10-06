@@ -25,9 +25,11 @@
     "plex": {
       "version": "1.1.0 (Sans), 2.5.0 (Mono)",
       "licence": "OFL-1.1",
-      "source": "npm @ibm/plex-sans@1.1.0 (sha512-WPgvO6Yfj2w5YbhyAr1tv95RUz4LRJlqN+CmYvBglabXteufP1D1E9BABMde+ZIKdRbFJDoKF5eQzfhpnbgZcQ==): fonts/split/woff2/IBMPlexSans-Regular-Latin1.woff2, fonts/split/woff2/IBMPlexSans-SemiBold-Latin1.woff2 and LICENSE.txt; npm @ibm/plex-mono@2.5.0 (sha512-STBJIPxPomOYPmBMO7z5TKPJUotAF9u3gAUumTqVgwgrAO+K4FRNh0MlhsoJjKhJKsMbBJR10/bk4inkj/wc1w==): fonts/split/woff2/IBMPlexMono-Regular-Latin1.woff2, whose LICENSE.txt is the same file; all unmodified",
+      "source": "npm @ibm/plex-sans@1.1.0 (sha512-WPgvO6Yfj2w5YbhyAr1tv95RUz4LRJlqN+CmYvBglabXteufP1D1E9BABMde+ZIKdRbFJDoKF5eQzfhpnbgZcQ==): fonts/split/woff2/IBMPlexSans-Regular-Latin1.woff2, fonts/split/woff2/IBMPlexSans-Medium-Latin1.woff2, fonts/split/woff2/IBMPlexSans-SemiBold-Latin1.woff2 and LICENSE.txt; npm @ibm/plex-mono@2.5.0 (sha512-STBJIPxPomOYPmBMO7z5TKPJUotAF9u3gAUumTqVgwgrAO+K4FRNh0MlhsoJjKhJKsMbBJR10/bk4inkj/wc1w==): fonts/split/woff2/IBMPlexMono-Regular-Latin1.woff2 and fonts/split/woff2/IBMPlexMono-Medium-Latin1.woff2, whose LICENSE.txt is the same file; all unmodified",
       "files": {
+        "plex/IBMPlexMono-Medium-Latin1.woff2": "sha256-QSAbZYoyi50ANoIVwvEQJ3D4CxWVKrgmMeQAYlXmNl0=",
         "plex/IBMPlexMono-Regular-Latin1.woff2": "sha256-6Jk9lGZJudAaux7QbVdLGdjqPma1w5SGAtszXETBjlY=",
+        "plex/IBMPlexSans-Medium-Latin1.woff2": "sha256-tWEK8E0NS1oUpiHZbZdLmT6UWgZdsaiGGRj2nvkyGTQ=",
         "plex/IBMPlexSans-Regular-Latin1.woff2": "sha256-ta1705+ZYUSRXwrZhJqQGDsn2MKK2X7ZivWxvrxR9rE=",
         "plex/IBMPlexSans-SemiBold-Latin1.woff2": "sha256-//CrOoiwtKoLaT5PAgE1mhUYOwjj+laW0ZGNjwreitU=",
         "plex/LICENSE.txt": "sha256-fmsoGO29j2oBroBkHMjxalEIDQj7TlMr46C290rbB9o="

@@ -126,7 +126,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 
 The Web Components UI over the facade: tokens, kit, layout, canvas adapter, library, inspector, depth navigation, run controls, scrubber and keyboard access.
 
-- [ ] [0501 Design tokens, themes and fonts](M05-shell/0501-tokens-themes.md) (after 0007)
+- [x] [0501 Design tokens, themes and fonts](M05-shell/0501-tokens-themes.md) (after 0007)
 - [ ] [0502 StrataElement base class and shell config](M05-shell/0502-strata-element.md) (after 0501, 0115)
 - [ ] [0503 UI kit: controls](M05-shell/0503-kit-controls.md) (after 0502)
 - [ ] [0504 UI kit: containers and feedback](M05-shell/0504-kit-containers.md) (after 0502)

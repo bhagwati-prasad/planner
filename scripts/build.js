@@ -5,6 +5,7 @@
 //   dist/strata.cjs       CommonJS build of the facade for Node: require('./dist/strata.cjs')
 //   dist/strata.html      the offline app: open it from disk, no server needed
 //   dist/components/      the starter library, packed, one script tag each in strata.html
+//   dist/fonts/           the bundled IBM Plex faces, which strata.css declares
 //   dist/sim-worker.js    the simulation worker's source as a string (StrataSimWorker.source),
 //                         so a file:// page can start it from a Blob URL
 //   dist/vendor/          D3 as shipped, Three.js bundled to a classic script (THREE), and their
@@ -24,6 +25,7 @@ import {
 import { componentFolders, packFolder } from '../packages/server/src/index.js'
 import { BEGIN_MARKER, END_MARKER } from '../packages/cli/src/index.js'
 import { ENGINE_VERSION, PROTOCOL_VERSION } from '../packages/sim/src/index.js'
+import { FONTS } from '../packages/ui/src/index.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const STARTER = [join(ROOT, 'components'), join(ROOT, 'connection-types')]
@@ -120,6 +122,13 @@ export async function simWorkerSource({ minify = true } = {}) {
   return script(await sources(), SIM_WORKER_ENTRY, { format: 'iife', minify, banner }).code
 }
 
+/**
+ * The @font-face rule of a bundled face, from the fonts folder next to strata.css.
+ * @param {{ family: string, weight: number, file: string }} face
+ */
+const fontFace = ({ family, weight, file }) =>
+  `@font-face { font-family: '${family}'; font-weight: ${weight}; font-style: normal; font-display: swap; src: url('fonts/${file}') format('woff2'); }\n`
+
 const html = scripts => `<!doctype html>
 <html lang="en">
 <head>
@@ -196,7 +205,15 @@ export async function build({
   await writeFile(join(outDir, 'vendor/three.js'), three.code)
   await cp(join(ROOT, 'vendor/three/LICENSE'), join(outDir, 'vendor/LICENSE-three'))
   // The page's own styles, as a file: served with the CSP of eng §16, inline styles are refused.
-  await cp(join(ROOT, 'app/app.css'), join(outDir, 'strata.css'))
+  // They start with the bundled IBM Plex faces (design system §2, task 0501), copied next to them.
+  await mkdir(join(outDir, 'fonts'), { recursive: true })
+  for (const { file } of FONTS)
+    await cp(join(ROOT, 'vendor/plex', file), join(outDir, 'fonts', file))
+  await cp(join(ROOT, 'vendor/plex/LICENSE.txt'), join(outDir, 'fonts/LICENSE-plex.txt'))
+  await writeFile(
+    join(outDir, 'strata.css'),
+    FONTS.map(fontFace).join('') + (await readFile(join(ROOT, 'app/app.css'), 'utf8'))
+  )
   await writeFile(join(outDir, 'strata.html'), html(scripts))
 
   const kb = n => `${(n / 1024).toFixed(0)} KB`
