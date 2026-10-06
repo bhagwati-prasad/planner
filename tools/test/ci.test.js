@@ -235,8 +235,8 @@ describe('size check', () => {
 
   it('measures the simulation worker as its bundle, including the modules it imports', () => {
     const fixture = tree({
-      'packages/sim/src/worker/main.js':
-        "import { data } from '../kernel.js'\nglobalThis.x = data\n",
+      'packages/debug/src/worker.js':
+        "import { data } from '../../sim/src/kernel.js'\nglobalThis.x = data\n",
       'packages/sim/src/kernel.js': moduleOf(30_000),
       'packages/sim/src/unused.js': moduleOf(50_000),
     })

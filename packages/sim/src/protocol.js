@@ -9,7 +9,7 @@
  *   ← { v: 1, type: 'run.result', id, payload: RunResult }
  *   ← { v: 1, type: 'error', id, payload: { code, message } }
  */
-import { SIM_PROTOCOL_VERSION, fail } from '../../core/src/index.js'
+import { SIM_PROTOCOL_VERSION } from '../../core/src/index.js'
 import { createRunSessions } from './sessions.js'
 import { simulate } from './skeleton.js'
 
@@ -77,15 +77,11 @@ export function handleMessage(message) {
   }
 }
 
-/** A scheduler for an in-process host given none: playing a run needs one. */
-const NO_SCHEDULER = {
-  setTimeout: () =>
-    fail(
-      'INVALID',
-      'Playing a run in process needs a scheduler: createInProcessSimHost({ scheduler })'
-    ),
-  clearTimeout: () => {},
-}
+/**
+ * The scheduler of an in-process host given none: a playing run never gets a frame, and every
+ * other control works.
+ */
+const NO_SCHEDULER = { setTimeout: () => null, clearTimeout: () => {} }
 
 /**
  * A simulation host that runs the kernel in the calling thread, for Node scripts and tests
@@ -95,11 +91,19 @@ const NO_SCHEDULER = {
  * `load` loads nothing, and runs take their behaviours from `behaviours`, by `id@version` or id.
  * @param {object} [options]
  * @param {Record<string, object>} [options.behaviours]  behaviour modules by component type
- * @param {import('./control.js').Scheduler} [options.scheduler]  plays runs
+ * @param {import('./control.js').Scheduler} [options.scheduler]  plays runs; without one, a
+ *   playing run does not advance
  * @param {() => number} [options.wallMs]  wall time, for views while playing
+ * @param {import('./sessions.js').Extensions} [options.extensions]  more run controls and reads,
+ *   such as strata-debug's `debugExtensions`
  * @example createStrata({ simHost: createInProcessSimHost({ behaviours: { 'acme.queue': queue }, scheduler }) })
  */
-export function createInProcessSimHost({ behaviours = {}, scheduler, wallMs = () => 0 } = {}) {
+export function createInProcessSimHost({
+  behaviours = {},
+  scheduler,
+  wallMs = () => 0,
+  extensions,
+} = {}) {
   /** @type {Set<(message: ProtocolMessage) => void>} */
   const listeners = new Set()
   const runs = createRunSessions({
@@ -110,6 +114,7 @@ export function createInProcessSimHost({ behaviours = {}, scheduler, wallMs = ()
       for (const listener of listeners) listener(structuredClone(message))
     },
     chunkBytes: Infinity,
+    extensions,
   })
   return {
     /** @param {ProtocolMessage} message @returns {Promise<ProtocolMessage>} */

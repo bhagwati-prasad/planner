@@ -106,8 +106,9 @@ export async function bundledModules(entry) {
   return bundleModules(await sources(), [entry]).order
 }
 
-/** The simulation worker's entry (eng §13), bundled with everything it imports. */
-export const SIM_WORKER_ENTRY = 'packages/sim/src/worker/main.js'
+/** The simulation worker's entry (eng §13), bundled with everything it imports: strata-debug's,
+ * the top package in the worker (ADR 0024). */
+export const SIM_WORKER_ENTRY = 'packages/debug/src/worker.js'
 
 /**
  * The simulation worker as one classic script. The app starts it from a Blob URL, and Node runs

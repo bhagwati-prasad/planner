@@ -19,6 +19,7 @@ import {
 } from '../../core/src/index.js'
 import { behaviourScript } from '../../plugins/src/index.js'
 import { CORE, defined } from './internal.js'
+import { LATEST } from './debug.js'
 import { RunHandle, VIEW, momentOf, pathIn } from './run.js'
 
 /**
@@ -45,46 +46,28 @@ import { RunHandle, VIEW, momentOf, pathIn } from './run.js'
  */
 
 /**
- * Every place a node runs, by its id: its paths of node ids from the root.
- * @param {any} core
+ * Every place a component runs: its paths of node ids from the root, through every system.
+ * @param {any} core @param {string[]} [path]
+ * @returns {string[]}
  */
-function placesOf(core) {
-  /** @type {Map<string, string[]>} */
-  const places = new Map()
-  /** @param {string[]} path */
-  const walk = path => {
-    for (const node of core.nodesOf(core.resolveSystem(path).systemId)) {
-      const at = [...path, node.id]
-      places.set(node.id, [...(places.get(node.id) ?? []), at.join('/')])
-      if (node.innerSystemRef) walk(at)
-    }
-  }
-  walk([])
-  return [...places.values()].flat()
+function placesOf(core, path = []) {
+  return core.nodesOf(core.resolveSystem(path).systemId).flatMap((/** @type {any} */ node) => {
+    const at = [...path, node.id]
+    return [at.join('/'), ...(node.innerSystemRef ? placesOf(core, at) : [])]
+  })
 }
 
 /**
  * Where two values differ, as paths.
- * @param {unknown} a @param {unknown} b @param {(string|number)[]} path
+ * @param {any} a @param {any} b @param {(string|number)[]} path
  * @returns {{ path: (string|number)[], a: unknown, b: unknown }[]}
  */
 function differences(a, b, path = []) {
-  const object = (/** @type {unknown} */ v) => v !== null && typeof v === 'object'
-  if (object(a) && object(b) && Array.isArray(a) === Array.isArray(b)) {
-    const keys = [
-      ...new Set([
-        ...Object.keys(/** @type {object} */ (a)),
-        ...Object.keys(/** @type {object} */ (b)),
-      ]),
-    ]
-    if (!Array.isArray(a)) keys.sort()
-    return keys.flatMap(k =>
-      differences(/** @type {any} */ (a)[k], /** @type {any} */ (b)[k], [
-        ...path,
-        Array.isArray(a) ? Number(k) : k,
-      ])
-    )
-  }
+  const list = Array.isArray(a)
+  if (a && b && typeof a === 'object' && typeof b === 'object' && list === Array.isArray(b))
+    return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+      .sort(list ? (x, y) => +x - +y : undefined)
+      .flatMap(k => differences(a[k], b[k], [...path, list ? +k : k]))
   return Object.is(a, b) ? [] : [{ path, a, b }]
 }
 
@@ -107,6 +90,8 @@ export class SimApi {
   #loaded = null
   /** @type {import('./run.js').RunLink} */
   #link
+  /** @type {RunHandle|null} */
+  #latest = null
 
   /**
    * @param {{ project: any, components: any, transaction: (fn: () => void, options?: object) => unknown }} strata
@@ -124,7 +109,7 @@ export class SimApi {
         if (before) this.#runs.delete(before)
         handle[VIEW](view)
         this.#runs.set(view.run, handle)
-        return handle
+        return (this.#latest = handle)
       },
       forget: handle => void this.#runs.delete(handle.id),
       keep: commands =>
@@ -135,13 +120,18 @@ export class SimApi {
     }
   }
 
+  /** The latest run started, branched or restarted, which strata.debug debugs by default. */
+  get [LATEST]() {
+    return this.#latest
+  }
+
   /** The host, or why there is none. */
   #needHost() {
     return (
       this.#host ??
       fail(
         'E_SIM_NO_HOST',
-        'No simulation host: the browser app starts one; in Node, pass simHost to createStrata (strata-sim has createInProcessSimHost for scripts and tests)'
+        'No simulation host: the browser app starts one; in Node, pass simHost to createStrata'
       )
     )
   }
@@ -183,10 +173,10 @@ export class SimApi {
   }
 
   /**
-   * Starts a run of the open project, ready to play (spec §11, §12): its scope, the
-   * `{ selection }` of components or a `{ system }` and everything inside it, the whole project
-   * by default; the requests it is given; its seed; `modes` and `stubs` by path; and how long it
-   * lasts, 60 s by default. Scenarios arrive in R1.
+   * Starts a run of the open project, ready to play. Its scope is a `{ selection }` of
+   * components, or a `{ system }` and everything inside it, or by default the whole project;
+   * it takes the requests it is given, its seed, `modes` and `stubs` by path, and how long it
+   * lasts, 60 s by default (spec §11, §12). Scenarios arrive in R1.
    * @param {{ requests?: RunRequest[], scope?: { selection?: any[], system?: any }, seed?: number, modes?: Record<string, 'expanded'|'blackbox'>, stubs?: Record<string, object>, durationMs?: number, speed?: number, inspect?: boolean, record?: boolean, scenario?: string }} [options]
    * @returns {Promise<RunHandle>}
    * @example const run = await strata.sim.start({ requests: [{ to: svc, body: { id: 1 } }], seed: 42 })
@@ -194,10 +184,7 @@ export class SimApi {
   async start(options = {}) {
     const { scenario, requests = [], scope, modes = {}, stubs = {}, seed = 1, ...rest } = options
     if (scenario !== undefined)
-      fail(
-        'UNSUPPORTED',
-        'Scenarios arrive in R1 (task 0801); until then, give a run its requests: strata.sim.start({ requests: [{ to: svc, body }] })'
-      )
+      fail('UNSUPPORTED', 'Scenarios arrive in R1; until then, give a run its requests')
     const project = this.#strata.project ?? fail('NOT_FOUND', 'No project is open')
     const core = project[CORE]
     const places = placesOf(core)
@@ -240,9 +227,9 @@ export class SimApi {
   }
 
   /**
-   * Two runs side by side (spec §12 "Run tree"): metrics by component and name, and state field
-   * by field. Each run at its own moment, or, given one (`{ event }` or `{ timeMs }`), both moved
-   * there first, which needs a round trip.
+   * Two runs side by side: metrics by component and name, and state field by field. Each run
+   * is at its own moment, or, given one (`{ event }` or `{ timeMs }`), both move there first,
+   * which needs a round trip (spec §12 "Run tree").
    * @param {RunHandle} a @param {RunHandle} b
    * @param {{ event?: number, timeMs?: number }} [moment]
    * @example strata.sim.compare(run, branch)
@@ -258,23 +245,15 @@ export class SimApi {
         return diff
       })
     const [x, y] = [a[VIEW](), b[VIEW]()]
-    const none = { count: 0, sum: 0, last: null }
+    /** @param {any} m */
+    const totals = m => ({ count: m?.count ?? 0, sum: m?.sum ?? 0, last: m?.last ?? null })
     /** @param {any[]} list */
     const byKey = list => new Map(list.map(m => [`${m.node}\u0000${m.name}`, m]))
     const [mx, my] = [byKey(x.metrics), byKey(y.metrics)]
     const metrics = [...new Set([...mx.keys(), ...my.keys()])].sort().flatMap(key => {
+      const [p, q] = [totals(mx.get(key)), totals(my.get(key))]
       const { node, name } = mx.get(key) ?? my.get(key)
-      const [p, q] = [mx.get(key) ?? none, my.get(key) ?? none]
-      return p.count === q.count && p.sum === q.sum && p.last === q.last
-        ? []
-        : [
-            {
-              node,
-              name,
-              a: { count: p.count, sum: p.sum, last: p.last },
-              b: { count: q.count, sum: q.sum, last: q.last },
-            },
-          ]
+      return differences(p, q).length ? [{ node, name, a: p, b: q }] : []
     })
     const nodes = [...new Set([...Object.keys(x.components), ...Object.keys(y.components)])].sort()
     const state = nodes.flatMap(node =>
@@ -284,8 +263,8 @@ export class SimApi {
   }
 
   /**
-   * Runs one request over an edge of a system and resolves with the finished run: its trace, its
-   * response and its run hash (the walking skeleton).
+   * Runs the walking skeleton's one request over an edge of a system. It resolves with the
+   * finished run: its trace, its response and its run hash.
    * @param {object} [options]
    * @param {any} [options.system]  the system to run (default: the one the navigator shows)
    * @param {string} [options.edge] the edge the request travels (default: the system's first edge)

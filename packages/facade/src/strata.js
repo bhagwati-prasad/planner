@@ -20,6 +20,7 @@ import { formatTarget } from './format.js'
 import { helpText, PLANNED } from './help.js'
 import { copyNodes } from './clipboard.js'
 import { ComponentsApi } from './components.js'
+import { DebugApi } from './debug.js'
 import { SimApi } from './sim.js'
 
 /**
@@ -108,8 +109,11 @@ export class Strata {
     /** Component types (built-in types, manifests and packed plugins share one registry). */
     this.components = new ComponentsApi(this.#registry, emit, storage)
 
-    /** Simulation (spec §11): one request over one edge so far. */
+    /** Simulation (spec §11, §12): runs and their controls. */
     this.sim = new SimApi(this, simHost)
+
+    /** The debugger (spec §13) on the run being debugged. */
+    this.debug = new DebugApi(this)
 
     for (const [name, info] of Object.entries(PLANNED))
       this[name] = planned(name, info.release, info.what)

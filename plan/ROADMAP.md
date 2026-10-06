@@ -120,7 +120,7 @@ The core feature, built headless first: kernel, sandbox, method dispatch, typed 
 - [x] [0415 Editing a paused run and branch runs](M04-simulation-core/0415-edits-branches.md) (after 0414)
 - [x] [0416 Breakpoints and inspection](M04-simulation-core/0416-breakpoints-inspection.md) (after 0414)
 - [x] [0417 Run sessions on the facade](M04-simulation-core/0417-facade-sim.md) (after 0415, 0416, 0412, 0115)
-- [ ] [0429 strata.debug and the cross-engine determinism suite](M04-simulation-core/0429-facade-debug-determinism.md) (after 0417)
+- [x] [0429 strata.debug and the cross-engine determinism suite](M04-simulation-core/0429-facade-debug-determinism.md) (after 0417)
 
 ### M05 Shell
 

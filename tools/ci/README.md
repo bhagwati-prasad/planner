@@ -22,7 +22,7 @@
 | Core, facade and non-UI packages | `src/` of every package except graph, 3d and ui (the views), cli and server (Node only) and sim (the worker bundle's, [ADR 0018](../../docs/adr/0018-simulation-code-ships-only-in-the-worker.md)), without the console help metadata |
 | strata-graph | `packages/graph/src` |
 | strata-ui | `packages/ui/src` |
-| Simulation worker bundle | The bundle the build makes from `packages/sim/src/worker/main.js`, with everything it imports (reported as not built until the entry exists) |
+| Simulation worker bundle | The bundle the build makes from `packages/debug/src/worker.js`, the worker's entry, with everything it imports (reported as not built until the entry exists) |
 | Bundled fonts | every `.woff2` in `packages/ui` and `vendor/` |
 | Console help metadata | `packages/facade/src/help-data.js`, generated from the facade's JSDoc (`tools/help`); text, not code, so it has its own line ([ADR 0013](../../docs/adr/0013-console-help-metadata-has-its-own-budget.md)) |
 

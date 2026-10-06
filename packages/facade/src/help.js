@@ -11,11 +11,6 @@ export const PLANNED = Object.freeze({
     what: 'functional, SLO, resilience and architecture-rule tests',
     example: "await strata.test.run({ tags: ['slo'] })",
   },
-  debug: {
-    release: 'R1',
-    what: 'breakpoints, stepping, hop inspection and trace waterfall',
-    example: "strata.debug.setBreakpoint({ node: 'Orders', on: 'arrival' })",
-  },
   comments: {
     release: 'R0 milestone M6',
     what: 'annotations and threaded comments on anything',
@@ -93,6 +88,14 @@ const TOPICS = {
     from: [
       ['strata.sim', 'SimApi'],
       ['run', 'RunHandle'],
+    ],
+  },
+  debug: {
+    summary:
+      'The debugger (spec §13) on the latest run, or the one attached: breakpoints, hops, the method stack, state and effective properties.',
+    from: [
+      ['strata.debug', 'DebugApi'],
+      ['run', 'RunHandle', ['setBreakpoint', 'clearBreakpoints']],
     ],
   },
   output: {
