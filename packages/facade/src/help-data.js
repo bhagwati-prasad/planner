@@ -90,6 +90,36 @@ export const HELP = {
       "console.table(strata.components.list({ kind: 'component' }))",
     ],
   ],
+  DebugApi: [
+    ['run', null, 'The run being debugged: the one attached, or the latest started'],
+    ['attach', 'run', 'Debugs this run from now on', 'strata.debug.attach(branch)'],
+    [
+      'setBreakpoint',
+      'spec',
+      'Pauses before the event in which something happens',
+      "await strata.debug.setBreakpoint({ on: 'call', node: db, method: 'lock' })",
+    ],
+    ['clearBreakpoints', '', 'Removes every breakpoint', 'await strata.debug.clearBreakpoints()'],
+    [
+      'hops',
+      'trace',
+      'The hops of a request, the followed one by default, with their differences',
+      '(await strata.debug.hops()).map(h => h.diff)',
+    ],
+    [
+      'methodStack',
+      '',
+      "The followed request's calls still running, outermost first",
+      'await strata.debug.methodStack()',
+    ],
+    ['state', 'node', "A component's state at the run's moment", 'strata.debug.state(db)'],
+    [
+      'effectiveProps',
+      'node',
+      'Each property value the run uses for a component, with its source',
+      'await strata.debug.effectiveProps(payments)',
+    ],
+  ],
   Handle: [
     ['project', null, 'The project this handle belongs to'],
     [
@@ -671,7 +701,7 @@ export const HELP = {
     [
       'edit',
       'node, { props, state }',
-      'Changes the paused run only (spec §12 "Editing a paused run"): `{ props }` in canonical units, or `{ state: { path, value } }`',
+      'Changes the paused run only',
       'run.edit(db, { props: { maxConnections: 200 } })',
     ],
     [
@@ -695,10 +725,17 @@ export const HELP = {
     [
       'keepInModel',
       '',
-      'Makes the run-only property edits model changes, as one undoable change; state, code and structure edits have no place in the model and come back as not kept',
+      'Makes the run-only property edits model changes, as one undoable change',
       'const { notKept } = await run.keepInModel()',
     ],
     ['discard', '', 'Drops the run-only edits', 'await run.discard()'],
+    [
+      'setBreakpoint',
+      '{ node }',
+      'Pauses before a message arrives at a component',
+      "await run.setBreakpoint({ node: db, method: 'insert' })",
+    ],
+    ['clearBreakpoints', '', 'Removes every breakpoint', 'await run.clearBreakpoints()'],
     ['refresh', '', 'Fetches the latest view, after the frame being played', 'await run.refresh()'],
     [
       'spans',
@@ -715,19 +752,19 @@ export const HELP = {
     [
       'start',
       '{ requests, scope, seed, modes, stubs, durationMs, speed, inspect, record, scenario }',
-      'Starts a run of the open project, ready to play (spec §11, §12): its scope, the `{ selection }` of components or a `{ system }` and everything inside it, the whole project by default; the requests it is given; its seed; `modes` and `stubs` by path; and how long it lasts, 60 s by default',
+      'Starts a run of the open project, ready to play',
       'const run = await strata.sim.start({ requests: [{ to: svc, body: { id: 1 } }], seed: 42 })',
     ],
     [
       'compare',
       'a, b, { event, timeMs }',
-      'Two runs side by side (spec §12 "Run tree"): metrics by component and name, and state field by field',
+      'Two runs side by side: metrics by component and name, and state field by field',
       'strata.sim.compare(run, branch)',
     ],
     [
       'once',
       '{ system, edge, seed }',
-      'Runs one request over an edge of a system and resolves with the finished run: its trace, its response and its run hash (the walking skeleton)',
+      "Runs the walking skeleton's one request over an edge of a system",
       'const run = await strata.sim.once({ seed: 42 }); run.response.atUs',
     ],
   ],

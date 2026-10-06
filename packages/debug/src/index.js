@@ -5,3 +5,4 @@
  * This is the package's only public entry point (eng §4).
  */
 export { createDebugger } from './debugger.js'
+export { debugExtensions } from './session.js'

@@ -44,8 +44,10 @@ import { createRunSessions } from '../sessions.js'
  * @param {import('../control.js').Scheduler} [options.scheduler]  plays runs; without one, runs
  *   fail to start
  * @param {() => number} [options.wallMs]  wall time, for heartbeats and views while playing
+ * @param {import('../sessions.js').Extensions} [options.extensions]  more run controls and
+ *   reads, such as strata-debug's
  */
-export function createWorkerSession({ post, sandbox, scheduler, wallMs = () => 0 }) {
+export function createWorkerSession({ post, sandbox, scheduler, wallMs = () => 0, extensions }) {
   /** @type {Map<string, { entry: string, runtime: ModuleRuntime }>} */
   const components = new Map()
   let sealed = false
@@ -110,6 +112,7 @@ export function createWorkerSession({ post, sandbox, scheduler, wallMs = () => 0
       scheduler: scheduler ?? fail('INVALID', 'This worker was started without a scheduler'),
       wallMs,
       post: message => post(message, transferables(message.payload)),
+      extensions,
     }))
 
   return {

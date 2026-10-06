@@ -10,6 +10,8 @@ import { INSPECT } from './internal.js'
 
 /** Reads or replaces a handle's view; the facade's own. */
 export const VIEW = Symbol('strata.run.view')
+/** Reads something of the run from the worker; the facade's own. */
+export const READ = Symbol('strata.run.read')
 
 /** The step units of spec §12 by their console names, as strata-sim names them. */
 const UNITS = /** @type {Record<string, string>} */ ({
@@ -251,8 +253,9 @@ export class RunHandle {
   }
 
   /**
-   * Changes the paused run only (spec §12 "Editing a paused run"): `{ props }` in canonical units,
-   * or `{ state: { path, value } }`. It reaches the run ahead of the next control.
+   * Changes the paused run only. The change is `{ props }` in canonical units, or
+   * `{ state: { path, value } }`, and reaches the run ahead of the next control (spec §12
+   * "Editing a paused run").
    * @param {any} node  a node handle, its id, or its path
    * @param {{ props?: Record<string, unknown>, state?: { path: (string|number)[], value: unknown } }} change
    * @example run.edit(db, { props: { maxConnections: 200 } })
@@ -268,10 +271,7 @@ export class RunHandle {
       ? { kind: 'props', node: at, props: change.props }
       : change?.state
         ? { kind: 'state', node: at, path: change.state.path, value: change.state.value }
-        : fail(
-            'INVALID',
-            'A run-only edit changes { props } or { state: { path, value } }; code and structure edits come with the inspector'
-          )
+        : fail('INVALID', 'A run-only edit is { props } or { state: { path, value } }')
     const sent = this.#link
       .ask('run.control', { run: this.id, action: 'edit', args: { edit } })
       .then(view => void (this.#view = view))
@@ -305,7 +305,7 @@ export class RunHandle {
   }
 
   /**
-   * Makes the run-only property edits model changes, as one undoable change; state, code and
+   * Makes the run-only property edits model changes, as one undoable change. State, code and
    * structure edits have no place in the model and come back as not kept.
    * @example const { notKept } = await run.keepInModel()
    */
@@ -325,11 +325,35 @@ export class RunHandle {
   }
 
   /**
+   * Pauses before a message arrives at a component. It takes `{ node, method }`, or a debugger
+   * breakpoint (strata.debug.setBreakpoint), and the next move goes past it.
+   * @param {{ node?: any, [key: string]: unknown }} spec
+   * @example await run.setBreakpoint({ node: db, method: 'insert' })
+   */
+  setBreakpoint(spec) {
+    const node = spec.node && pathIn(spec.node, Object.keys(this.#view.components))
+    return this.#move('setBreakpoint', node ? { ...spec, node } : spec)
+  }
+
+  /**
+   * Removes every breakpoint.
+   * @example await run.clearBreakpoints()
+   */
+  clearBreakpoints() {
+    return this.#move('clearBreakpoints')
+  }
+
+  /** @param {string} what @param {object} [args] */
+  [READ](what, args) {
+    return this.#link.ask('run.read', { run: this.id, what, args })
+  }
+
+  /**
    * Fetches the latest view, after the frame being played.
    * @example await run.refresh()
    */
   async refresh() {
-    this.#view = await this.#link.ask('run.read', { run: this.id, what: 'view' })
+    this.#view = await this[READ]('view')
     return this
   }
 
@@ -338,7 +362,7 @@ export class RunHandle {
    * @example (await run.spans()).filter(s => s.status === 'error')
    */
   spans() {
-    return this.#link.ask('run.read', { run: this.id, what: 'spans' })
+    return this[READ]('spans')
   }
 
   /**
@@ -346,7 +370,7 @@ export class RunHandle {
    * @example await run.logs()
    */
   logs() {
-    return this.#link.ask('run.read', { run: this.id, what: 'logs' })
+    return this[READ]('logs')
   }
 
   /**
@@ -354,7 +378,7 @@ export class RunHandle {
    * @example await run.hash()
    */
   hash() {
-    return this.#link.ask('run.read', { run: this.id, what: 'hash' })
+    return this[READ]('hash')
   }
 
   /**

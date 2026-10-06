@@ -5,14 +5,12 @@
 // sessions (task 0417, ADR 0025), each run by an injected simulation host.
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { createFakeClock, createFakeScheduler, createRandom } from '../../../tools/testing/index.js'
 import { createMemoryStorage, createSimHost, createStrata } from '../src/index.js'
 import * as sim from '../../sim/src/index.js'
 import { createTestStrata } from './fixtures.js'
-import { packComponent } from '../../plugins/src/index.js'
+import { ENDPOINTS, checkout, orders } from './runs.js'
 import { spawnThreadWorker } from '../../server/src/index.js'
 import { simWorkerSource } from '../../../scripts/build.js'
 import service from '../../../components/service/index.js'
@@ -150,71 +148,6 @@ describe('strata.sim.once', () => {
     )
   })
 })
-
-const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
-
-/** Starter plugins packed as `strata pack` packs them. @param {string[]} folders */
-function packed(folders) {
-  return folders.map(folder => {
-    const dir = join(ROOT, folder)
-    /** @type {Record<string, Uint8Array>} */
-    const files = {}
-    /** @param {string} d */
-    const walk = d => {
-      for (const entry of readdirSync(d)) {
-        const path = join(d, entry)
-        if (statSync(path).isDirectory()) walk(path)
-        else files[relative(dir, path).split('\\').join('/')] = readFileSync(path)
-      }
-    }
-    walk(dir)
-    const { bundle, problems } = packComponent(files, { name: folder.split('/').at(-1) })
-    assert.deepEqual(problems, [], `${folder} packs cleanly`)
-    return /** @type {any} */ (bundle)
-  })
-}
-
-const STARTER = packed([
-  'components/api-gateway',
-  'components/service',
-  'components/relational-db',
-  'connection-types/http',
-  'connection-types/db-protocol',
-])
-
-/**
- * A strata with the starter gateway, service and relational DB installed, and a project called
- * checkout, which runs simulations through `simHost`.
- * @param {any} simHost
- */
-async function checkout(simHost) {
-  const clock = createFakeClock({ start: Date.UTC(2026, 9, 2, 9) })
-  const random = createRandom(4)
-  const strata = createStrata({
-    storage: createMemoryStorage(),
-    clock: clock.now,
-    random: n => Uint8Array.from({ length: n }, () => random.uint32() & 0xff),
-    identity: { id: 'user-1', name: 'Ada' },
-    output: () => {},
-    simHost,
-  })
-  for (const bundle of STARTER) strata.components.install(bundle)
-  await strata.projects.create('checkout')
-  return strata
-}
-
-/** The orders service's one endpoint, which inserts each order into the database. */
-const ENDPOINTS = [{ name: 'POST /orders', calls: ['out.insert'] }]
-
-/** `n` orders for the service, 5 ms apart. @param {any} to @param {number} n */
-const orders = (to, n) =>
-  Array.from({ length: n }, (_, i) => ({
-    to,
-    path: '/orders',
-    headers: { method: 'POST' },
-    body: { table: 'orders', row: { total: 10 + i } },
-    atMs: i * 5,
-  }))
 
 /** Whether an error says a namespace or option arrives in a later release. @param {string} release */
 const later = release => (/** @type {any} */ err) =>

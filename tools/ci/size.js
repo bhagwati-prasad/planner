@@ -123,7 +123,7 @@ export const MEASURES = {
     ),
   'strata-graph (minified)': root => minified([src(root, 'graph')]),
   'strata-ui (minified)': root => minified([src(root, 'ui')]),
-  'Simulation worker bundle (minified)': root => bundled(root, 'packages/sim/src/worker/main.js'),
+  'Simulation worker bundle (minified)': root => bundled(root, 'packages/debug/src/worker.js'),
   'Bundled fonts (woff2, Latin subset)': root =>
     raw([join(root, 'packages', 'ui'), join(root, 'vendor')], '.woff2'),
   'Console help metadata (minified)': root =>

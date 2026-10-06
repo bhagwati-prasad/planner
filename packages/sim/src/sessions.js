@@ -53,6 +53,14 @@ import { withBehaviours } from './behaviours.js'
  * @property {() => number} wallMs  wall time in ms, for heartbeats and views while playing
  * @property {(message: ProtocolMessage) => void} post  posts what no request asked for
  * @property {number} [chunkBytes]  the most a read's chunk may hold (eng §13: 64 KB)
+ * @property {Extensions} [extensions]  more controls and reads, such as strata-debug's
+ *
+ * Controls and reads a package above strata-sim adds to the run sessions (task 0429): each
+ * control takes the run's control and its arguments, and each read takes the run as it is at
+ * its own moment, `{ run, following }`, and its arguments.
+ * @typedef {object} Extensions
+ * @property {Record<string, (control: RunControl, args: any) => unknown>} [actions]
+ * @property {Record<string, (at: any, args: any) => unknown>} [reads]
  */
 
 /** A long action posts a heartbeat this often, in ms of wall time (spec §8 "Watchdog"). */
@@ -149,7 +157,16 @@ function chunked(data, bytes) {
  * The runs of a worker, or of the in-process host.
  * @param {SessionOptions} options
  */
-export function createRunSessions({ behaviourOf, scheduler, wallMs, post, chunkBytes = 64_000 }) {
+export function createRunSessions({
+  behaviourOf,
+  scheduler,
+  wallMs,
+  post,
+  chunkBytes = 64_000,
+  extensions = {},
+}) {
+  /** @type {Record<string, (control: RunControl, args: any, session: Session) => unknown>} */
+  const actions = { ...ACTIONS, ...extensions.actions }
   /** @type {Map<string, { session: Session, tree: string }>} */
   const runs = new Map()
   let count = 0
@@ -246,7 +263,7 @@ export function createRunSessions({ behaviourOf, scheduler, wallMs, post, chunkB
   /** @param {ProtocolMessage['id']} id @param {{ run: string, action: string, args?: any }} payload */
   async function control(id, { run, action, args }) {
     const { session: s, tree } = find(run)
-    const act = ACTIONS[action] ?? fail('INVALID', `Runs have no control '${action}'`)
+    const act = actions[action] ?? fail('INVALID', `Runs have no control '${action}'`)
     if (s.control.current.id !== tree)
       throw new StrataError(
         'E_RUN_STATE',
@@ -300,8 +317,13 @@ export function createRunSessions({ behaviourOf, scheduler, wallMs, post, chunkB
         return compareRuns(it, b, args.moment)
       },
     }
+    const more = extensions.reads?.[what]
+    // An extension reads the run as it is at its own moment, followed trace included.
+    const at = { run: it, following: s.control.current.id === tree ? s.control.following : null }
     const data = await (
-      reads[what] ?? (() => fail('INVALID', `Runs have nothing to read as '${what}'`))
+      reads[what] ??
+      (more && (() => more(at, args))) ??
+      (() => fail('INVALID', `Runs have nothing to read as '${what}'`))
     )()
     const parts = chunked(data, chunkBytes)
     return parts.map((part, chunk) =>

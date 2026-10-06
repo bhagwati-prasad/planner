@@ -25,3 +25,4 @@ export {
   inProcessSimHost,
 } from './protocol.js'
 export { createWorkerSession } from './worker/session.js'
+export { startWorker } from './worker/start.js'

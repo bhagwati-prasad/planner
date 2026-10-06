@@ -88,11 +88,12 @@ export const STARTER = [
   },
 ]
 
-/** A facade with deterministic ids and time, the starter stand-ins registered, and captured output. */
+/** A facade with deterministic ids and time, the starter stand-ins registered, captured output, and the simulation host given. */
 export function createTestStrata({
   storage = createMemoryStorage(),
   seed = 1,
   start = Date.UTC(2026, 8, 25, 9),
+  simHost = /** @type {any} */ (undefined),
 } = {}) {
   const prng = createPrng(seed)
   let now = start
@@ -103,6 +104,7 @@ export function createTestStrata({
     random: n => prng.bytes(n),
     identity: { id: 'user-1', name: 'Ada' },
     output: text => printed.push(text),
+    simHost,
   })
   for (const m of STARTER) strata.components.register(m)
   return {
